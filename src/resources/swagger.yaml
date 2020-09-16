@@ -38,6 +38,45 @@ paths:
             application/json:
               schema:
                 type: object
+  /files:
+    post:
+      tags:
+        - Files
+      summary: create a File
+      description: creates a file, if the file already exists (same obj Id) it will just fetch it.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $$ref: '#/components/schemas/File'
+      responses:
+        '200':
+          description: 'the file that was created or found already.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+  /files/{id}:
+    get:
+      parameters:
+        - name: id
+          description: id of the file to get
+          in: path
+          required: true
+          schema:
+            type: string
+      tags:
+        - Files
+      summary: get file by Id
+      responses:
+        '404':
+          description: 'app is not fully healthy'
+        '200':
+          description: File object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
 
 components:
   securitySchemes:
@@ -45,3 +84,19 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    File:
+      type: object
+      properties:
+        fileId:
+          type: number
+        objectId:
+          type: string
+        repoId:
+          type: string
+        programId:
+          type: string
+        analysisId:
+          type: string
+        labels:
+          type: object

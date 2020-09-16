@@ -17,12 +17,16 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import express from 'express';
+import express, { NextFunction, Request, Response, RequestHandler } from 'express';
+
 import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
 import yaml from 'yamljs';
+import { Errors, File, getFileRecordById } from './service';
 import { AppConfig } from './config';
+import { getOrCreateFileRecordByObjId } from './service';
+import logger from './logger';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
@@ -40,12 +44,73 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
+  app.get(
+    '/files/:id',
+    wrapAsync(async (req: Request, res: Response) => {
+      return res.status(200).send(await getFileRecordById(Number(req.params.id)));
+    }),
+  );
+  app.post(
+    '/files',
+    wrapAsync(async (req: Request, res: Response) => {
+      const file = req.body as File;
+      return res.status(200).send(await getOrCreateFileRecordByObjId(file));
+    }),
+  );
+
   app.use(
     config.openApiPath,
     swaggerUi.serve,
     swaggerUi.setup(yaml.load(path.join(__dirname, './resources/swagger.yaml'))),
   );
+
+  // this has to be defined after all routes for it to work
+  app.use(errorHandler);
+
   return app;
+};
+
+// general catch all error handler
+export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): any => {
+  logger.error('error handler received error: ', err);
+  if (res.headersSent) {
+    logger.debug('error handler skipped');
+    return next(err);
+  }
+  let status: number;
+  let customizableMsg = err.message;
+
+  switch (true) {
+    case err instanceof Errors.InvalidArgument:
+      status = 400;
+      break;
+    case err instanceof Errors.NotFound:
+      status = 404;
+      break;
+    case err instanceof Errors.StateConflict:
+      status = 409;
+      break;
+    case (err as any).name == 'CastError':
+      status = 404;
+      err.name = 'Not found';
+      customizableMsg = 'Id not found';
+      break;
+    default:
+      status = 500;
+  }
+  res.status(status).send({ error: err.name, message: customizableMsg });
+  // pass the error down (so other error handlers can also process the error)
+  next(err);
+};
+
+// wrapper to handle errors from async express route handlers
+export const wrapAsync = (fn: RequestHandler): RequestHandler => {
+  return (req, res, next) => {
+    const routePromise = fn(req, res, next);
+    if (routePromise.catch) {
+      routePromise.catch(next);
+    }
+  };
 };
 
 export enum Status {
