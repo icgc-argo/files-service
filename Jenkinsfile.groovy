@@ -80,10 +80,7 @@ spec:
               sh "npm ci"
             }
             container('node') {
-              sh "npm run unit-test"
-            }
-            container('node') {
-              sh "npm run int-test"
+              sh "npm t"
             }
           }
         }
