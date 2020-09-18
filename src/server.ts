@@ -89,6 +89,8 @@ console.log('in server.ts');
       reconnectTries: 10,
       reconnectInterval: 3000,
       useNewUrlParser: true,
+      user: appConfig.mongoProperties.mongoUser,
+      pass: appConfig.mongoProperties.mongoPassword,
     });
   } catch (err) {
     logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);
