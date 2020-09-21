@@ -29,7 +29,6 @@ if (process.env.DB_USERNAME && process.env.DB_PASSWORD) {
 const config = {
   mongodb: {
     url: process.env.DB_URL,
-    databaseName: 'appdb',
     options: {
       auth: auth,
       useNewUrlParser: true, // removes a deprecation warning when connecting
