@@ -34,9 +34,9 @@ console.log('in server.ts');
    * if the value is undefined or empty string we have to avoid setting it in the env because process.env will force string "undefined"
    */
   const mongoProps = appConfig.mongoProperties;
-  if (mongoProps.mongoUser && mongoProps.mongoPassword) {
-    process.env.DB_USERNAME = mongoProps.mongoUser;
-    process.env.DB_PASSWORD = mongoProps.mongoPassword;
+  if (mongoProps.dbUsername && mongoProps.dbPassword) {
+    process.env.DB_USERNAME = mongoProps.dbUsername;
+    process.env.DB_PASSWORD = mongoProps.dbPassword;
   }
 
   let connection: any;
@@ -81,7 +81,7 @@ console.log('in server.ts');
   });
 
   try {
-    await mongoose.connect(appConfig.mongoProperties.mongoUrl, {
+    await mongoose.connect(appConfig.mongoProperties.dbUrl, {
       autoReconnect: true,
       socketTimeoutMS: 10000,
       connectTimeoutMS: 30000,
@@ -89,8 +89,8 @@ console.log('in server.ts');
       reconnectTries: 10,
       reconnectInterval: 3000,
       useNewUrlParser: true,
-      user: appConfig.mongoProperties.mongoUser,
-      pass: appConfig.mongoProperties.mongoPassword,
+      user: appConfig.mongoProperties.dbUsername,
+      pass: appConfig.mongoProperties.dbPassword,
     });
   } catch (err) {
     logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);
