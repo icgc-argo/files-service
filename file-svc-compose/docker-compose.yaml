@@ -29,7 +29,7 @@ services:
     environment:
       MONGODB_USERNAME: admin
       MONGODB_PASSWORD: password
-      MONGODB_DATABASE: appdb
+      MONGODB_DATABASE: files
       MONGODB_ROOT_PASSWORD: password123
   zookeeper:
     image: wurstmeister/zookeeper

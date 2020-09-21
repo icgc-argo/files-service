@@ -6,7 +6,7 @@
     "start": "npm run serve",
     "serve": "node dist/src/server.js",
     "build-ts": "tsc",
-    "resources": "copyfiles -u 1 src/resources/*.* dist/src",
+    "resources": "copyfiles -u 1 src/resources/*.* dist/",
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
