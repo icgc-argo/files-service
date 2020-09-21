@@ -30,9 +30,9 @@ export interface AppConfig {
 
 export interface MongoProps {
   // Mongo
-  mongoUser: string;
-  mongoPassword: string;
-  mongoUrl: string; // allow overriding all the url
+  dbUsername: string;
+  dbPassword: string;
+  dbUrl: string; // allow overriding all the url
 }
 export interface KafkaConfigurations {
   kafkaMessagingEnabled: boolean;
@@ -68,9 +68,9 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
     serverPort: process.env.PORT || '3000',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
     mongoProperties: {
-      mongoUser: secrets.MONGO_USER || process.env.MONGO_USER,
-      mongoPassword: secrets.MONGO_PASS || process.env.MONGO_PASS,
-      mongoUrl: secrets.MONGO_URL || process.env.MONGO_URL || `mongodb://localhost:27027/appdb`,
+      dbUsername: secrets.DB_USERNAME || process.env.DB_USERNAME,
+      dbPassword: secrets.DB_PASSWORD || process.env.DB_PASSWORD,
+      dbUrl: secrets.DB_URL || process.env.DB_URL || `mongodb://localhost:27027/appdb`,
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
