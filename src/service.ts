@@ -1,19 +1,21 @@
-import mongoose from 'mongoose';
-const AutoIncrement = require('mongoose-sequence')(mongoose);
 import _ from 'lodash';
+import { File, QueryFilters } from './entity';
+import * as db from './model';
+
+export async function getFiles(filters: QueryFilters) {
+  return await db.getFiles(filters);
+}
 
 export async function getFileRecordById(id: number): Promise<File | undefined> {
-  return (await FileModel.findOne({ fileId: id })
-    .lean()
-    .exec()) as File | undefined;
+  const file = await db.getFileRecordById(id);
+  if (file == undefined) {
+    throw new Errors.NotFound('no file found for this id ');
+  }
+  return file;
 }
 
 export async function getFileRecordByObjId(objId: string): Promise<File | undefined> {
-  return (await FileModel.findOne({
-    objectId: objId,
-  })
-    .lean()
-    .exec()) as File | undefined;
+  return await db.getFileRecordByObjId(objId);
 }
 
 export async function getOrCreateFileRecordByObjId(fileToCreate: File): Promise<File> {
@@ -21,9 +23,8 @@ export async function getOrCreateFileRecordByObjId(fileToCreate: File): Promise<
   if (file != undefined) {
     return file;
   }
-  const newFile = new FileModel(fileToCreate);
-  const createdFile = await newFile.save();
-  return toPojo(createdFile);
+  // todo : validate labels1
+  return await db.create(fileToCreate);
 }
 
 export async function addOrUpdateFileLabel(
@@ -35,10 +36,7 @@ export async function addOrUpdateFileLabel(
     throw new Errors.NotFound('');
   }
   _.merge(file.labels, newLabels);
-  const toUpdate = new FileModel(file);
-  unsetIsNewFlagForUpdate(file);
-  const updatedFile = await toUpdate.save();
-  return toPojo(updatedFile);
+  return await db.update(file);
 }
 
 export async function removeLabel(fileId: number, key: string) {
@@ -47,51 +45,8 @@ export async function removeLabel(fileId: number, key: string) {
     throw new Errors.NotFound('');
   }
   _.unset(file.labels, key);
-  const toUpdate = new FileModel(file);
-  unsetIsNewFlagForUpdate(file);
-  const updatedFile = await toUpdate.save();
-  return toPojo(updatedFile);
+  return await db.update(file);
 }
-
-function unsetIsNewFlagForUpdate(file: File) {
-  (file as any).isNew = false;
-}
-
-export interface File {
-  fileId?: number;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: { [key: string]: string[] };
-}
-
-const FileSchema = new mongoose.Schema(
-  {
-    fileId: { type: Number, index: true, unique: true },
-    objectId: { type: String, required: true, unique: true },
-    repoId: { type: String, required: true },
-    analysisId: { type: String, required: true },
-    labels: {},
-  },
-  { timestamps: true, minimize: false },
-);
-
-FileSchema.plugin(AutoIncrement, {
-  inc_field: 'fileId',
-});
-
-type FileDocument = mongoose.Document & File;
-
-export let FileModel = mongoose.model<FileDocument>('File', FileSchema);
-
-export const toPojo = (doc: mongoose.Document) => {
-  const pojo = doc.toObject();
-  if (pojo._id) {
-    pojo._id = pojo._id.toString();
-  }
-  return pojo;
-};
 
 export namespace Errors {
   export class InvalidArgument extends Error {

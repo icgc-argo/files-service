@@ -4,7 +4,7 @@ debug: dcompose
 
 #run the docker compose file
 dcompose:
-	docker-compose -f file-svc-compose/docker-compose.yaml up --force-recreate -d
+	docker-compose -f file-svc-compose/docker-compose.yaml up -d
 
 # run all tests
 verify:

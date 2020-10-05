@@ -39,6 +39,43 @@ paths:
               schema:
                 type: object
   /files:
+    get:
+      parameters:
+        - name: analysisId
+          description: list of analysis ids, csv
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+        - name: objectId
+          description: list of file object Ids, csv
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+        - name: programId
+          description: list of file program Ids, csv
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+      tags:
+        - Files
+      summary: get all files, filtered by the query parameters if provided
+      responses:
+        '404':
+          description: 'app is not fully healthy'
+        '200':
+          description: File object
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/File'
     post:
       tags:
         - Files
@@ -48,7 +85,7 @@ paths:
         content:
           application/json:
             schema:
-              $$ref: '#/components/schemas/File'
+              $ref: '#/components/schemas/File'
       responses:
         '200':
           description: 'the file that was created or found already.'

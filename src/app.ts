@@ -23,10 +23,11 @@ import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
 import yaml from 'yamljs';
-import { Errors, File, getFileRecordById } from './service';
+import { Errors, getFileRecordById, getFiles } from './service';
 import { AppConfig } from './config';
 import { getOrCreateFileRecordByObjId } from './service';
 import logger from './logger';
+import { File } from './entity';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
@@ -34,7 +35,8 @@ const App = (config: AppConfig): express.Express => {
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
 
-  app.get('/', (req, res) => res.status(200).send('hello world'));
+  app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
+
   app.get('/health', (req, res) => {
     const status = dbHealth.status == Status.OK ? 200 : 500;
     const resBody = {
@@ -45,11 +47,25 @@ const App = (config: AppConfig): express.Express => {
   });
 
   app.get(
+    '/files',
+    wrapAsync(async (req: Request, res: Response) => {
+      return res.status(200).send(
+        await getFiles({
+          analysisId: (req.query as any)?.analysisId?.split(','),
+          objectId: (req.query as any)?.objectId?.split(','),
+          programId: (req.query as any)?.programId?.split(','),
+        }),
+      );
+    }),
+  );
+
+  app.get(
     '/files/:id',
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(await getFileRecordById(Number(req.params.id)));
     }),
   );
+
   app.post(
     '/files',
     wrapAsync(async (req: Request, res: Response) => {
@@ -64,6 +80,7 @@ const App = (config: AppConfig): express.Express => {
     swaggerUi.setup(yaml.load(path.join(__dirname, './resources/swagger.yaml'))),
   );
 
+  app.use('/static', express.static(path.join(__dirname, 'resources')));
   // this has to be defined after all routes for it to work
   app.use(errorHandler);
 
@@ -85,6 +102,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
       status = 400;
       break;
     case err instanceof Errors.NotFound:
+      err.name = 'Not found';
       status = 404;
       break;
     case err instanceof Errors.StateConflict:
