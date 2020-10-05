@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Matrix</title>
+    <title>Files Service</title>
     <style>
       html,
       body {
@@ -44,6 +44,18 @@
     <script>
       const columnCount = Math.floor(window.innerWidth / 30);
       const rowCount = Math.floor(window.innerHeight / 30);
+
+      function titleChanger() {
+        console.log('title changed..');
+        const c = getRandomChar();
+        let newTitle = 'Files Service';
+        const index = random(0, newTitle.length);
+        newTitle = newTitle.substring(0, index) + c + newTitle.substring(index + 1);
+        document.title = newTitle;
+      }
+
+      setInterval(() => titleChanger(), 300);
+
       setTimeout(() => {
         for (let i = 0; i < columnCount; i++) {
           const p = document.createElement('p');
