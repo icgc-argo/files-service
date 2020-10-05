@@ -47,7 +47,6 @@ console.log('in server.ts');
   } catch (err) {
     console.error('failed to do migration', err);
     process.exit(-10);
-    return;
   }
 
   /** Mongoose setup */
