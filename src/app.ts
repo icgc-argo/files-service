@@ -28,9 +28,20 @@ import { getOrCreateFileRecordByObjId } from './service';
 import logger from './logger';
 import { File } from './entity';
 import Auth from './auth';
+import log from './logger';
 
 const App = (config: AppConfig): express.Express => {
-  const authFilter = Auth(config.auth.jwtKeyUrl, config.auth.jwtKey);
+  // Auth middleware
+  const noOpReqHandler: RequestHandler = (req, res, next) => {
+    log.warn('calling protected endpoint without auth enabled');
+    next();
+  };
+  const authFilter = config.auth.enabled
+    ? Auth(config.auth.jwtKeyUrl, config.auth.jwtKey)
+    : (scope: string) => {
+        return noOpReqHandler;
+      };
+
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
