@@ -18,7 +18,6 @@
  */
 
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
-
 import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
@@ -28,9 +27,10 @@ import { AppConfig } from './config';
 import { getOrCreateFileRecordByObjId } from './service';
 import logger from './logger';
 import { File } from './entity';
+import Auth from './auth';
 
-console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
+  const authFilter = Auth(config.auth.jwtKeyUrl, config.auth.jwtKey);
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
@@ -68,6 +68,7 @@ const App = (config: AppConfig): express.Express => {
 
   app.post(
     '/files',
+    authFilter(config.auth.WRITE_SCOPE),
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body as File;
       return res.status(200).send(await getOrCreateFileRecordByObjId(file));
