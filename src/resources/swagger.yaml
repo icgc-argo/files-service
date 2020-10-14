@@ -67,7 +67,15 @@ paths:
       summary: get all files, filtered by the query parameters if provided
       responses:
         '404':
-          description: 'app is not fully healthy'
+          description: Requested resource not found
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
         '200':
           description: File object
           content:
@@ -87,6 +95,16 @@ paths:
             schema:
               $ref: '#/components/schemas/File'
       responses:
+        '404':
+          description: Requested resource not found
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
         '200':
           description: 'the file that was created or found already.'
           content:
@@ -107,7 +125,15 @@ paths:
       summary: get file by Id
       responses:
         '404':
-          description: 'app is not fully healthy'
+          description: Requested resource not found
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
         '200':
           description: File object
           content:
@@ -116,6 +142,17 @@ paths:
                 $ref: '#/components/schemas/File'
 
 components:
+  responses:
+    ServiceUnavailableError:
+      description: Endpoint service unavailable
+    UnauthorizedError:
+      description: Access token is missing or invalid
+    ServerError:
+      description: Server error
+    ForbiddenError:
+      description: Access token has incorrect scopes
+    NotFoundError:
+      description: Requested resource was not found
   securitySchemes:
     bearerAuth:
       type: http

@@ -25,7 +25,7 @@ import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
 
 let server: Server;
-console.log('in server.ts');
+logger.debug('in server.ts');
 (async () => {
   const appConfig = await getAppConfig();
 
@@ -90,6 +90,8 @@ console.log('in server.ts');
       useNewUrlParser: true,
       user: appConfig.mongoProperties.dbUsername,
       pass: appConfig.mongoProperties.dbPassword,
+      w: appConfig.mongoProperties.writeConcern,
+      wtimeout: appConfig.mongoProperties.writeAckTimeout,
     });
   } catch (err) {
     logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);

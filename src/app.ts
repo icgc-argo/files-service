@@ -16,9 +16,7 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
-
 import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
@@ -28,9 +26,17 @@ import { AppConfig } from './config';
 import { getOrCreateFileRecordByObjId } from './service';
 import logger from './logger';
 import { File } from './entity';
+import Auth from '@overture-stack/ego-token-middleware';
+import log from './logger';
 
-console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
+  // Auth middleware
+  const authFilter = config.auth.enabled
+    ? Auth(config.auth.jwtKeyUrl, config.auth.jwtKey)
+    : (scopes: string[]) => {
+        return noOpReqHandler;
+      };
+
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
@@ -68,6 +74,7 @@ const App = (config: AppConfig): express.Express => {
 
   app.post(
     '/files',
+    authFilter([config.auth.WRITE_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body as File;
       return res.status(200).send(await getOrCreateFileRecordByObjId(file));
@@ -98,6 +105,12 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
   let customizableMsg = err.message;
 
   switch (true) {
+    case err.name == 'Unauthorized':
+      status = 401;
+      break;
+    case err.name == 'Forbidden':
+      status = 403;
+      break;
     case err instanceof Errors.InvalidArgument:
       status = 400;
       break;
@@ -129,6 +142,11 @@ export const wrapAsync = (fn: RequestHandler): RequestHandler => {
       routePromise.catch(next);
     }
   };
+};
+
+const noOpReqHandler: RequestHandler = (req, res, next) => {
+  log.warn('calling protected endpoint without auth enabled');
+  next();
 };
 
 export enum Status {
