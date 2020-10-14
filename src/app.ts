@@ -105,6 +105,12 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
   let customizableMsg = err.message;
 
   switch (true) {
+    case err.name == 'Unauthorized':
+      status = 401;
+      break;
+    case err.name == 'Forbidden':
+      status = 403;
+      break;
     case err instanceof Errors.InvalidArgument:
       status = 400;
       break;
