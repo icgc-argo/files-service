@@ -1,12 +1,12 @@
 import _ from 'lodash';
-import { File, QueryFilters } from './entity';
+import { File, FileLabels, QueryFilters } from './entity';
 import * as db from './model';
 
 export async function getFiles(filters: QueryFilters) {
   return await db.getFiles(filters);
 }
 
-export async function getFileRecordById(id: number): Promise<File | undefined> {
+export async function getFileRecordById(id: number) {
   const file = await db.getFileRecordById(id);
   if (file == undefined) {
     throw new Errors.NotFound('no file found for this id ');
@@ -14,39 +14,53 @@ export async function getFileRecordById(id: number): Promise<File | undefined> {
   return file;
 }
 
-export async function getFileRecordByObjId(objId: string): Promise<File | undefined> {
+export async function getFileRecordByObjId(objId: string) {
   return await db.getFileRecordByObjId(objId);
 }
 
-export async function getOrCreateFileRecordByObjId(fileToCreate: File): Promise<File> {
+export async function getOrCreateFileRecordByObjId(fileToCreate: File) {
   const file = await getFileRecordByObjId(fileToCreate.objectId);
   if (file != undefined) {
     return file;
   }
-  // todo : validate labels1
+
+  fileToCreate.labels = {};
   return await db.create(fileToCreate);
 }
 
-export async function addOrUpdateFileLabel(
-  fileId: number,
-  newLabels: { key: string; value: string[] },
-) {
+export async function addOrUpdateFileLabel(fileId: number, newLabels: FileLabels) {
   const file = await getFileRecordById(fileId);
-  if (file === undefined) {
-    throw new Errors.NotFound('');
+  if (file == undefined) {
+    throw new Errors.NotFound('No file for id ' + fileId);
   }
-  _.merge(file.labels, newLabels);
+  validateLabels(newLabels);
+  Object.keys(newLabels).forEach(k => {
+    const labelValue = newLabels[k];
+    file.labels[k] = labelValue || [];
+  });
+  file.markModified('labels');
   return await db.update(file);
 }
 
-export async function removeLabel(fileId: number, key: string) {
+export async function removeLabel(fileId: number, keys: string[]) {
   const file = await getFileRecordById(fileId);
   if (file === undefined) {
     throw new Errors.NotFound('');
   }
-  _.unset(file.labels, key);
+  keys.forEach(k => {
+    _.unset(file.labels, k);
+  });
+  file.markModified('labels');
   return await db.update(file);
 }
+
+const validateLabels = (labels: FileLabels) => {
+  Object.keys(labels).forEach(k => {
+    if (k.indexOf(',') !== -1) {
+      throw new Errors.InvalidArgument('Keys cannot have comma in them.');
+    }
+  });
+};
 
 export namespace Errors {
   export class InvalidArgument extends Error {

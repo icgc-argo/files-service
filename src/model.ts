@@ -3,36 +3,28 @@ import { File, QueryFilters } from './entity';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export async function getFiles(filters: QueryFilters) {
-  return (await FileModel.find(buildQueryFilters(filters))
-    .lean()
-    .exec()) as File[];
+  return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileDocument[];
 }
 
-export async function getFileRecordById(id: number): Promise<File | undefined> {
-  return (await FileModel.findOne({ fileId: id })
-    .lean()
-    .exec()) as File | undefined;
+export async function getFileRecordById(id: number) {
+  return await FileModel.findOne({ fileId: id });
 }
 
-export async function getFileRecordByObjId(objId: string): Promise<File | undefined> {
-  return (await FileModel.findOne({
+export async function getFileRecordByObjId(objId: string) {
+  return await FileModel.findOne({
     objectId: objId,
-  })
-    .lean()
-    .exec()) as File | undefined;
+  });
 }
 
 export async function create(file: File) {
   const newFile = new FileModel(file);
   const createdFile = await newFile.save();
-  return toPojo(createdFile);
+  return createdFile;
 }
 
-export async function update(file: File) {
-  const toUpdate = new FileModel(file);
-  unsetIsNewFlagForUpdate(file);
+export async function update(toUpdate: FileDocument) {
   const updatedFile = await toUpdate.save();
-  return toPojo(updatedFile);
+  return updatedFile;
 }
 
 function unsetIsNewFlagForUpdate(file: File) {
@@ -48,14 +40,14 @@ const FileSchema = new mongoose.Schema(
     programId: { type: String, required: true },
     labels: {},
   },
-  { timestamps: true, minimize: false },
+  { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
 );
 
 FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
 });
 
-type FileDocument = mongoose.Document & File;
+export type FileDocument = mongoose.Document & File;
 
 export let FileModel = mongoose.model<FileDocument>('File', FileSchema);
 
