@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { File, FileLabels, QueryFilters } from './entity';
+import { File, FileLabel, QueryFilters } from './entity';
 import * as db from './model';
 
 export async function getFiles(filters: QueryFilters) {
@@ -24,21 +24,31 @@ export async function getOrCreateFileRecordByObjId(fileToCreate: File) {
     return file;
   }
 
-  fileToCreate.labels = {};
+  fileToCreate.labels = new Array<FileLabel>();
   return await db.create(fileToCreate);
 }
 
-export async function addOrUpdateFileLabel(fileId: number, newLabels: FileLabels) {
+export async function addOrUpdateFileLabel(fileId: number, newLabels: FileLabel[]) {
   const file = await getFileRecordById(fileId);
   if (file == undefined) {
     throw new Errors.NotFound('No file for id ' + fileId);
   }
+
   validateLabels(newLabels);
-  Object.keys(newLabels).forEach(k => {
-    const labelValue = newLabels[k];
-    file.labels[k] = labelValue || [];
+  newLabels.forEach(label => {
+    const newLabelKey = normalizeLabel(label.key);
+    const existingLabel = file.labels.find(l => normalizeLabel(l.key) == newLabelKey);
+    if (!existingLabel) {
+      file.labels.push({
+        key: newLabelKey,
+        value: label.value || [],
+      });
+      return;
+    }
+
+    existingLabel.value = label.value || [];
+    return;
   });
-  file.markModified('labels');
   return await db.update(file);
 }
 
@@ -47,25 +57,41 @@ export async function removeLabel(fileId: number, keys: string[]) {
   if (file === undefined) {
     throw new Errors.NotFound('');
   }
-  keys.forEach(k => {
-    _.unset(file.labels, k);
-  });
-  file.markModified('labels');
+
+  file.labels = file.labels.filter(l => !keys.includes(l.key));
   return await db.update(file);
 }
 
-const validateLabels = (labels: FileLabels) => {
-  Object.keys(labels).forEach(k => {
-    if (k.indexOf(',') !== -1) {
-      throw new Errors.InvalidArgument('Keys cannot have comma in them.');
+const validateLabels = (labels: FileLabel[]) => {
+  if (!labels || labels.length == 0) {
+    throw new Errors.InvalidArgument('missing the labels');
+  }
+  labels.forEach((l, i) => {
+    if (!l.key) {
+      throw new Errors.InvalidArgument(`Label at index ${i}, is missing the "key" attribute`);
+    }
+
+    if (l.key.indexOf(',') !== -1) {
+      throw new Errors.InvalidArgument(`Label at index ${i}, Keys cannot have comma in them.`);
+    }
+
+    const hasDuplicates =
+      labels.filter(l2 => normalizeLabel(l2.key) == normalizeLabel(l.key)).length > 1;
+
+    if (hasDuplicates) {
+      throw new Errors.InvalidArgument(`Label at index ${i}, cannot submit duplicated label keys`);
     }
   });
 };
 
+const normalizeLabel = (key: string) => {
+  return key.toLowerCase().trim();
+};
+
 export namespace Errors {
   export class InvalidArgument extends Error {
-    constructor(argumentName: string) {
-      super(`Invalid argument : ${argumentName}`);
+    constructor(message: string) {
+      super(message);
     }
   }
 

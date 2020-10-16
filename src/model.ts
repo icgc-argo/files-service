@@ -27,9 +27,15 @@ export async function update(toUpdate: FileDocument) {
   return updatedFile;
 }
 
-function unsetIsNewFlagForUpdate(file: File) {
-  (file as any).isNew = false;
-}
+const LabelSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    value: { type: [String], required: false },
+  },
+  {
+    _id: false,
+  },
+);
 
 const FileSchema = new mongoose.Schema(
   {
@@ -38,7 +44,7 @@ const FileSchema = new mongoose.Schema(
     repoId: { type: String, required: true },
     analysisId: { type: String, required: true },
     programId: { type: String, required: true },
-    labels: {},
+    labels: [LabelSchema],
   },
   { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
 );

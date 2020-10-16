@@ -154,7 +154,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Labels'
+              type: array
+              items:
+                $ref: '#/components/schemas/Labels'
       tags:
         - Files
       summary: update / create labels for a file
@@ -172,6 +174,7 @@ paths:
         '200':
           description: update successful
     delete:
+      summary: delete labels for a file by key(s)
       tags:
         - Files
       parameters:
@@ -227,12 +230,19 @@ components:
         analysisId:
           type: string
         labels:
-          $ref: '#/components/schemas/Labels'
+          type: array
+          items:
+            $ref: '#/components/schemas/Labels'
     Labels:
       type: object
-      additionalProperties:
-        type: array
-        items:
+      description: 'arbitrary pair of a key and value(s) string'
+      properties:
+        key:
           type: string
-        example:
-          - value 1
+          required: true
+          description: 'label key, cannot contain commas, note that this will be normalized to lower case'
+        value:
+          type: array
+          description: label values array, can be empty if the label doesn't need values
+          items:
+            type: string
