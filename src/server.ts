@@ -23,7 +23,7 @@ import logger from './logger';
 import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
-
+mongoose.set('debug', true);
 let server: Server;
 logger.debug('in server.ts');
 (async () => {
