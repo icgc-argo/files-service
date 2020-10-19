@@ -4,8 +4,13 @@ export interface File {
   repoId: string;
   programId: string;
   analysisId: string;
-  labels: { [key: string]: string[] };
+  labels: FileLabel[];
 }
+
+export type FileLabel = {
+  key: string;
+  value: string[];
+};
 
 export type QueryFilters = {
   analysisId?: string[];

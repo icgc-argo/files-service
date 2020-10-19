@@ -23,7 +23,7 @@ import path from 'path';
 import yaml from 'yamljs';
 import { Errors, getFileRecordById, getFiles } from './service';
 import { AppConfig } from './config';
-import { getOrCreateFileRecordByObjId } from './service';
+import * as service from './service';
 import logger from './logger';
 import { File } from './entity';
 import Auth from '@overture-stack/ego-token-middleware';
@@ -77,7 +77,38 @@ const App = (config: AppConfig): express.Express => {
     authFilter([config.auth.WRITE_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body as File;
-      return res.status(200).send(await getOrCreateFileRecordByObjId(file));
+      return res.status(200).send(await service.getOrCreateFileRecordByObjId(file));
+    }),
+  );
+
+  app.patch(
+    '/files/:id/labels',
+    authFilter([config.auth.WRITE_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const labels = req.body as any;
+      const id = Number(req.params.id);
+      if (!id || id == Number.NaN) {
+        throw new Errors.InvalidArgument('id');
+      }
+      await service.addOrUpdateFileLabel(id, labels);
+      return res.status(200).send();
+    }),
+  );
+
+  app.delete(
+    '/files/:id/labels',
+    authFilter([config.auth.WRITE_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const keys = (req.query?.keys as string)?.split(',');
+      if (keys == undefined) {
+        throw new Errors.InvalidArgument('keys');
+      }
+      const id = Number(req.params.id);
+      if (!id || id == Number.NaN) {
+        throw new Errors.InvalidArgument('id');
+      }
+      await service.removeLabel(id, keys);
+      return res.status(200).send();
     }),
   );
 
