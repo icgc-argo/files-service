@@ -84,6 +84,29 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/File'
+    delete:
+      parameters:
+        - name: id
+          description: list of file program Ids, csv (if not provided all will be deleted)
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+      tags:
+        - Testing
+      summary: deletes all files, filtered by the query parameters if provided
+      responses:
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '201':
+          description: files deleted
     post:
       tags:
         - Files
@@ -93,7 +116,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/File'
+              $ref: '#/components/schemas/CreateFile'
       responses:
         '404':
           description: Requested resource not found
@@ -216,6 +239,17 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    CreateFile:
+      type: object
+      properties:
+        objectId:
+          type: string
+        repoId:
+          type: string
+        programId:
+          type: string
+        analysisId:
+          type: string
     File:
       type: object
       properties:
