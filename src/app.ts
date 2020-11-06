@@ -47,7 +47,9 @@ const App = (config: AppConfig): express.Express => {
     const status = dbHealth.status == Status.OK ? 200 : 500;
     const resBody = {
       db: dbHealth,
-      version: `${process.env.npm_package_version} - ${process.env.SVC_COMMIT_ID}`,
+      version: `${process.env.npm_package_version || process.env.SVC_VERSION} - ${
+        process.env.SVC_COMMIT_ID
+      }`,
     };
     return res.status(status).send(resBody);
   });
@@ -68,7 +70,7 @@ const App = (config: AppConfig): express.Express => {
   app.get(
     '/files/:id',
     wrapAsync(async (req: Request, res: Response) => {
-      return res.status(200).send(await getFileRecordById(Number(req.params.id)));
+      return res.status(200).send(await getFileRecordById(req.params.id));
     }),
   );
 
@@ -86,9 +88,9 @@ const App = (config: AppConfig): express.Express => {
     authFilter([config.auth.WRITE_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       const labels = req.body as any;
-      const id = Number(req.params.id);
-      if (!id || id == Number.NaN) {
-        throw new Errors.InvalidArgument('id');
+      const id = req.params.id;
+      if (!id) {
+        throw new Errors.InvalidArgument('id is required');
       }
       await service.addOrUpdateFileLabel(id, labels);
       return res.status(200).send();
@@ -101,14 +103,25 @@ const App = (config: AppConfig): express.Express => {
     wrapAsync(async (req: Request, res: Response) => {
       const keys = (req.query?.keys as string)?.split(',');
       if (keys == undefined) {
-        throw new Errors.InvalidArgument('keys');
+        throw new Errors.InvalidArgument('keys list are required');
       }
-      const id = Number(req.params.id);
-      if (!id || id == Number.NaN) {
-        throw new Errors.InvalidArgument('id');
+      const id = req.params.id;
+      if (!id) {
+        throw new Errors.InvalidArgument('id is required');
       }
       await service.removeLabel(id, keys);
       return res.status(200).send();
+    }),
+  );
+
+  app.delete(
+    '/files/',
+    testEndpointFilter,
+    authFilter([config.auth.WRITE_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const ids = (req.query.id as string | undefined)?.split(',') || [];
+      await service.deleteAll(ids);
+      return res.status(201).send();
     }),
   );
 
@@ -123,6 +136,13 @@ const App = (config: AppConfig): express.Express => {
   app.use(errorHandler);
 
   return app;
+};
+
+export const testEndpointFilter = (req: Request, res: Response, next: NextFunction) => {
+  if (process.env.ENABLE_TEST_ENDPOINT !== 'true') {
+    return res.status(403).send('Test endpoints are disabled');
+  }
+  return next();
 };
 
 // general catch all error handler
