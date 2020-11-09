@@ -3,37 +3,34 @@ import { File, FileLabel, QueryFilters } from './entity';
 import * as db from './model';
 
 export async function getFiles(filters: QueryFilters) {
-  return await db.getFiles(filters);
+  return (await db.getFiles(filters)).map(toPojo);
 }
 
-export async function getFileRecordById(id: number) {
-  const file = await db.getFileRecordById(id);
-  if (file == undefined) {
-    throw new Errors.NotFound('no file found for this id ');
-  }
-  return file;
+export async function getFileRecordById(fileId: string) {
+  const file = await getFileAsDoc(toNumericId(fileId));
+  return toPojo(file);
 }
 
 export async function getFileRecordByObjId(objId: string) {
-  return await db.getFileRecordByObjId(objId);
+  const file = await db.getFileRecordByObjId(objId);
+  if (!file) {
+    throw new Errors.NotFound('no file found for objId: ' + objId);
+  }
+  return toPojo(file);
 }
 
 export async function getOrCreateFileRecordByObjId(fileToCreate: File) {
-  const file = await getFileRecordByObjId(fileToCreate.objectId);
+  const file = await db.getFileRecordByObjId(fileToCreate.objectId);
   if (file != undefined) {
-    return file;
+    return toPojo(file);
   }
 
   fileToCreate.labels = new Array<FileLabel>();
-  return await db.create(fileToCreate);
+  return toPojo(await db.create(fileToCreate));
 }
 
-export async function addOrUpdateFileLabel(fileId: number, newLabels: FileLabel[]) {
-  const file = await getFileRecordById(fileId);
-  if (file == undefined) {
-    throw new Errors.NotFound('No file for id ' + fileId);
-  }
-
+export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[]) {
+  const file = await getFileAsDoc(toNumericId(fileId));
   validateLabels(newLabels);
   newLabels.forEach(label => {
     const newLabelKey = normalizeLabel(label.key);
@@ -49,17 +46,51 @@ export async function addOrUpdateFileLabel(fileId: number, newLabels: FileLabel[
     existingLabel.value = label.value || [];
     return;
   });
-  return await db.update(file);
+  return toPojo(await db.update(file));
 }
 
-export async function removeLabel(fileId: number, keys: string[]) {
-  const file = await getFileRecordById(fileId);
-  if (file === undefined) {
-    throw new Errors.NotFound('');
-  }
-
+export async function removeLabel(fileId: string, keys: string[]) {
+  const file = await getFileAsDoc(toNumericId(fileId));
   file.labels = file.labels.filter(l => !keys.includes(l.key));
-  return await db.update(file);
+  const updated = await db.update(file);
+  return toPojo(updated);
+}
+
+export async function deleteAll(ids: string[]) {
+  await db.deleteAll(ids.map(toNumericId));
+}
+
+function toNumericId(id: string) {
+  if (!id.startsWith('FL')) {
+    throw new Errors.InvalidArgument('file id should start with FL, example: FL1234');
+  }
+  const numId = Number(id.substr(2, id.length - 2));
+  if (!numId || numId == Number.NaN) {
+    throw new Errors.InvalidArgument(`id ${id} is not a valid`);
+  }
+  return numId;
+}
+
+async function getFileAsDoc(id: number): Promise<db.FileDocument> {
+  const file = await db.getFileRecordById(id);
+  if (file == undefined) {
+    throw new Errors.NotFound('no file found for this id ');
+  }
+  return file;
+}
+
+function toPojo(f: db.FileDocument) {
+  if (!f) {
+    throw new Error('cannot convert undefined');
+  }
+  return {
+    analysisId: f.analysisId,
+    labels: f.labels,
+    objectId: f.objectId,
+    programId: f.programId,
+    repoId: f.repoId,
+    fileId: `FL${f.fileId}`,
+  } as File;
 }
 
 const validateLabels = (labels: FileLabel[]) => {

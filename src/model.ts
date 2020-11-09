@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { File, QueryFilters } from './entity';
+import { DbFile, File, QueryFilters } from './entity';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export async function getFiles(filters: QueryFilters) {
@@ -25,6 +25,19 @@ export async function create(file: File) {
 export async function update(toUpdate: FileDocument) {
   const updatedFile = await toUpdate.save();
   return updatedFile;
+}
+
+export async function deleteAll(ids: number[]) {
+  if (!ids || ids.length == 0) {
+    await FileModel.deleteMany({});
+    return;
+  }
+
+  await FileModel.deleteMany({
+    fileId: {
+      $in: ids,
+    },
+  });
 }
 
 const LabelSchema = new mongoose.Schema(
@@ -53,7 +66,7 @@ FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
 });
 
-export type FileDocument = mongoose.Document & File;
+export type FileDocument = mongoose.Document & DbFile;
 
 export let FileModel = mongoose.model<FileDocument>('File', FileSchema);
 

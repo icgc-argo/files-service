@@ -1,5 +1,14 @@
-export interface File {
+export interface DbFile {
   fileId?: number;
+  objectId: string;
+  repoId: string;
+  programId: string;
+  analysisId: string;
+  labels: FileLabel[];
+}
+
+export interface File {
+  fileId?: string;
   objectId: string;
   repoId: string;
   programId: string;
