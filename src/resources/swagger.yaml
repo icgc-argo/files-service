@@ -85,9 +85,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/File'
   /test/handleAnalysisEvent:
-    tags:
-      - Testing
     post:
+      tags:
+        - Testing
       requestBody:
         content:
           application/json:
