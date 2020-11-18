@@ -20,6 +20,7 @@
 import * as dotenv from 'dotenv';
 import * as vault from './vault';
 
+let config: AppConfig | undefined = undefined;
 export interface AppConfig {
   // Express
   serverPort: string;
@@ -32,6 +33,7 @@ export interface AppConfig {
     jwtKey: string;
     WRITE_SCOPE: string;
   };
+  analysisConverterUrl: string;
 }
 
 export interface MongoProps {
@@ -72,7 +74,7 @@ const buildBootstrapContext = async () => {
 
 const buildAppContext = async (secrets: any): Promise<AppConfig> => {
   console.log('building app context');
-  const config: AppConfig = {
+  config = {
     serverPort: process.env.PORT || '3000',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
     mongoProperties: {
@@ -93,11 +95,15 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       jwtKey: process.env.JWT_KEY || '',
       WRITE_SCOPE: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
     },
+    analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
   };
   return config;
 };
 
 export const getAppConfig = async (): Promise<AppConfig> => {
+  if (config != undefined) {
+    return config;
+  }
   const secrets = await buildBootstrapContext();
   return buildAppContext(secrets);
 };

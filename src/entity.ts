@@ -7,6 +7,18 @@ export interface DbFile {
   labels: FileLabel[];
 }
 
+export type AnalysisUpdateEvent = {
+  songServerId: string;
+  analysis: { [k: string]: any };
+};
+
+export type FileCentricDocument = { [k: string]: any } & {
+  fileId: string;
+  objectId: string;
+  studyId: string;
+  analysis: { [k: string]: any };
+};
+
 export interface File {
   fileId?: string;
   objectId: string;
