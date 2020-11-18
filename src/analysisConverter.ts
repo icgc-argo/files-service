@@ -16,43 +16,31 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-export interface DbFile {
-  fileId?: number;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: FileLabel[];
+import fetch from 'node-fetch';
+import { getAppConfig } from './config';
+import { FileCentricDocument } from './entity';
+import logger from './logger';
+
+export async function convertAnalysisToFileDocuments(
+  analysis: any,
+  repoCode: string,
+): Promise<{
+  [k: string]: FileCentricDocument[];
+}> {
+  const url = (await getAppConfig()).analysisConverterUrl;
+  if (!url) {
+    throw new Error('a url for converter is not configured correctly');
+  }
+  const result = await fetch(url, {
+    body: JSON.stringify({ analyses: [analysis], repoCode }),
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (result.status != 201) {
+    logger.error(`response from converter: ${await result.text()}`);
+    throw new Error(`failed to convert files, got response ${result.status}`);
+  }
+  const response = await result.json();
+
+  return response;
 }
-
-export type AnalysisUpdateEvent = {
-  songServerId: string;
-  analysis: { [k: string]: any };
-};
-
-export type FileCentricDocument = { [k: string]: any } & {
-  fileId: string;
-  objectId: string;
-  studyId: string;
-  analysis: { [k: string]: any };
-};
-
-export interface File {
-  fileId?: string;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: FileLabel[];
-}
-
-export type FileLabel = {
-  key: string;
-  value: string[];
-};
-
-export type QueryFilters = {
-  analysisId?: string[];
-  programId?: string[];
-  objectId?: string[];
-};

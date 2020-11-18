@@ -28,6 +28,7 @@ import logger from './logger';
 import { File } from './entity';
 import Auth from '@overture-stack/ego-token-middleware';
 import log from './logger';
+import { handleAnalysisPublishEvent } from './manager';
 
 const App = (config: AppConfig): express.Express => {
   // Auth middleware
@@ -115,13 +116,26 @@ const App = (config: AppConfig): express.Express => {
   );
 
   app.delete(
-    '/files/',
+    '/test/files/',
     testEndpointFilter,
     authFilter([config.auth.WRITE_SCOPE]),
     wrapAsync(async (req: Request, res: Response) => {
       const ids = (req.query.id as string | undefined)?.split(',') || [];
       await service.deleteAll(ids);
       return res.status(201).send();
+    }),
+  );
+
+  app.post(
+    '/test/handleAnalysisEvent',
+    testEndpointFilter,
+    authFilter([config.auth.WRITE_SCOPE]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const analysisEvent = req.body;
+      const result = await handleAnalysisPublishEvent(analysisEvent);
+      return res.status(201).send({
+        fileDocuments: result,
+      });
     }),
   );
 
