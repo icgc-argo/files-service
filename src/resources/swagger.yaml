@@ -84,10 +84,28 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/File'
+  /test/handleAnalysisEvent:
+    tags:
+      - Testing
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisEvent'
+      responses:
+        '200':
+          description: 'the file that was created or found already.'
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /test/files:
     delete:
       parameters:
         - name: id
-          description: list of file program Ids, csv (if not provided all will be deleted)
+          description: list of file Ids, csv (if not provided all will be deleted)
           in: query
           required: false
           schema:
@@ -239,6 +257,15 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    AnalysisEvent:
+      type: object
+      properties:
+        state:
+          type: string
+        songServerId:
+          type: string
+        analysis:
+          type: object
     CreateFile:
       type: object
       properties:
