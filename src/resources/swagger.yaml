@@ -84,47 +84,6 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/File'
-  /test/handleAnalysisEvent:
-    post:
-      tags:
-        - Testing
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AnalysisEvent'
-      responses:
-        '200':
-          description: 'the file that was created or found already.'
-          content:
-            application/json:
-              schema:
-                type: object
-
-  /test/files:
-    delete:
-      parameters:
-        - name: id
-          description: list of file Ids, csv (if not provided all will be deleted)
-          in: query
-          required: false
-          schema:
-            type: string
-            format: csv
-      tags:
-        - Testing
-      summary: deletes all files, filtered by the query parameters if provided
-      responses:
-        '400':
-          description: Invalid parameters or body request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          $ref: '#/components/responses/ForbiddenError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-        '201':
-          description: files deleted
     post:
       tags:
         - Files
@@ -181,6 +140,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/File'
+
+  /test/handleAnalysisEvent:
+    post:
+      tags:
+        - Testing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisEvent'
+      responses:
+        '200':
+          description: 'the file that was created or found already.'
+          content:
+            application/json:
+              schema:
+                type: object
+  /test/files:
+    delete:
+      parameters:
+        - name: id
+          description: list of file Ids, csv (if not provided all will be deleted)
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+      tags:
+        - Testing
+      summary: deletes all files, filtered by the query parameters if provided
+      responses:
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '201':
+          description: files deleted
 
   /files/{id}/labels:
     parameters:
