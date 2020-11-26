@@ -1,0 +1,246 @@
+{
+  "settings": {
+    "index.number_of_shards": 3,
+    "index.max_result_window": 300000,
+    "analysis": {
+      "analyzer": {
+        "autocomplete_analyzer": {
+          "filter": ["lowercase", "edge_ngram"],
+          "tokenizer": "standard"
+        },
+        "autocomplete_prefix": {
+          "filter": ["lowercase", "edge_ngram"],
+          "tokenizer": "keyword"
+        },
+        "lowercase_keyword": {
+          "filter": ["lowercase"],
+          "tokenizer": "keyword"
+        }
+      },
+      "filter": {
+        "edge_ngram": {
+          "max_gram": 20,
+          "min_gram": 2,
+          "side": "front",
+          "type": "edge_ngram"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "_meta": {
+      "version": "0.1"
+    },
+    "dynamic": false,
+    "date_detection": false,
+    "properties": {
+      "file_autocomplete": {
+        "fields": {
+          "analyzed": {
+            "analyzer": "autocomplete_analyzer",
+            "search_analyzer": "lowercase_keyword",
+            "type": "text"
+          },
+          "lowercase": {
+            "analyzer": "lowercase_keyword",
+            "type": "text"
+          },
+          "prefix": {
+            "analyzer": "autocomplete_prefix",
+            "search_analyzer": "lowercase_keyword",
+            "type": "text"
+          }
+        },
+        "type": "keyword"
+      },
+      "file_id": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "study_id": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "object_id": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "file_type": {
+        "type": "keyword"
+      },
+      "release_stage": {
+        "type": "keyword"
+      },
+      "program_access_date": {
+        "type": "date"
+      },
+      "data_type": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "data_category": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "analysis_tools": {
+        "type": "keyword",
+        "copy_to": ["file_autocomplete"]
+      },
+      "file_access": {
+        "type": "keyword"
+      },
+      "analysis": {
+        "properties": {
+          "analysis_id": {
+            "type": "keyword",
+            "copy_to": ["file_autocomplete"]
+          },
+          "analysis_type": {
+            "type": "keyword"
+          },
+          "analysis_version": {
+            "type": "integer"
+          },
+          "publish_date": {
+            "type": "date"
+          },
+          "workflow": {
+            "properties": {
+              "workflow_name": {
+                "type": "keyword"
+              },
+              "workflow_version": {
+                "type": "keyword"
+              }
+            }
+          },
+          "variant_class": {
+            "type": "keyword"
+          },
+          "experiment": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "keyword"
+              },
+              "experimental_strategy": {
+                "type": "keyword"
+              }
+            }
+          }
+        }
+      },
+      "file": {
+        "properties": {
+          "size": {
+            "type": "long"
+          },
+          "md5sum": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword",
+            "copy_to": ["file_autocomplete"]
+          },
+          "index_file": {
+            "properties": {
+              "object_id": {
+                "type": "keyword"
+              },
+              "file_type": {
+                "type": "keyword"
+              },
+              "md5sum": {
+                "type": "keyword"
+              },
+              "name": {
+                "type": "keyword"
+              },
+              "size": {
+                "type": "long"
+              }
+            }
+          }
+        }
+      },
+      "donors": {
+        "type": "nested",
+        "properties": {
+          "donor_id": {
+            "type": "keyword",
+            "copy_to": ["file_autocomplete"]
+          },
+          "submitter_donor_id": {
+            "type": "keyword",
+            "copy_to": ["file_autocomplete"]
+          },
+          "gender": {
+            "type": "keyword"
+          },
+          "specimens": {
+            "type": "nested",
+            "properties": {
+              "specimen_id": {
+                "type": "keyword",
+                "copy_to": ["file_autocomplete"]
+              },
+              "submitter_specimen_id": {
+                "type": "keyword",
+                "copy_to": ["file_autocomplete"]
+              },
+              "tumour_normal_designation": {
+                "type": "keyword"
+              },
+              "specimen_tissue_source": {
+                "type": "keyword"
+              },
+              "specimen_type": {
+                "type": "keyword"
+              },
+              "samples": {
+                "type": "nested",
+                "properties": {
+                  "sample_id": {
+                    "type": "keyword",
+                    "copy_to": ["file_autocomplete"]
+                  },
+                  "submitter_sample_id": {
+                    "type": "keyword",
+                    "copy_to": ["file_autocomplete"]
+                  },
+                  "sample_type": {
+                    "type": "keyword"
+                  },
+                  "matched_normal_submitter_sample_id": {
+                    "type": "keyword",
+                    "copy_to": ["file_autocomplete"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "repositories": {
+        "type": "nested",
+        "properties": {
+          "code": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          },
+          "organization": {
+            "type": "keyword"
+          },
+          "country": {
+            "type": "keyword"
+          },
+          "url": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
