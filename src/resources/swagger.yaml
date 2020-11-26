@@ -152,7 +152,7 @@ paths:
               $ref: '#/components/schemas/AnalysisEvent'
       responses:
         '200':
-          description: 'the file that was created or found already.'
+          description:
           content:
             application/json:
               schema:

@@ -36,6 +36,26 @@ services:
     ports:
       - 2181:2181
 
+  ################################
+  ####  Elastic containers    ####
+  ################################
+  elasticsearch:
+    image: 'elasticsearch:7.5.0'
+    ports:
+      - 9200:9200
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - cluster.name=workflow.elasticsearch
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx2048m'
+
+  kibana:
+    image: 'kibana:7.5.0'
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5601:5601
 ################################
 ####    KAFKA containers    ####
 ################################
@@ -97,4 +117,7 @@ services:
 volumes:
   mongodb_data:
     name: appdb_db_vol
+    driver: local
+  es_data:
+    name: es_data_vol
     driver: local

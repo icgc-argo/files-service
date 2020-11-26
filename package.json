@@ -80,6 +80,7 @@
   "dependencies": {
     "@icgc-argo/ego-token-utils": "^7.2.0",
     "@overture-stack/ego-token-middleware": "^2.2.0",
+    "@elastic/elasticsearch": "7.5.0",
     "axios": "^0.20.0",
     "body-parser": "^1.19.0",
     "connect-mongo": "^3.0.0",

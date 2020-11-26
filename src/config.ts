@@ -27,11 +27,18 @@ export interface AppConfig {
   openApiPath: string;
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
+  elasticProperties: {
+    node: string;
+    username: string;
+    password: string;
+    indexName: string;
+    createSampleIndex: string;
+  };
   auth: {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
-    WRITE_SCOPE: string;
+    writeScope: string;
   };
   analysisConverterUrl: string;
 }
@@ -50,9 +57,7 @@ export interface KafkaConfigurations {
   kafkaBrokers: string[];
 }
 
-const buildBootstrapContext = async () => {
-  dotenv.config();
-
+const loadVaultSecrets = async () => {
   const vaultEnabled = process.env.VAULT_ENABLED || false;
   let secrets: any = {};
   /** Vault */
@@ -72,7 +77,7 @@ const buildBootstrapContext = async () => {
   return secrets;
 };
 
-const buildAppContext = async (secrets: any): Promise<AppConfig> => {
+const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
   console.log('building app context');
   config = {
     serverPort: process.env.PORT || '3000',
@@ -89,11 +94,18 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       kafkaClientId: process.env.KAFKA_CLIENT_ID || '',
       kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'true' ? true : false,
     },
+    elasticProperties: {
+      node: process.env.ES_NODE || 'http://localhost:9200',
+      username: secrets.ES_USER || process.env.ES_USER,
+      password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
+      indexName: process.env.INDEX_NAME || 'file_centric_test',
+      createSampleIndex: process.env.CREATE_SAMPLE_INDEX || 'false',
+    },
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false',
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      WRITE_SCOPE: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
+      writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
   };
@@ -104,6 +116,7 @@ export const getAppConfig = async (): Promise<AppConfig> => {
   if (config != undefined) {
     return config;
   }
-  const secrets = await buildBootstrapContext();
-  return buildAppContext(secrets);
+  dotenv.config();
+  const secrets = await loadVaultSecrets();
+  return buildAppConfig(secrets);
 };

@@ -77,7 +77,7 @@ const App = (config: AppConfig): express.Express => {
 
   app.post(
     '/files',
-    authFilter([config.auth.WRITE_SCOPE]),
+    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body as File;
       return res.status(200).send(await service.getOrCreateFileRecordByObjId(file));
@@ -86,7 +86,7 @@ const App = (config: AppConfig): express.Express => {
 
   app.patch(
     '/files/:id/labels',
-    authFilter([config.auth.WRITE_SCOPE]),
+    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const labels = req.body as any;
       const id = req.params.id;
@@ -100,7 +100,7 @@ const App = (config: AppConfig): express.Express => {
 
   app.delete(
     '/files/:id/labels',
-    authFilter([config.auth.WRITE_SCOPE]),
+    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const keys = (req.query?.keys as string)?.split(',');
       if (keys == undefined) {
@@ -118,7 +118,7 @@ const App = (config: AppConfig): express.Express => {
   app.delete(
     '/test/files/',
     testEndpointFilter,
-    authFilter([config.auth.WRITE_SCOPE]),
+    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const ids = (req.query.id as string | undefined)?.split(',') || [];
       await service.deleteAll(ids);
@@ -129,7 +129,7 @@ const App = (config: AppConfig): express.Express => {
   app.post(
     '/test/handleAnalysisEvent',
     testEndpointFilter,
-    authFilter([config.auth.WRITE_SCOPE]),
+    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const analysisEvent = req.body;
       const result = await handleAnalysisPublishEvent(analysisEvent);
