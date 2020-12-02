@@ -22,10 +22,17 @@ import * as vault from './vault';
 
 let config: AppConfig | undefined = undefined;
 export interface AppConfig {
-  // Express
   serverPort: string;
   openApiPath: string;
-  kafkaProperties: KafkaConfigurations;
+  kafkaProperties: {
+    kafkaMessagingEnabled: boolean;
+    kafkaBrokers: string[];
+    kafkaClientId: string;
+    consumers: {
+      analysisUpdates: KafkaConsumerConfigurations;
+      reindexing: KafkaConsumerConfigurations;
+    };
+  };
   mongoProperties: MongoProps;
   elasticProperties: {
     node: string;
@@ -43,6 +50,12 @@ export interface AppConfig {
   analysisConverterUrl: string;
 }
 
+export interface KafkaConsumerConfigurations {
+  topic: string;
+  group: string;
+  dlq: string | undefined;
+}
+
 export interface MongoProps {
   // Mongo
   dbUsername: string;
@@ -50,11 +63,6 @@ export interface MongoProps {
   writeConcern: string;
   writeAckTimeout: number;
   dbUrl: string; // allow overriding all the url
-}
-export interface KafkaConfigurations {
-  kafkaMessagingEnabled: boolean;
-  kafkaClientId: string;
-  kafkaBrokers: string[];
 }
 
 const loadVaultSecrets = async () => {
@@ -91,8 +99,20 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
-      kafkaClientId: process.env.KAFKA_CLIENT_ID || '',
       kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'true' ? true : false,
+      kafkaClientId: process.env.KAFKA_CLIENT_ID || 'file-service',
+      consumers: {
+        analysisUpdates: {
+          topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'song_analysis',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-svc-analysis',
+          dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
+        },
+        reindexing: {
+          topic: process.env.KAFKA_REINDEXING_TOPIC || 'files_reindexing',
+          group: process.env.KAFKA_REINDEXING_GROUP || 'files-svc-reindexing',
+          dlq: process.env.KAFKA_REINDEXING_DLQ,
+        },
+      },
     },
     elasticProperties: {
       node: process.env.ES_NODE || 'http://localhost:9200',
