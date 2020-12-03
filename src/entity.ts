@@ -34,6 +34,7 @@ export type FileCentricDocument = { [k: string]: any } & {
   fileId: string;
   objectId: string;
   studyId: string;
+  repositories: { [k: string]: string }[];
   analysis: { [k: string]: any };
 };
 

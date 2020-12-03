@@ -34,6 +34,7 @@ export async function convertAnalysisToFileDocuments(
   const result = await fetch(url, {
     body: JSON.stringify({ analyses: [analysis], repoCode }),
     method: 'POST',
+    timeout: 1000, // todo make configurable
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {

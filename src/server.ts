@@ -23,9 +23,17 @@ import logger from './logger';
 import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
+import { Consumer, Producer } from 'kafkajs';
+import * as kafka from './kafka';
+
 mongoose.set('debug', true);
+
 let server: Server;
-logger.debug('in server.ts');
+let kafkaConnections: {
+  analysisUpdatesConsumer: Consumer;
+  analysisUpdatesDlqProducer: Producer | undefined;
+};
+
 (async () => {
   const appConfig = await getAppConfig();
 
@@ -106,4 +114,40 @@ logger.debug('in server.ts');
     logger.info(`App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`);
     logger.info('Press CTRL-C to stop');
   });
+
+  kafkaConnections = await kafka.setup(appConfig);
 })();
+
+// terminate kafka connections before exiting
+// https://kafka.js.org/docs/producer-example
+const errorTypes = ['unhandledRejection', 'uncaughtException'];
+const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
+
+errorTypes.map(type => {
+  process.on(type as any, async (e: Error) => {
+    try {
+      console.log(`process.on ${type}`);
+      console.error(e);
+      await Promise.all([
+        kafkaConnections.analysisUpdatesConsumer?.disconnect(),
+        kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+      ]);
+      process.exit(0);
+    } catch (_) {
+      process.exit(1);
+    }
+  });
+});
+
+signalTraps.map(type => {
+  process.once(type as any, async () => {
+    try {
+      await Promise.all([
+        kafkaConnections.analysisUpdatesConsumer?.disconnect(),
+        kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+      ]);
+    } finally {
+      process.kill(process.pid, type);
+    }
+  });
+});

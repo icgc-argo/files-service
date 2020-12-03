@@ -18,6 +18,7 @@
  */
 import { convertAnalysisToFileDocuments } from './analysisConverter';
 import * as service from './service';
+import * as indexer from './indexer';
 import { AnalysisUpdateEvent, File, FileCentricDocument } from './entity';
 
 export async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEvent) {
@@ -48,12 +49,14 @@ export async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEv
     f.fileId = fileRecord.fileId as string;
     return f;
   });
-
+  const docsToIndex = await Promise.all(docsWithFile);
   // call clinical to fetch file centric clinical fields
 
   // call elasticsearch to index the batch of enriched file documents
+  indexer.index(docsToIndex);
 
   // for now return the docs
-  const docsToIndex = await Promise.all(docsWithFile);
-  return docsToIndex;
+  return docsToIndex.map(d => {
+    return d.objectId;
+  });
 }
