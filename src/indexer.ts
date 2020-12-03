@@ -67,6 +67,21 @@ export async function index(docs: FileCentricDocument[]) {
   }
 }
 
+export async function remove(docs: FileCentricDocument[]) {
+  const client = await getClient();
+  const body = docs.map(doc => ({ delete: { _id: doc.object_id } }));
+
+  try {
+    await client.bulk({
+      index: indexName,
+      body,
+    });
+  } catch (e) {
+    logger.error(`failed bulk delete request: ${JSON.stringify(e)}`, e);
+    throw e;
+  }
+}
+
 function camelCaseKeysToUnderscore(obj: any) {
   if (typeof obj != 'object') return obj;
 
