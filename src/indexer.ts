@@ -69,7 +69,7 @@ export async function index(docs: FileCentricDocument[]) {
 
 export async function remove(docs: FileCentricDocument[]) {
   const client = await getClient();
-  const body = docs.map(doc => ({ delete: { _id: doc.object_id } }));
+  const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));
 
   try {
     await client.bulk({
