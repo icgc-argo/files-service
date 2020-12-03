@@ -31,6 +31,10 @@ async function getClient() {
   const config = await getAppConfig();
   esClient = new Client({
     node: config.elasticProperties.node,
+    auth: {
+      username: config.elasticProperties.username,
+      password: config.elasticProperties.password,
+    },
   });
   await esClient.ping();
   indexName = config.elasticProperties.indexName;
