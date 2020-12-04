@@ -30,7 +30,7 @@ mongoose.set('debug', true);
 
 let server: Server;
 let kafkaConnections: {
-  analysisUpdatesConsumer: Consumer;
+  analysisUpdatesConsumer: Consumer | undefined;
   analysisUpdatesDlqProducer: Producer | undefined;
 };
 
@@ -115,7 +115,9 @@ let kafkaConnections: {
     logger.info('Press CTRL-C to stop');
   });
 
-  kafkaConnections = await kafka.setup(appConfig);
+  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
+    kafkaConnections = await kafka.setup(appConfig);
+  }
 })();
 
 // terminate kafka connections before exiting
@@ -128,10 +130,13 @@ errorTypes.map(type => {
     try {
       console.log(`process.on ${type}`);
       console.error(e);
-      await Promise.all([
-        kafkaConnections.analysisUpdatesConsumer?.disconnect(),
-        kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
-      ]);
+      await mongoose.disconnect();
+      if (kafkaConnections) {
+        await Promise.all([
+          kafkaConnections.analysisUpdatesConsumer?.disconnect(),
+          kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+        ]);
+      }
       process.exit(0);
     } catch (_) {
       process.exit(1);
@@ -142,10 +147,13 @@ errorTypes.map(type => {
 signalTraps.map(type => {
   process.once(type as any, async () => {
     try {
-      await Promise.all([
-        kafkaConnections.analysisUpdatesConsumer?.disconnect(),
-        kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
-      ]);
+      await mongoose.disconnect();
+      if (kafkaConnections) {
+        await Promise.all([
+          kafkaConnections.analysisUpdatesConsumer?.disconnect(),
+          kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+        ]);
+      }
     } finally {
       process.kill(process.pid, type);
     }

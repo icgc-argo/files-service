@@ -21,7 +21,7 @@ import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 import { AppConfig } from './config';
 import retry from 'async-retry';
 import { AnalysisUpdateEvent } from './entity';
-import { handleAnalysisPublishEvent } from './manager';
+import { handleAnalysisPublishEvent, handleAnalysisSupressedOrUnpublished } from './manager';
 import log from './logger';
 
 let analysisUpdatesConsumer: Consumer | undefined;
@@ -102,9 +102,12 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
     await retry(
       async (bail: Function) => {
         // todo validate message body
-        await handleAnalysisPublishEvent(
-          JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent,
-        );
+        const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
+        if (analysisEvent.analysis.analysisState == 'PUBLISHED') {
+          await handleAnalysisPublishEvent(analysisEvent);
+        } else {
+          await handleAnalysisSupressedOrUnpublished(analysisEvent);
+        }
       },
       {
         retries: 3,
