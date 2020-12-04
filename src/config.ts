@@ -99,7 +99,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
-      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'true' ? true : false,
+      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'false' ? false : true,
       kafkaClientId: process.env.KAFKA_CLIENT_ID || 'file-service',
       consumers: {
         analysisUpdates: {

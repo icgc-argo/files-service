@@ -50,13 +50,29 @@ export async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEv
     return f;
   });
   const docsToIndex = await Promise.all(docsWithFile);
-  // call clinical to fetch file centric clinical fields
 
   // call elasticsearch to index the batch of enriched file documents
-  indexer.index(docsToIndex);
+  await indexer.index(docsToIndex);
 
   // for now return the docs
   return docsToIndex.map(d => {
     return d.objectId;
   });
+}
+
+export async function handleAnalysisSupressedOrUnpublished(analysisEvent: AnalysisUpdateEvent) {
+  const analysis = analysisEvent.analysis;
+  const dataCenterId = analysisEvent.songServerId;
+
+  // get genomic files for an analysis
+  const filesByAnalysisId = await convertAnalysisToFileDocuments(analysis, dataCenterId);
+  let files: FileCentricDocument[] = [];
+
+  // get the file docs arrays from maestro response
+  Object.keys(filesByAnalysisId).forEach((a: string) => {
+    files = files.concat(filesByAnalysisId[a]);
+  });
+
+  // remove from elastic index
+  await indexer.remove(files);
 }
