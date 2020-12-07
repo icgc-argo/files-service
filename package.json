@@ -11,7 +11,7 @@
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
     "watch-debug": "nodemon --delay 1000ms --inspect --watch  'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
-    "test": "mocha -r ts-node/register src/test/**/*.spec.ts",
+    "test": "mocha --timeout 60000 -r ts-node/register src/test/**/*.spec.ts",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
     "migrate-status": "migrate-mongo status"
@@ -74,7 +74,7 @@
     "pretty-quick": "^1.11.1",
     "shelljs": "^0.8.3",
     "sinon": "^7.3.2",
-    "testcontainers": "^1.1.19",
+    "testcontainers": "^6.4.0",
     "tslint": "^5.20.1",
     "typescript": "^4.0.2"
   },

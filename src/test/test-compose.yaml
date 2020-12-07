@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  mongodb:
+    container_name: test_app_db
+    image: 'bitnami/mongodb:4.0'
+    ports:
+      - '27027:27017'
+    environment:
+      MONGODB_USERNAME: admin
+      MONGODB_PASSWORD: password
+      MONGODB_DATABASE: files
+      MONGODB_ROOT_PASSWORD: password123
+
+  elasticsearch:
+    container_name: test_fs_es
+    image: 'elasticsearch:7.5.0'
+    healthcheck:
+      test: curl -f http://localhost:9200 || exit 1
+      retries: 2
+      interval: 10s
+      timeout: 30s
+    ports:
+      - 2358:9200
+    environment:
+      - discovery.type=single-node
+      - cluster.name=test-fsvc.elasticsearch
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx2048m'
