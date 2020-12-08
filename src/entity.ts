@@ -57,3 +57,9 @@ export type QueryFilters = {
   programId?: string[];
   objectId?: string[];
 };
+
+export enum Status {
+  OK = '😇',
+  UNKNOWN = '🤔',
+  ERROR = '😱',
+}
