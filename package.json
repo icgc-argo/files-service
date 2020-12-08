@@ -11,7 +11,7 @@
     "build": "npm run build-ts && npm run resources && npm run tslint",
     "debug": "npm run build && sleep 3 && npm run watch-debug",
     "watch-debug": "nodemon --delay 1000ms --inspect --watch  'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
-    "test": "mocha --inspect --timeout 60000 -r ts-node/register src/test/**/*.spec.ts",
+    "test": "mocha --exit --inspect --timeout 60000 -r ts-node/register src/test/**/*.spec.ts",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
     "migrate-status": "migrate-mongo status"

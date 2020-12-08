@@ -55,8 +55,6 @@ describe('manager', () => {
     } catch (err) {
       console.error('failed to setup test environment', err);
       await environment.down();
-    } finally {
-      process.exit(-30);
     }
   });
 
@@ -73,8 +71,8 @@ describe('manager', () => {
     });
 
     console.log(`response: ${JSON.stringify(getFileById.body)}`);
-    expect(getFileById.body.id).to.eq('4b509876-3f0d-57ae-b097-50d892bf268e');
-    expect(getFileById.body).to.eq(expectedResult);
+    expect(getFileById.body._id).to.eq('4b509876-3f0d-57ae-b097-50d892bf268e');
+    expect(getFileById.body).to.deep.eq(expectedResult);
   });
 });
 
