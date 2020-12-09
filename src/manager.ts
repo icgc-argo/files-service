@@ -56,7 +56,7 @@ export async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEv
 
   // for now return the docs
   return docsToIndex.map(d => {
-    return d.objectId;
+    return d.object_id;
   });
 }
 

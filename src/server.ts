@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import App, { setDBStatus, Status } from './app';
+import App from './app';
 import mongoose from 'mongoose';
 import logger from './logger';
 import { Server } from 'http';
@@ -25,8 +25,7 @@ import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
 import { Consumer, Producer } from 'kafkajs';
 import * as kafka from './kafka';
-
-mongoose.set('debug', true);
+import * as dbConnection from './dbConnection';
 
 let server: Server;
 let kafkaConnections: {
@@ -34,9 +33,13 @@ let kafkaConnections: {
   analysisUpdatesDlqProducer: Producer | undefined;
 };
 
+// bootstraping the app and setting up connections to: db, kafka, experss server
 (async () => {
   const appConfig = await getAppConfig();
 
+  if (process.env.LOG_QUERIES === 'true') {
+    mongoose.set('debug', true);
+  }
   /**
    * Migrate mongo config requires exact undefined to be able to connect to db without user/password (dev/qa) env
    * if the value is undefined or empty string we have to avoid setting it in the env because process.env will force string "undefined"
@@ -57,54 +60,7 @@ let kafkaConnections: {
     process.exit(-10);
   }
 
-  /** Mongoose setup */
-  mongoose.connection.on('connecting', () => {
-    logger.info('Connecting to MongoDB...');
-    setDBStatus(Status.OK);
-  });
-  mongoose.connection.on('connected', () => {
-    logger.info('...Connection Established to MongoDB');
-    setDBStatus(Status.OK);
-  });
-  mongoose.connection.on('reconnected', () => {
-    logger.info('Connection Reestablished');
-    setDBStatus(Status.OK);
-  });
-  mongoose.connection.on('disconnected', () => {
-    logger.warn('Connection Disconnected');
-    setDBStatus(Status.ERROR);
-  });
-  mongoose.connection.on('close', () => {
-    logger.warn('Connection Closed');
-    setDBStatus(Status.ERROR);
-  });
-  mongoose.connection.on('error', error => {
-    logger.error('MongoDB Connection Error:' + error);
-    setDBStatus(Status.ERROR);
-  });
-  mongoose.connection.on('reconnectFailed', () => {
-    logger.error('Ran out of reconnect attempts, abandoning...');
-    setDBStatus(Status.ERROR);
-  });
-
-  try {
-    await mongoose.connect(appConfig.mongoProperties.dbUrl, {
-      autoReconnect: true,
-      socketTimeoutMS: 10000,
-      connectTimeoutMS: 30000,
-      keepAlive: true,
-      reconnectTries: 10,
-      reconnectInterval: 3000,
-      useNewUrlParser: true,
-      user: appConfig.mongoProperties.dbUsername,
-      pass: appConfig.mongoProperties.dbPassword,
-      w: appConfig.mongoProperties.writeConcern,
-      wtimeout: appConfig.mongoProperties.writeAckTimeout,
-    });
-  } catch (err) {
-    logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);
-    process.exit();
-  }
+  await dbConnection.connectDb(appConfig);
 
   /**
    * Start Express server.
