@@ -18,23 +18,36 @@
  */
 
 import { expect } from 'chai';
-import {
-  StartedTestContainer,
-  Wait,
-  DockerComposeEnvironment,
-  StartedDockerComposeEnvironment,
-} from 'testcontainers';
+import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
 import { AnalysisUpdateEvent } from '../entity';
 import * as manager from '../manager';
 import nock from 'nock';
 import * as db from '../dbConnection';
 import { getAppConfig } from '../config';
-const ES_PORT = 2358;
+const ES_PORT = 9200;
 
 describe('manager', () => {
-  let environment: StartedDockerComposeEnvironment;
   let esClient: Client;
+  let esContainer: StartedTestContainer;
+  let mongoContainer: StartedTestContainer;
+
+  const startContainers = async () => {
+    esContainer = await new GenericContainer('elasticsearch', '7.5.0')
+      .withExposedPorts(ES_PORT)
+      .withEnv('discovery.type', 'single-node')
+      .withEnv('http.port', `${ES_PORT}`)
+      .withHealthCheck({
+        test: `curl -f http://localhost:${ES_PORT} || exit 1`, // this is executed inside the container
+        startPeriod: 10000,
+        retries: 5,
+        interval: 2000,
+        timeout: 5000,
+      })
+      .withWaitStrategy(Wait.forHealthCheck())
+      .start();
+    mongoContainer = await new GenericContainer('mongo', '4.0').withExposedPorts(27017).start();
+  };
 
   before(async () => {
     const config = await getAppConfig('./src/test/.env.test');
@@ -42,24 +55,24 @@ describe('manager', () => {
       .post(`/convert`)
       .reply(201, convertedAnalysisResponse);
     try {
-      environment = await new DockerComposeEnvironment(__dirname, 'test-compose.yaml')
-        .withWaitStrategy('test_fs_es', Wait.forHealthCheck())
-        .up();
-      const esContainer = environment.getContainer('test_fs_es') as StartedTestContainer;
-      const ES_MAPPED_HOST = `http://${esContainer.getHost()}`;
-      const ES_HOST = `${ES_MAPPED_HOST}:${ES_PORT}`;
+      await startContainers();
+      const ES_HOST = `http://${esContainer.getHost()}:${esContainer.getMappedPort(ES_PORT)}`;
       esClient = new Client({
         node: ES_HOST,
       });
+      config.elasticProperties.node = ES_HOST;
+      config.mongoProperties.dbUrl = `mongodb://${mongoContainer.getHost()}:${mongoContainer.getMappedPort(
+        27017,
+      )}/files`;
       db.connectDb(config);
     } catch (err) {
       console.error('failed to setup test environment', err);
-      await environment.down();
+      await esContainer.stop();
     }
   });
 
   after(async () => {
-    await environment.down();
+    await esContainer.stop();
   });
 
   it('can handle published analysis event', async () => {
