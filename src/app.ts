@@ -25,10 +25,11 @@ import { Errors, getFileRecordById, getFiles } from './service';
 import { AppConfig } from './config';
 import * as service from './service';
 import logger from './logger';
-import { File } from './entity';
+import { File, Status } from './entity';
 import Auth from '@overture-stack/ego-token-middleware';
 import log from './logger';
 import { handleAnalysisPublishEvent } from './manager';
+import { dbHealth } from './dbConnection';
 
 const App = (config: AppConfig): express.Express => {
   // Auth middleware
@@ -213,31 +214,5 @@ const noOpReqHandler: RequestHandler = (req, res, next) => {
   log.warn('calling protected endpoint without auth enabled');
   next();
 };
-
-export enum Status {
-  OK = '😇',
-  UNKNOWN = '🤔',
-  ERROR = '😱',
-}
-
-export const dbHealth = {
-  status: Status.UNKNOWN,
-  stautsText: 'N/A',
-};
-
-export function setDBStatus(status: Status) {
-  if (status == Status.OK) {
-    dbHealth.status = Status.OK;
-    dbHealth.stautsText = 'OK';
-  }
-  if (status == Status.UNKNOWN) {
-    dbHealth.status = Status.UNKNOWN;
-    dbHealth.stautsText = 'UNKNOWN';
-  }
-  if (status == Status.ERROR) {
-    dbHealth.status = Status.ERROR;
-    dbHealth.stautsText = 'ERROR';
-  }
-}
 
 export default App;

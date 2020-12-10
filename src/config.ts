@@ -132,11 +132,17 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
   return config;
 };
 
-export const getAppConfig = async (): Promise<AppConfig> => {
+export const getAppConfig = async (envFile?: string): Promise<AppConfig> => {
   if (config != undefined) {
     return config;
   }
-  dotenv.config();
+  if (envFile) {
+    dotenv.config({
+      path: envFile,
+    });
+  } else {
+    dotenv.config();
+  }
   const secrets = await loadVaultSecrets();
   return buildAppConfig(secrets);
 };
