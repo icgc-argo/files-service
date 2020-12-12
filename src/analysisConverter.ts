@@ -22,7 +22,7 @@ import { FileCentricDocument } from './entity';
 import logger from './logger';
 
 export async function convertAnalysisToFileDocuments(
-  analysis: any,
+  analyses: any[],
   repoCode: string,
 ): Promise<{
   [k: string]: FileCentricDocument[];
@@ -32,7 +32,7 @@ export async function convertAnalysisToFileDocuments(
     throw new Error('a url for converter is not configured correctly');
   }
   const result = await fetch(url, {
-    body: JSON.stringify({ analyses: [analysis], repoCode }),
+    body: JSON.stringify({ analyses, repoCode }),
     method: 'POST',
     timeout: 1000, // todo make configurable
     headers: { 'Content-Type': 'application/json' },

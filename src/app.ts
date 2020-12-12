@@ -28,7 +28,7 @@ import logger from './logger';
 import { File, Status } from './entity';
 import Auth from '@overture-stack/ego-token-middleware';
 import log from './logger';
-import { handleAnalysisPublishEvent } from './manager';
+import { handleAnalysisPublishEvent, processReindexRequest } from './manager';
 import { dbHealth } from './dbConnection';
 
 const App = (config: AppConfig): express.Express => {
@@ -113,6 +113,15 @@ const App = (config: AppConfig): express.Express => {
       }
       await service.removeLabel(id, keys);
       return res.status(200).send();
+    }),
+  );
+
+  app.get(
+    '/admin/index',
+    authFilter([config.auth.writeScope]),
+    wrapAsync(async (req: Request, res: Response) => {
+      const file = req.body as File;
+      return res.status(200).send(await processReindexRequest('song.collab'));
     }),
   );
 
