@@ -24,48 +24,55 @@ import fetch from 'node-fetch';
 import streamArray from 'stream-json/streamers/StreamArray';
 import Batch from 'stream-json/utils/Batch';
 import stream from 'stream';
+import { getAppConfig } from './config';
+import logger from './logger';
+
+const ANALYSIS_BATCH_SIZE = 100;
 
 export async function processReindexRequest(dataCenterId: string) {
-  // const url = getDataRepositoryUrl(args.dataCenterId);
-  // const studies: string[] = await getStudies(`${url}/studies/all`);
-  console.log('start');
-  const analysesStream = await generateStudyAnalyses();
+  logger.info(`indexing repo ${dataCenterId}`);
+  const url = await getDataCenterUrl(dataCenterId);
+  logger.info(url);
+  const studies: string[] = await getStudies(url);
+  logger.info(`fetched all studies, count: ${studies?.length}`);
 
-  for await (const analyses of analysesStream) {
-    console.log(`data =>>>>>>. ${JSON.stringify(analyses)}`);
-    const eAnalyses = analyses.map((a: any) => a.value);
-    await indexAnalyses(eAnalyses, dataCenterId);
+  for (const study of studies) {
+    logger.info(`indexing study: ${study}`);
+    const analysesStream = await generateStudyAnalyses(url, study);
+    for await (const analyses of analysesStream) {
+      logger.info(`data =>>>>>> ${JSON.stringify(analyses.map((kv: any) => kv.value.analysisId))}`);
+      const analysesObject = analyses.map((a: any) => a.value);
+      await indexAnalyses(analysesObject, dataCenterId);
+    }
   }
-
-  await testStream();
-  console.log(`done reading`);
+  logger.info(`done indexing`);
 }
 
-async function testStream() {
-  return new Promise(async (res, rej) => {
-    const pipeline = await getReadStream();
-    pipeline.on('readable', () => {
-      console.log(`reading: ${pipeline.read()}`);
-    });
-    pipeline.on('end', () => {
-      res();
-    });
-  });
+async function getDataCenterUrl(dataCenterId: string) {
+  const url = (await getAppConfig()).dataCenterURL;
+  return url;
 }
 
-async function generateStudyAnalyses() {
-  const pipeline = await getReadStream();
+async function generateStudyAnalyses(url: string, studyId: string) {
+  const pipeline = await getAnalysesBatchesStream(url, studyId);
   console.log('got stream');
+  // read one batch entry at a time
   return streamToAsyncGenerator<any>(pipeline, 1);
 }
 
-async function getReadStream() {
+async function getStudies(url: string) {
+  const res = await fetch(`${url}/studies/all`);
+  const studies = await res.json();
+  return studies;
+}
+
+async function getAnalysesBatchesStream(url: string, studyId: string) {
   // todo add custom time out
-  const res = await fetch(
-    'https://song.rdpc-qa.cancercollaboratory.org/studies/TEST-CA/analysis?analysisStates=PUBLISHED',
-  );
+  const res = await fetch(`${url}/studies/${studyId}/analysis?analysisStates=PUBLISHED`);
   const resStream = res.body;
-  const pipeline = resStream.pipe(streamArray.withParser()).pipe(new Batch({ batchSize: 2 }));
+  const pipeline = resStream
+    .pipe(streamArray.withParser())
+    .pipe(new Batch({ batchSize: ANALYSIS_BATCH_SIZE }));
   return pipeline;
 }
 
@@ -95,11 +102,11 @@ async function indexAnalyses(analyses: any[], dataCenterId: string) {
     };
 
     const fileRecord = await service.getOrCreateFileRecordByObjId(fileToCreate);
-
     // here we can extract the file Id/labels for indexing later
     f.fileId = fileRecord.fileId as string;
     return f;
   });
+
   const docsToIndex = await Promise.all(docsWithFile);
 
   // call elasticsearch to index the batch of enriched file documents
@@ -131,7 +138,7 @@ export async function handleAnalysisSupressedOrUnpublished(analysisEvent: Analys
 // source: https://www.derpturkey.com/nodejs-async-generators-for-streaming/
 // Converts a stream into an AsyncGenerator that allows reading bytes
 // of data from the stream in the chunk size specified. This function
-// has some similarities to the `streamToGenerator` function.
+// has some similarities to the `;streamToGenerator` function.
 function streamToAsyncGenerator<T>(
   reader: stream.Readable,
   chunkSize?: number,
@@ -163,11 +170,11 @@ function streamToAsyncGenerator<T>(
       }
 
       // We are no longer readable and one of two things will
-      // happen now: `readable` or `end` will fire. We construct
-      // a new `readable` signal to wait for the next signal.
+      // happen now: `;readable` or `;end` will fire. We construct
+      // a new `;readable` signal to wait for the next signal.
       const readablePromise = signalReadable(reader);
 
-      // We wait for either the `end` or `readable` event to fire
+      // We wait for either the `;end` or `;readable` event to fire
       const result = await Promise.race([endPromise, readablePromise]);
       if (result == 'done') {
         console.log('race done');
@@ -177,8 +184,8 @@ function streamToAsyncGenerator<T>(
   })();
 }
 
-// Resolves when the stream fires its next `readable` event. We use the
-// event `once` method so that it only ever fires on the next `readable`
+// Resolves when the stream fires its next `;readable` event. We use the
+// event `;once` method so that it only ever fires on the next `;readable`
 // event
 async function signalReadable(reader: stream.Readable) {
   return new Promise<string>(resolve => {
@@ -186,7 +193,7 @@ async function signalReadable(reader: stream.Readable) {
   });
 }
 
-// Resolves when the stream fires the `end` event. We use the `once`
+// Resolves when the stream fires the `;end` event. We use the `;once`
 // method so that the promise only resolves once.
 async function signalEnd(reader: stream.Readable) {
   return new Promise<string>(resolve => {

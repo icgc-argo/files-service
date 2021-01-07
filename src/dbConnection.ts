@@ -36,8 +36,8 @@ export const connectDb = async (appConfig: AppConfig) => {
     logger.info('Connection Reestablished');
     setDBStatus(Status.OK);
   });
-  mongoose.connection.on('disconnected', () => {
-    logger.warn('Connection Disconnected');
+  mongoose.connection.on('disconnected', (args: any[]) => {
+    logger.warn('Connection Disconnected ' + JSON.stringify(args));
     setDBStatus(Status.ERROR);
   });
   mongoose.connection.on('close', () => {
@@ -56,7 +56,6 @@ export const connectDb = async (appConfig: AppConfig) => {
   try {
     await mongoose.connect(appConfig.mongoProperties.dbUrl, {
       autoReconnect: true,
-      socketTimeoutMS: 10000,
       connectTimeoutMS: 3000,
       keepAlive: true,
       reconnectTries: 3,

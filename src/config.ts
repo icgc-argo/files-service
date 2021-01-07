@@ -48,6 +48,8 @@ export interface AppConfig {
     writeScope: string;
   };
   analysisConverterUrl: string;
+  dataCenterId: string;
+  dataCenterURL: string;
 }
 
 export interface KafkaConsumerConfigurations {
@@ -128,6 +130,8 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
+    dataCenterId: process.env.DC_ID || '',
+    dataCenterURL: process.env.DC_URL || '',
   };
   return config;
 };

@@ -28,10 +28,10 @@ import * as kafka from './kafka';
 import * as dbConnection from './dbConnection';
 
 let server: Server;
-let kafkaConnections: {
+let kafkaConnections: Promise<{
   analysisUpdatesConsumer: Consumer | undefined;
   analysisUpdatesDlqProducer: Producer | undefined;
-};
+}>;
 
 // bootstraping the app and setting up connections to: db, kafka, experss server
 (async () => {
@@ -72,7 +72,7 @@ let kafkaConnections: {
   });
 
   if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
-    kafkaConnections = await kafka.setup(appConfig);
+    kafkaConnections = kafka.setup(appConfig);
   }
 })();
 
@@ -88,9 +88,10 @@ errorTypes.map(type => {
       console.error(e);
       await mongoose.disconnect();
       if (kafkaConnections) {
+        const kc = await kafkaConnections;
         await Promise.all([
-          kafkaConnections.analysisUpdatesConsumer?.disconnect(),
-          kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+          kc.analysisUpdatesConsumer?.disconnect(),
+          kc.analysisUpdatesDlqProducer?.disconnect(),
         ]);
       }
       process.exit(0);
@@ -105,9 +106,10 @@ signalTraps.map(type => {
     try {
       await mongoose.disconnect();
       if (kafkaConnections) {
+        const kc = await kafkaConnections;
         await Promise.all([
-          kafkaConnections.analysisUpdatesConsumer?.disconnect(),
-          kafkaConnections.analysisUpdatesDlqProducer?.disconnect(),
+          kc.analysisUpdatesConsumer?.disconnect(),
+          kc.analysisUpdatesDlqProducer?.disconnect(),
         ]);
       }
     } finally {

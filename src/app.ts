@@ -116,12 +116,13 @@ const App = (config: AppConfig): express.Express => {
     }),
   );
 
-  app.get(
-    '/admin/index',
+  app.post(
+    '/admin/index/:datacenter',
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      const file = req.body as File;
-      return res.status(200).send(await processReindexRequest('song.collab'));
+      const repoId = req.params.datacenter;
+      processReindexRequest(repoId);
+      return res.status(200).send(`submitted`);
     }),
   );
 
