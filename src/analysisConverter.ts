@@ -28,6 +28,7 @@ export async function convertAnalysisToFileDocuments(
   [k: string]: FileCentricDocument[];
 }> {
   const url = (await getAppConfig()).analysisConverterUrl;
+  const timeout = (await getAppConfig()).analysisConverterTimeout;
   if (!url) {
     throw new Error('a url for converter is not configured correctly');
   }
@@ -35,7 +36,7 @@ export async function convertAnalysisToFileDocuments(
   const result = await fetch(url, {
     body: JSON.stringify({ analyses, repoCode }),
     method: 'POST',
-    timeout: 30000, // todo make configurable
+    timeout: timeout,
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {

@@ -26,36 +26,45 @@ import Batch from 'stream-json/utils/Batch';
 import stream from 'stream';
 import { getAppConfig } from './config';
 import logger from './logger';
-
-const ANALYSIS_BATCH_SIZE = 100;
+import abortController from 'abort-controller';
 
 export async function processReindexRequest(dataCenterId: string) {
-  logger.info(`indexing repo ${dataCenterId}`);
-  const url = await getDataCenterUrl(dataCenterId);
-  logger.info(url);
-  const studies: string[] = await getStudies(url);
-  logger.info(`fetched all studies, count: ${studies?.length}`);
+  try {
+    logger.info(`indexing repo ${dataCenterId}`);
+    const url = await getDataCenterUrl(dataCenterId);
+    logger.info(url);
+    const studies: string[] = await getStudies(url);
+    logger.info(`fetched all studies, count: ${studies?.length}`);
 
-  for (const study of studies) {
-    logger.info(`indexing study: ${study}`);
-    const analysesStream = await generateStudyAnalyses(url, study);
-    for await (const analyses of analysesStream) {
-      logger.info(`data =>>>>>> ${JSON.stringify(analyses.map((kv: any) => kv.value.analysisId))}`);
-      const analysesObject = analyses.map((a: any) => a.value);
-      await indexAnalyses(analysesObject, dataCenterId);
+    for (const study of studies) {
+      try {
+        logger.info(`indexing study: ${study}`);
+        const analysesStream = await generateStudyAnalyses(url, study);
+        for await (const analyses of analysesStream) {
+          logger.info(
+            `data =>>>>>> ${JSON.stringify(analyses.map((kv: any) => kv.value.analysisId))}`,
+          );
+          const analysesObject = analyses.map((a: any) => a.value);
+          await indexAnalyses(analysesObject, dataCenterId);
+        }
+      } catch (err) {
+        logger.error(`failed to index study ${study}, ${err}`, err);
+      }
     }
+  } catch (err) {
+    logger.error(`error while indexing repository ${dataCenterId}`);
+    throw err;
   }
   logger.info(`done indexing`);
 }
 
 async function getDataCenterUrl(dataCenterId: string) {
-  const url = (await getAppConfig()).dataCenterURL;
+  const url = (await getAppConfig()).datacenter.url;
   return url;
 }
 
 async function generateStudyAnalyses(url: string, studyId: string) {
   const pipeline = await getAnalysesBatchesStream(url, studyId);
-  console.log('got stream');
   // read one batch entry at a time
   return streamToAsyncGenerator<any>(pipeline, 1);
 }
@@ -67,13 +76,24 @@ async function getStudies(url: string) {
 }
 
 async function getAnalysesBatchesStream(url: string, studyId: string) {
-  // todo add custom time out
-  const res = await fetch(`${url}/studies/${studyId}/analysis?analysisStates=PUBLISHED`);
-  const resStream = res.body;
-  const pipeline = resStream
-    .pipe(streamArray.withParser())
-    .pipe(new Batch({ batchSize: ANALYSIS_BATCH_SIZE }));
-  return pipeline;
+  const controller = new abortController();
+  const timeoutPeriod = (await getAppConfig()).datacenter.fetchTimeout;
+  const batchSize = (await getAppConfig()).datacenter.batchSize;
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutPeriod);
+  try {
+    const res = await fetch(`${url}/studies/${studyId}/analysis?analysisStates=PUBLISHED`, {
+      signal: controller.signal,
+    });
+    const resStream = res.body;
+    const pipeline = resStream.pipe(streamArray.withParser()).pipe(new Batch({ batchSize }));
+    return pipeline;
+  } catch (error) {
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEvent) {
