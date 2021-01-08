@@ -213,7 +213,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 // wrapper to handle errors from async express route handlers
 export const wrapAsync = (fn: RequestHandler): RequestHandler => {
   return (req, res, next) => {
-    const routePromise = fn(req, res, next);
+    const routePromise = fn(req, res, next) as any;
     if (routePromise.catch) {
       routePromise.catch(next);
     }
