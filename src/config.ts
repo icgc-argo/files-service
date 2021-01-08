@@ -48,6 +48,14 @@ export interface AppConfig {
     writeScope: string;
   };
   analysisConverterUrl: string;
+  analysisConverterTimeout: number;
+  datacenter: {
+    registryUrl: string;
+    dataCenterId: string;
+    url: string;
+    fetchTimeout: number;
+    batchSize: number;
+  };
 }
 
 export interface KafkaConsumerConfigurations {
@@ -128,6 +136,14 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
+    analysisConverterTimeout: Number(process.env.ANALYSIS_CONVERTER_TIMEOUT || 30 * 1000),
+    datacenter: {
+      registryUrl: process.env.DC_REGISTRY_URL || '',
+      dataCenterId: process.env.DC_ID || '',
+      url: process.env.DC_URL || '',
+      fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
+      batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+    },
   };
   return config;
 };

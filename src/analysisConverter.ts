@@ -22,19 +22,21 @@ import { FileCentricDocument } from './entity';
 import logger from './logger';
 
 export async function convertAnalysisToFileDocuments(
-  analysis: any,
+  analyses: any[],
   repoCode: string,
 ): Promise<{
   [k: string]: FileCentricDocument[];
 }> {
   const url = (await getAppConfig()).analysisConverterUrl;
+  const timeout = (await getAppConfig()).analysisConverterTimeout;
   if (!url) {
     throw new Error('a url for converter is not configured correctly');
   }
+  logger.info(`convert analysis to file documents `);
   const result = await fetch(url, {
-    body: JSON.stringify({ analyses: [analysis], repoCode }),
+    body: JSON.stringify({ analyses, repoCode }),
     method: 'POST',
-    timeout: 1000, // todo make configurable
+    timeout: timeout,
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {
@@ -42,6 +44,6 @@ export async function convertAnalysisToFileDocuments(
     throw new Error(`failed to convert files, got response ${result.status}`);
   }
   const response = await result.json();
-
+  logger.info(`done convert analysis to file documents `);
   return response;
 }
