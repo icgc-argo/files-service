@@ -142,9 +142,9 @@ paths:
                 $ref: '#/components/schemas/File'
 
   /admin/index/{datacenter}:
-    tags:
-      - Admin
     post:
+      tags:
+        - Admin
       parameters:
         - name: datacenter
           description: datacenter code (ex song.collab)
