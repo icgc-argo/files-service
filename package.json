@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "start": "npm run serve",
-    "serve": "node dist/src/server.js",
+    "serve": "node dist/server.js",
     "build-ts": "tsc",
     "resources": "copyfiles -u 1 src/resources/*.* dist/",
     "tslint": "tslint -c tslint.json -p tsconfig.json",
