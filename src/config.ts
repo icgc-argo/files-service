@@ -39,7 +39,7 @@ export interface AppConfig {
     username: string;
     password: string;
     indexName: string;
-    createSampleIndex: string;
+    createSampleIndex: boolean;
   };
   auth: {
     enabled: boolean;
@@ -55,6 +55,9 @@ export interface AppConfig {
     url: string;
     fetchTimeout: number;
     batchSize: number;
+  };
+  debug: {
+    endpointsEnabled: boolean;
   };
 }
 
@@ -107,7 +110,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
-      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'false' ? false : true,
+      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED !== 'false', // true unless set to 'false'
       kafkaClientId: process.env.KAFKA_CLIENT_ID || 'file-service',
       consumers: {
         analysisUpdates: {
@@ -127,10 +130,10 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       username: secrets.ES_USER || process.env.ES_USER,
       password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
       indexName: process.env.INDEX_NAME || 'file_centric_test',
-      createSampleIndex: process.env.CREATE_SAMPLE_INDEX || 'false',
+      createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
     },
     auth: {
-      enabled: process.env.AUTH_ENABLED !== 'false',
+      enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
       writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
@@ -143,6 +146,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       url: process.env.DC_URL || '',
       fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+    },
+    debug: {
+      endpointsEnabled: process.env.ENABLE_TEST_ENDPOINT === 'true', // false unless set to 'true'
     },
   };
   return config;

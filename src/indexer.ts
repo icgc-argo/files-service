@@ -38,7 +38,7 @@ async function getClient() {
   });
   await esClient.ping();
   indexName = config.elasticProperties.indexName;
-  if (config.elasticProperties.createSampleIndex.toLowerCase() == 'true') {
+  if (config.elasticProperties.createSampleIndex) {
     await createSampleIndex(indexName, esClient);
   } else {
     await checkIndexExists(indexName, esClient);
