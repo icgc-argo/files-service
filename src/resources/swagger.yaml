@@ -28,35 +28,36 @@ paths:
     get:
       tags:
         - Health
-      summary: get status of app and various app components
+      summary: Get status of app and various app components
       responses:
         '500':
-          description: 'app is not fully healthy'
+          description: 'App is not fully healthy'
         '200':
-          description: 'all components reporting healthy status'
+          description: 'All components reporting healthy status'
           content:
             application/json:
               schema:
                 type: object
+
   /files:
     get:
       parameters:
         - name: analysisId
-          description: list of analysis ids, csv
+          description: List of analysis ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
         - name: objectId
-          description: list of file object Ids, csv
+          description: List of file object Ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
         - name: programId
-          description: list of file program Ids, csv
+          description: List of file program Ids, csv
           in: query
           required: false
           schema:
@@ -64,7 +65,7 @@ paths:
             format: csv
       tags:
         - Files
-      summary: get all files, filtered by the query parameters if provided
+      summary: Get all files, filtered by the query parameters if provided
       responses:
         '404':
           description: Requested resource not found
@@ -87,8 +88,8 @@ paths:
     post:
       tags:
         - Files
-      summary: create a File or just fetch it if the object id exists
-      description: creates a file, if the file already exists (same obj Id) it will just fetch it.
+      summary: Create a File or fetch it if the object id exists
+      description: Creates a file, if the file already exists (same obj Id) it will just fetch it.
       requestBody:
         content:
           application/json:
@@ -106,7 +107,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
         '200':
-          description: 'the file that was created or found already.'
+          description: The file that was created or found already.
           content:
             application/json:
               schema:
@@ -140,68 +141,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/File'
-
-  /admin/index/{datacenter}:
-    post:
-      tags:
-        - Admin
-      parameters:
-        - name: datacenter
-          description: datacenter code (ex song.collab)
-          in: path
-          required: true
-          schema:
-            type: string
-
-      responses:
-        '200':
-          description: submitted, will run in background
-          content:
-            application/json:
-              schema:
-                type: string
-
-  /test/handleAnalysisEvent:
-    post:
-      tags:
-        - Testing
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AnalysisEvent'
-      responses:
-        '200':
-          description:
-          content:
-            application/json:
-              schema:
-                type: object
-  /test/files:
-    delete:
-      parameters:
-        - name: id
-          description: list of file Ids, csv (if not provided all will be deleted)
-          in: query
-          required: false
-          schema:
-            type: string
-            format: csv
-      tags:
-        - Testing
-      summary: deletes all files, filtered by the query parameters if provided
-      responses:
-        '400':
-          description: Invalid parameters or body request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          $ref: '#/components/responses/ForbiddenError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-        '201':
-          description: files deleted
-
   /files/{id}/labels:
     parameters:
       - name: id
@@ -259,6 +198,68 @@ paths:
           $ref: '#/components/responses/ServerError'
         '200':
           description: delete successful
+
+  /admin/index/{datacenter}:
+    post:
+      tags:
+        - Admin
+      parameters:
+        - name: datacenter
+          description: Datacenter code (ex song.collab)
+          in: path
+          required: true
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Submitted, will run in background
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /debug/handleAnalysisEvent:
+    post:
+      tags:
+        - Debug
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisEvent'
+      responses:
+        '200':
+          description:
+          content:
+            application/json:
+              schema:
+                type: object
+  /debug/files:
+    delete:
+      tags:
+        - Debug
+      parameters:
+        - name: id
+          description: List of file Ids, csv (if not provided all will be deleted)
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+      summary: Deletes all files, filtered by the query parameters if provided
+      responses:
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '201':
+          description: files deleted
+
 components:
   responses:
     ServiceUnavailableError:
@@ -316,14 +317,14 @@ components:
             $ref: '#/components/schemas/Labels'
     Labels:
       type: object
-      description: 'arbitrary pair of a key and value(s) string'
+      description: Arbitrary pair of a key and value(s) string
       properties:
         key:
           type: string
           required: true
-          description: 'label key, cannot contain commas, note that this will be normalized to lower case'
+          description: Label key, cannot contain commas, note that this will be normalized to lower case
         value:
           type: array
-          description: label values array, can be empty if the label doesn't need values
+          description: Label values array, can be empty if the label doesn't need values
           items:
             type: string
