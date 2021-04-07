@@ -18,7 +18,7 @@
  */
 
 import * as dotenv from 'dotenv';
-import * as vault from './vault';
+import * as vault from './external/vault';
 
 let config: AppConfig | undefined = undefined;
 export interface AppConfig {
@@ -45,7 +45,9 @@ export interface AppConfig {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
+    policy: string;
     writeScope: string;
+    readScope: string;
   };
   analysisConverterUrl: string;
   analysisConverterTimeout: number;
@@ -98,6 +100,7 @@ const loadVaultSecrets = async () => {
 
 const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
   console.log('building app context');
+  const policy = process.env.EGO_POLICY || 'FILES-SVC';
   config = {
     serverPort: process.env.PORT || '3000',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
@@ -136,7 +139,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
+      policy,
+      writeScope: `${policy}.WRITE`,
+      readScope: `${policy}.READ`,
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
     analysisConverterTimeout: Number(process.env.ANALYSIS_CONVERTER_TIMEOUT || 30 * 1000),
@@ -148,7 +153,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
     },
     debug: {
-      endpointsEnabled: process.env.ENABLE_TEST_ENDPOINT === 'true', // false unless set to 'true'
+      endpointsEnabled: process.env.ENABLE_DEBUG_ENDPOINTS === 'true', // false unless set to 'true'
     },
   };
   return config;
