@@ -18,11 +18,18 @@
  */
 
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { AppConfig } from './config';
+import { AppConfig } from '../config';
 import retry from 'async-retry';
-import { AnalysisUpdateEvent } from './entity';
-import { handleAnalysisPublishEvent, handleAnalysisSupressedOrUnpublished } from './manager';
-import log from './logger';
+import {
+  handleAnalysisPublishEvent,
+  handleAnalysisSupressedOrUnpublished,
+} from '../services/manager';
+import log from '../logger';
+
+export type AnalysisUpdateEvent = {
+  songServerId: string;
+  analysis: { [k: string]: any };
+};
 
 let analysisUpdatesConsumer: Consumer | undefined;
 let analysisUpdatesDlqProducer: Producer | undefined;

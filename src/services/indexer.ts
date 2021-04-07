@@ -17,11 +17,11 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { getAppConfig } from './config';
-import { FileCentricDocument } from './entity';
+import { getAppConfig } from '../config';
+import { FileCentricDocument } from '../external/maestro';
 import { Client } from '@elastic/elasticsearch';
-import esMapping from './resources/file_centric_example.json';
-import logger from './logger';
+import esMapping from '../resources/file_centric_example.json';
+import logger from '../logger';
 
 let esClient: Client;
 let indexName: string = '';

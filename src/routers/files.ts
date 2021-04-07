@@ -22,18 +22,22 @@ import { Router, Request, Response, RequestHandler, NextFunction } from 'express
 import logger from '../logger';
 import { AppConfig } from '../config';
 import wrapAsync from '../utils/wrapAsync';
-import * as service from '../service';
-import { Errors } from '../service';
-import { File } from '../entity';
+import * as fileService from '../data/files';
+import { Errors } from '../data/files';
 
 const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
+  /**
+   * Get stored files using analyusisId, objectId, or programId as provided in query params
+   * TODO: May need refactoring to consider pagination or to remove ability to filter only by programId, responses could get huge.
+   */
   router.get(
     '/',
+    authFilter([config.auth.readScope]),
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
-        await service.getFiles({
+        await fileService.getFiles({
           analysisId: (req.query as any)?.analysisId?.split(','),
           objectId: (req.query as any)?.objectId?.split(','),
           programId: (req.query as any)?.programId?.split(','),
@@ -42,22 +46,34 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     }),
   );
 
+  /**
+   * Get File record by ID
+   */
   router.get(
     '/:id',
+    authFilter([config.auth.readScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      return res.status(200).send(await service.getFileRecordById(req.params.id));
+      return res.status(200).send(await fileService.getFileRecordById(req.params.id));
     }),
   );
 
+  /**
+   * Update or Create File record
+   * TODO - Move to Debug or Admin router - I can't see an automated service registering files directly, plan instead is to follow updates from RDPC through Kafka messages
+   */
   router.post(
     '/',
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      const file = req.body as File;
-      return res.status(200).send(await service.getOrCreateFileRecordByObjId(file));
+      const file = req.body;
+      const result = await fileService.getOrCreateFileRecordByObjId(file);
+      return res.status(200).send(result);
     }),
   );
 
+  /**
+   * Add or update label on a file
+   */
   router.patch(
     '/:id/labels',
     authFilter([config.auth.writeScope]),
@@ -67,11 +83,14 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
       if (!id) {
         throw new Errors.InvalidArgument('id is required');
       }
-      await service.addOrUpdateFileLabel(id, labels);
+      await fileService.addOrUpdateFileLabel(id, labels);
       return res.status(200).send();
     }),
   );
 
+  /**
+   * Remove list of labels from a File
+   */
   router.delete(
     '/:id/labels',
     authFilter([config.auth.writeScope]),
@@ -84,7 +103,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
       if (!id) {
         throw new Errors.InvalidArgument('id is required');
       }
-      await service.removeLabel(id, keys);
+      await fileService.removeLabel(id, keys);
       return res.status(200).send();
     }),
   );

@@ -23,7 +23,7 @@ import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import { AppConfig } from '../config';
 
-import { processReindexRequest } from '../manager';
+import { processReindexRequest } from '../services/manager';
 
 const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();

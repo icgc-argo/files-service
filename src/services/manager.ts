@@ -17,17 +17,20 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { convertAnalysisToFileDocuments } from './analysisConverter';
-import * as service from './service';
-import * as indexer from './indexer';
-import { AnalysisUpdateEvent, File, FileCentricDocument } from './entity';
+import abortController from 'abort-controller';
 import fetch from 'node-fetch';
+import stream from 'stream';
 import streamArray from 'stream-json/streamers/StreamArray';
 import Batch from 'stream-json/utils/Batch';
-import stream from 'stream';
-import { getAppConfig } from './config';
-import logger from './logger';
-import abortController from 'abort-controller';
+
+import logger from '../logger';
+
+import { convertAnalysisToFileDocuments, FileCentricDocument } from '../external/maestro';
+import { AnalysisUpdateEvent } from '../external/kafka';
+import { getAppConfig } from '../config';
+import * as indexer from './indexer';
+import * as fileService from '../data/files';
+import { File } from '../data/files';
 
 export async function processReindexRequest(dataCenterId: string) {
   try {
@@ -113,7 +116,7 @@ async function indexAnalyses(analyses: any[], dataCenterId: string) {
     files = files.concat(filesByAnalysisId[a]);
   });
 
-  const docsWithFile = files.map(async (f: FileCentricDocument) => {
+  const docsWithFile = files.map(async f => {
     const fileToCreate: File = {
       analysisId: f.analysis.analysisId,
       objectId: f.objectId,
@@ -122,7 +125,7 @@ async function indexAnalyses(analyses: any[], dataCenterId: string) {
       labels: [],
     };
 
-    const fileRecord = await service.getOrCreateFileRecordByObjId(fileToCreate);
+    const fileRecord = await fileService.getOrCreateFileRecordByObjId(fileToCreate);
     // here we can extract the file Id/labels for indexing later
     f.fileId = fileRecord.fileId as string;
     return f;

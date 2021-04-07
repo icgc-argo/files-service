@@ -20,10 +20,10 @@
 import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
-import { AnalysisUpdateEvent } from '../entity';
-import * as manager from '../manager';
+import { AnalysisUpdateEvent } from '../external/kafka';
+import * as manager from '../services/manager';
 import nock from 'nock';
-import * as db from '../dbConnection';
+import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
 const ES_PORT = 9200;
 

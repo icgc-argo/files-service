@@ -19,14 +19,14 @@
 
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
 import bodyParser from 'body-parser';
-import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import * as swaggerUi from 'swagger-ui-express';
 import yaml from 'yamljs';
-import { Errors } from './service';
+import Auth from '@overture-stack/ego-token-middleware';
+
+import { Errors } from './data/files';
 import { AppConfig } from './config';
 import logger from './logger';
-import Auth from '@overture-stack/ego-token-middleware';
-import log from './logger';
 
 import createAdminRouter from './routers/admin';
 import createFilesRouter from './routers/files';
@@ -108,7 +108,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 };
 
 const noOpReqHandler: RequestHandler = (req, res, next) => {
-  log.warn('calling protected endpoint without auth enabled');
+  logger.warn(`Calling protected ( ${req.url} ) endpoint without auth enabled.`);
   next();
 };
 

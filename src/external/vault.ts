@@ -19,7 +19,7 @@
 
 import vault from 'node-vault';
 import { promises } from 'fs';
-import logger from './logger';
+import logger from '../logger';
 
 let vaultClient: vault.client;
 

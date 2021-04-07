@@ -23,8 +23,8 @@ import { AppConfig } from '../config';
 
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import { handleAnalysisPublishEvent } from '../manager';
-import * as service from '../service';
+import { handleAnalysisPublishEvent } from '../services/manager';
+import * as fileService from '../data/files';
 
 const createDebugRouter = (
   config: AppConfig,
@@ -32,9 +32,9 @@ const createDebugRouter = (
 ): Router => {
   // Middleware to disable debug endpoints based on config
   const testEndpointFilter = (req: Request, res: Response, next: NextFunction) => {
-    if (config.debug.endpointsEnabled) {
+    if (!config.debug.endpointsEnabled) {
       logger.info(`DEBUG endpoints are DISABLED. ${req.url} denied.`);
-      return res.status(403).send('Test endpoints are disabled.');
+      return res.status(403).send('DEBUG endpoints are disabled.');
     }
     logger.info(`DEBUG endpoints are ENABLED. ${req.url} requested.`);
     return next();
@@ -49,7 +49,7 @@ const createDebugRouter = (
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const ids = (req.query.id as string | undefined)?.split(',') || [];
-      await service.deleteAll(ids);
+      await fileService.deleteAll(ids);
       return res.status(201).send();
     }),
   );

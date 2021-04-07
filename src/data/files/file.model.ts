@@ -18,8 +18,36 @@
  */
 
 import mongoose from 'mongoose';
-import { DbFile, File, QueryFilters } from './entity';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
+
+export interface File {
+  fileId?: string;
+  objectId: string;
+  repoId: string;
+  programId: string;
+  analysisId: string;
+  labels: FileLabel[];
+}
+
+export type FileLabel = {
+  key: string;
+  value: string[];
+};
+
+interface DbFile {
+  fileId?: number;
+  objectId: string;
+  repoId: string;
+  programId: string;
+  analysisId: string;
+  labels: FileLabel[];
+}
+
+export type QueryFilters = {
+  analysisId?: string[];
+  programId?: string[];
+  objectId?: string[];
+};
 
 export async function getFiles(filters: QueryFilters) {
   return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileDocument[];

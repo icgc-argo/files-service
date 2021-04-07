@@ -24,8 +24,8 @@ import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
 import { Consumer, Producer } from 'kafkajs';
-import * as kafka from './kafka';
-import * as dbConnection from './dbConnection';
+import * as kafka from './external/kafka';
+import * as dbConnection from './data/dbConnection';
 
 let server: Server;
 let kafkaConnections: Promise<{

@@ -18,11 +18,11 @@
  */
 
 import _ from 'lodash';
-import { File, FileLabel, QueryFilters } from './entity';
-import * as db from './model';
+import { File, FileLabel, QueryFilters } from './file.model';
+import * as fileModel from './file.model';
 
 export async function getFiles(filters: QueryFilters) {
-  return (await db.getFiles(filters)).map(toPojo);
+  return (await fileModel.getFiles(filters)).map(toPojo);
 }
 
 export async function getFileRecordById(fileId: string) {
@@ -31,7 +31,7 @@ export async function getFileRecordById(fileId: string) {
 }
 
 export async function getFileRecordByObjId(objId: string) {
-  const file = await db.getFileRecordByObjId(objId);
+  const file = await fileModel.getFileRecordByObjId(objId);
   if (!file) {
     throw new Errors.NotFound('no file found for objId: ' + objId);
   }
@@ -39,13 +39,13 @@ export async function getFileRecordByObjId(objId: string) {
 }
 
 export async function getOrCreateFileRecordByObjId(fileToCreate: File) {
-  const file = await db.getFileRecordByObjId(fileToCreate.objectId);
+  const file = await fileModel.getFileRecordByObjId(fileToCreate.objectId);
   if (file != undefined) {
     return toPojo(file);
   }
 
   fileToCreate.labels = new Array<FileLabel>();
-  return toPojo(await db.create(fileToCreate));
+  return toPojo(await fileModel.create(fileToCreate));
 }
 
 export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[]) {
@@ -65,18 +65,18 @@ export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[
     existingLabel.value = label.value || [];
     return;
   });
-  return toPojo(await db.update(file));
+  return toPojo(await fileModel.update(file));
 }
 
 export async function removeLabel(fileId: string, keys: string[]) {
   const file = await getFileAsDoc(toNumericId(fileId));
   file.labels = file.labels.filter(l => !keys.includes(l.key));
-  const updated = await db.update(file);
+  const updated = await fileModel.update(file);
   return toPojo(updated);
 }
 
 export async function deleteAll(ids: string[]) {
-  await db.deleteAll(ids.map(toNumericId));
+  await fileModel.deleteAll(ids.map(toNumericId));
 }
 
 function toNumericId(id: string) {
@@ -90,15 +90,15 @@ function toNumericId(id: string) {
   return numId;
 }
 
-async function getFileAsDoc(id: number): Promise<db.FileDocument> {
-  const file = await db.getFileRecordById(id);
+async function getFileAsDoc(id: number): Promise<fileModel.FileDocument> {
+  const file = await fileModel.getFileRecordById(id);
   if (file == undefined) {
     throw new Errors.NotFound('no file found for this id ');
   }
   return file;
 }
 
-function toPojo(f: db.FileDocument) {
+function toPojo(f: fileModel.FileDocument) {
   if (!f) {
     throw new Error('cannot convert undefined');
   }

@@ -18,13 +18,13 @@
  */
 
 import { Router } from 'express';
-import { Status } from '../entity';
-import { dbHealth } from '../dbConnection';
+import { dbHealth } from '../data/dbConnection';
+import Status from '../types/Status';
 
 const router = Router();
 
 router.get('/', (req, res) => {
-  const status = dbHealth.status == Status.OK ? 200 : 500;
+  const status = dbHealth.status === Status.OK ? 200 : 500;
   const resBody = {
     db: dbHealth,
     version: `${process.env.npm_package_version || process.env.SVC_VERSION} - ${
