@@ -1,4 +1,14 @@
-export { File, FileDocument, FileLabel, FileStatus, QueryFilters } from './file.model';
+export {
+  // Enums:
+  EmbargoStage,
+  ReleaseState,
+  // File Types:
+  File,
+  FileDocument,
+  FileLabel,
+  // Query Arguments:
+  QueryFilters,
+} from './file.model';
 export {
   Errors,
   addOrUpdateFileLabel,

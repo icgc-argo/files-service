@@ -30,7 +30,7 @@ import { AnalysisUpdateEvent } from '../external/kafka';
 import { getAppConfig } from '../config';
 import * as indexer from './indexer';
 import * as fileService from '../data/files';
-import { File } from '../data/files';
+import { File, EmbargoStage, ReleaseState } from '../data/files';
 
 export async function processReindexRequest(dataCenterId: string) {
   try {
@@ -117,11 +117,33 @@ async function indexAnalyses(analyses: any[], dataCenterId: string) {
   });
 
   const docsWithFile = files.map(async f => {
+    // Confirm we have only a single donor
+    if (f.donors.length > 1) {
+      logger.warn(
+        `File ${f.fileId} from analysis ${
+          f.analysis.analysisId
+        } has more than 1 donor: ${f.donors.map((donor: { donorId: string }) => donor.donorId)}`,
+      );
+    }
+    if (!f.donors || f.donors.length < 1) {
+      logger.error(`File ${f.fileId} has no associated donors`);
+      throw new Error('FileCentricDocument has no donors, it cannot be converted to a File.');
+    }
+
     const fileToCreate: File = {
       analysisId: f.analysis.analysisId,
       objectId: f.objectId,
       programId: f.studyId,
       repoId: dataCenterId,
+
+      status: f.analysis.analysisState,
+
+      donorId: f.donors[0].donorId,
+
+      firstPublished: f.analysis.firstPublishedAt,
+      embargoStage: EmbargoStage.PROGRAM_ONLY,
+      releaseState: ReleaseState.RESTRICTED,
+
       labels: [],
     };
 

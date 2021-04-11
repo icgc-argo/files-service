@@ -18,7 +18,14 @@
  */
 
 import _ from 'lodash';
-import { File, FileLabel, QueryFilters } from './file.model';
+import {
+  File,
+  FileDocument,
+  FileLabel,
+  QueryFilters,
+  EmbargoStage,
+  ReleaseState,
+} from './file.model';
 import * as fileModel from './file.model';
 
 export async function getFiles(filters: QueryFilters) {
@@ -81,11 +88,11 @@ export async function deleteAll(ids: string[]) {
 
 function toNumericId(id: string) {
   if (!id.startsWith('FL')) {
-    throw new Errors.InvalidArgument('file id should start with FL, example: FL1234');
+    throw new Errors.InvalidArgument('File ID should start with FL, example: FL1234');
   }
   const numId = Number(id.substr(2, id.length - 2));
   if (!numId || numId == Number.NaN) {
-    throw new Errors.InvalidArgument(`id ${id} is not a valid`);
+    throw new Errors.InvalidArgument(`ID ${id} is not a valid`);
   }
   return numId;
 }
@@ -98,18 +105,27 @@ async function getFileAsDoc(id: number): Promise<fileModel.FileDocument> {
   return file;
 }
 
-function toPojo(f: fileModel.FileDocument) {
+function toPojo(f: FileDocument): File {
   if (!f) {
     throw new Error('cannot convert undefined');
   }
   return {
-    analysisId: f.analysisId,
-    labels: f.labels,
-    objectId: f.objectId,
-    programId: f.programId,
-    repoId: f.repoId,
     fileId: `FL${f.fileId}`,
-  } as File;
+    objectId: f.objectId,
+    repoId: f.repoId,
+
+    analysisId: f.analysisId,
+    donorId: f.donorId,
+    programId: f.programId,
+    firstPublished: f.firstPublished,
+
+    status: f.status,
+
+    embargoStage: f.embargoStage as EmbargoStage,
+    releaseState: f.releaseState as ReleaseState,
+
+    labels: f.labels,
+  };
 }
 
 const validateLabels = (labels: FileLabel[]) => {

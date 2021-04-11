@@ -20,13 +20,17 @@
 import mongoose from 'mongoose';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
-export interface File {
-  fileId?: string;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: FileLabel[];
+export enum EmbargoStage {
+  PROGRAM_ONLY = 'PROGRAM_ONLY',
+  MEMBER_ACCESS = 'MEMBER_ACCESS',
+  ASSOCIATE_ACCESS = 'ASSOCIATE_ACCESS',
+  PUBLIC = 'PUBLIC',
+}
+
+export enum ReleaseState {
+  RESTRICTED = 'RESTRICTED',
+  QUEUED = 'QUEUED',
+  PUBLIC = 'PUBLIC',
 }
 
 export type FileLabel = {
@@ -34,20 +38,90 @@ export type FileLabel = {
   value: string[];
 };
 
+const LabelSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    value: { type: [String], required: false },
+  },
+  {
+    _id: false,
+  },
+);
 interface DbFile {
-  fileId?: number;
   objectId: string;
+  fileId?: number;
   repoId: string;
+  status: string;
+
   programId: string;
+  donorId: string;
   analysisId: string;
+
+  firstPublished: Date;
+
+  embargoStage: string;
+  releaseState: string;
+
   labels: FileLabel[];
 }
+
+export interface File {
+  fileId?: string;
+  objectId: string;
+  repoId: string;
+  status: string;
+
+  programId: string;
+  donorId: string;
+  analysisId: string;
+
+  firstPublished: Date;
+  embargoStage: EmbargoStage;
+  releaseState: ReleaseState;
+
+  labels: FileLabel[];
+}
+
+const FileSchema = new mongoose.Schema(
+  {
+    fileId: { type: Number, index: true, unique: true },
+    objectId: { type: String, required: true, unique: true },
+    repoId: { type: String, required: true },
+
+    programId: { type: String, required: true },
+    donorId: { type: String, required: true },
+    analysisId: { type: String, required: true },
+
+    firstPublished: { type: Date, required: true },
+    embargoStage: {
+      type: String,
+      required: true,
+      enum: Object.values(EmbargoStage),
+      default: EmbargoStage.PROGRAM_ONLY,
+    },
+    releaseState: {
+      type: String,
+      required: true,
+      enum: Object.values(EmbargoStage),
+      default: ReleaseState.RESTRICTED,
+    },
+
+    labels: [LabelSchema],
+  },
+  { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
+);
 
 export type QueryFilters = {
   analysisId?: string[];
   programId?: string[];
   objectId?: string[];
 };
+
+FileSchema.plugin(AutoIncrement, {
+  inc_field: 'fileId',
+});
+
+export type FileDocument = mongoose.Document & DbFile;
 
 export async function getFiles(filters: QueryFilters) {
   return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileDocument[];
@@ -87,43 +161,7 @@ export async function deleteAll(ids: number[]) {
   });
 }
 
-const LabelSchema = new mongoose.Schema(
-  {
-    key: { type: String, required: true },
-    value: { type: [String], required: false },
-  },
-  {
-    _id: false,
-  },
-);
-
-const FileSchema = new mongoose.Schema(
-  {
-    fileId: { type: Number, index: true, unique: true },
-    objectId: { type: String, required: true, unique: true },
-    repoId: { type: String, required: true },
-    analysisId: { type: String, required: true },
-    programId: { type: String, required: true },
-    labels: [LabelSchema],
-  },
-  { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
-);
-
-FileSchema.plugin(AutoIncrement, {
-  inc_field: 'fileId',
-});
-
-export type FileDocument = mongoose.Document & DbFile;
-
 export let FileModel = mongoose.model<FileDocument>('File', FileSchema);
-
-export const toPojo = (doc: mongoose.Document) => {
-  const pojo = doc.toObject();
-  if (pojo._id) {
-    pojo._id = pojo._id.toString();
-  }
-  return pojo;
-};
 
 function buildQueryFilters(filters: QueryFilters) {
   const queryFilters: mongoose.MongooseFilterQuery<FileDocument> = {};
