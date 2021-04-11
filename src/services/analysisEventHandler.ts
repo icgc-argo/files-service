@@ -18,17 +18,18 @@
  */
 
 import logger from '../logger';
-
-import { convertAnalysisToFileDocuments, FileCentricDocument } from '../external/analysisConverter';
+import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { AnalysisUpdateEvent } from '../external/kafka';
-
 import * as indexer from './indexer';
-import { indexAnalyses } from './manager';
+import { saveFilesAndIndex } from './manager';
 
 async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEvent) {
   const analysis = analysisEvent.analysis;
   const dataCenterId = analysisEvent.songServerId;
-  await indexAnalyses([analysis], dataCenterId);
+
+  const files = await convertAnalysesToFileDocuments([analysis], dataCenterId);
+
+  await saveFilesAndIndex(files, dataCenterId);
 }
 
 async function handleAnalysisSupressedOrUnpublished(analysisEvent: AnalysisUpdateEvent) {
@@ -36,7 +37,7 @@ async function handleAnalysisSupressedOrUnpublished(analysisEvent: AnalysisUpdat
   const dataCenterId = analysisEvent.songServerId;
 
   // get genomic files for an analysis
-  const files = await convertAnalysisToFileDocuments([analysis], dataCenterId);
+  const files = await convertAnalysesToFileDocuments([analysis], dataCenterId);
 
   // remove from elastic index
   await indexer.remove(files);

@@ -53,7 +53,7 @@ export type FileCentricDocument = { [k: string]: any } & {
  * @param repoCode
  * @returns
  */
-export async function convertAnalysisToFileDocuments(
+export async function convertAnalysesToFileDocuments(
   analyses: any[],
   repoCode: string,
 ): Promise<FileCentricDocument[]> {

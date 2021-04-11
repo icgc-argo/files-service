@@ -19,15 +19,14 @@
 
 import logger from '../logger';
 
-import { convertAnalysisToFileDocuments, FileCentricDocument } from '../external/analysisConverter';
+import { convertAnalysesToFileDocuments, FileCentricDocument } from '../external/analysisConverter';
 
 import * as indexer from './indexer';
 import * as fileService from '../data/files';
 import { File, EmbargoStage, ReleaseState } from '../data/files';
 
 /**
- * Index Analysis Steps:
- * 1. Convert all Analyses to FileCentricDocuments
+ * saveFilesAndIndex Steps:
  * 2. For each FileCentricDocument:
  *    - Save to DB
  *    - Update File document with FileID
@@ -36,10 +35,7 @@ import { File, EmbargoStage, ReleaseState } from '../data/files';
  * @param dataCenterId
  * @returns
  */
-export async function indexAnalyses(analyses: any[], dataCenterId: string) {
-  // get genomic files for analyses
-  const files = await convertAnalysisToFileDocuments(analyses, dataCenterId);
-
+export async function saveFilesAndIndex(files: FileCentricDocument[], dataCenterId: string) {
   const docsWithFile = files.map(async f => {
     // Confirm we have only a single donor
     if (f.donors.length > 1) {

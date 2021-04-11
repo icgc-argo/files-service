@@ -18,6 +18,7 @@
  */
 
 import logger from '../logger';
+import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesBatchesStream } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
@@ -40,7 +41,8 @@ export async function processReindexRequest(dataCenterId: string) {
             `data =>>>>>> ${JSON.stringify(analyses.map((kv: any) => kv.value.analysisId))}`,
           );
           const analysesObject = analyses.map((a: any) => a.value);
-          await indexAnalyses(analysesObject, dataCenterId);
+          const files = await convertAnalysesToFileDocuments(analysesObject, dataCenterId);
+          await indexAnalyses(files, dataCenterId);
         }
       } catch (err) {
         logger.error(`failed to index study ${study}, ${err}`, err);
