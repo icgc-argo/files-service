@@ -19,15 +19,17 @@
 
 /**
  * Note [Jon Eubank, 2021-04-09]:
+ *   This is Maestro service, in everything but name.
+ *
  *   Maestro is the Overture application that is used to convert a Song Analyis into
  *   FileCentric index documents. In the code, we are referring to this service as
  *                                 * analysisConverter *
  *   Naming it generically suggests that a different service could be swapped in to
  *   perform this transformation. Also, the name analysisConverter is more clear in purpose
  *   than something named 'Maestro'. There are no plans to do this but its simple enough
- *   a service that we kept the code references as the generic analysisConverter instead of 'maestro'.
+ *   a service that we kept the code references as the generic 'analysisConverter' instead of 'maestro'.
  *
- *   But for current purposes, analysisConverter = Maestro.
+ *   So, for current purposes, analysisConverter = Maestro.
  *
  *   https://github.com/overture-stack/maestro
  *
