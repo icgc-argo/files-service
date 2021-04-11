@@ -79,7 +79,7 @@ export interface MongoProps {
 }
 
 const loadVaultSecrets = async () => {
-  const vaultEnabled = process.env.VAULT_ENABLED || false;
+  const vaultEnabled = process.env.VAULT_ENABLED === 'true';
   let secrets: any = {};
   /** Vault */
   if (vaultEnabled) {
