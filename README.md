@@ -34,7 +34,9 @@ a swagger UI is available `/api-docs`
 
 `external/` provides connections to external services used by this application.
 
+- `analysesConverter` Convert analysis data into file-centric data. In practice, this is the Overture application `Maestro`. Typically it is used to index all documents from Song into ElasticSearch. In this service it is used to convert an Analysis message from Song into File documents.
+- `dataCenterRegistry` api which maintains a list of data centers available that can provide analysis-data, used to fetch URLs for `Song` services.
 - `kafka` managign Kafka topic subscriptions and message sending.
-- `maestro` Overture tool typically used to index all documents from Song into ElasticSearch. In this service it is used to convert an Analysis message from Song into File documents.
-- `rollcall` Overture tool used to manage index versioning and combining separate indices into an alias.
+- `rollcall` Overture application used to manage index versioning and combining separate indices into an alias.
+- `song` Overture application for storing Analysis metadata. Provides analysis data when a program/data-center is synced. There will be multiple Song servers (at least 1 per RDPC) that will be accessed for analysis data, their URLs will be found using the DataCenterRegistry.
 - `vault` provider of application configuration secrets. Optionally used based on the `VAULT_ENABLED` environment variable
