@@ -30,12 +30,13 @@ import { AnalysisUpdateEvent } from '../external/kafka';
 import { getAppConfig } from '../config';
 import * as indexer from './indexer';
 import * as fileService from '../data/files';
+import { getDataCenter } from '../external/dataCenterRegistry';
 import { File, EmbargoStage, ReleaseState } from '../data/files';
 
 export async function processReindexRequest(dataCenterId: string) {
   try {
     logger.info(`indexing repo ${dataCenterId}`);
-    const url = await getDataCenterUrl(dataCenterId);
+    const { url } = await getDataCenter(dataCenterId);
     logger.info(url);
     const studies: string[] = await getStudies(url);
     logger.info(`fetched all studies, count: ${studies?.length}`);
@@ -60,11 +61,6 @@ export async function processReindexRequest(dataCenterId: string) {
     throw err;
   }
   logger.info(`done indexing`);
-}
-
-async function getDataCenterUrl(dataCenterId: string) {
-  const url = (await getAppConfig()).datacenter.url;
-  return url;
 }
 
 async function generateStudyAnalyses(url: string, studyId: string) {
