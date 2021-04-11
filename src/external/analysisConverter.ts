@@ -56,9 +56,7 @@ export type FileCentricDocument = { [k: string]: any } & {
 export async function convertAnalysisToFileDocuments(
   analyses: any[],
   repoCode: string,
-): Promise<{
-  [k: string]: FileCentricDocument[];
-}> {
+): Promise<FileCentricDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
@@ -76,7 +74,18 @@ export async function convertAnalysisToFileDocuments(
     logger.error(`response from converter: ${await result.text()}`);
     throw new Error(`failed to convert files, got response ${result.status}`);
   }
-  const response = await result.json();
-  logger.info(`done convert analysis to file documents `);
-  return response;
+  const response: {
+    [k: string]: FileCentricDocument[];
+  } = await result.json();
+  logger.info(`done retrieving file documents from analysisConverter`);
+
+  // Convert the Analysis response (StringMap of FileCentricDocuments)
+  let files: FileCentricDocument[] = [];
+
+  // get the file docs arrays from maestro response
+  Object.keys(response).forEach((a: string) => {
+    files = files.concat(response[a]);
+  });
+
+  return files;
 }
