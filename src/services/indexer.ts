@@ -18,7 +18,7 @@
  */
 
 import { getAppConfig } from '../config';
-import { FileCentricDocument } from '../external/maestro';
+import { FileCentricDocument } from '../external/analysisConverter';
 import { Client } from '@elastic/elasticsearch';
 import esMapping from '../resources/file_centric_example.json';
 import logger from '../logger';

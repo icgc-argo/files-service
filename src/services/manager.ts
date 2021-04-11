@@ -25,7 +25,7 @@ import Batch from 'stream-json/utils/Batch';
 
 import logger from '../logger';
 
-import { convertAnalysisToFileDocuments, FileCentricDocument } from '../external/maestro';
+import { convertAnalysisToFileDocuments, FileCentricDocument } from '../external/analysisConverter';
 import { AnalysisUpdateEvent } from '../external/kafka';
 import { getAppConfig } from '../config';
 import * as indexer from './indexer';

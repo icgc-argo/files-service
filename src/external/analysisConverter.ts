@@ -17,6 +17,22 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * Note [Jon Eubank, 2021-04-09]:
+ *   Maestro is the Overture application that is used to convert a Song Analyis into
+ *   FileCentric index documents. In the code, we are referring to this service as
+ *                                 * analysisConverter *
+ *   Naming it generically suggests that a different service could be swapped in to
+ *   perform this transformation. Also, the name analysisConverter is more clear in purpose
+ *   than something named 'Maestro'. There are no plans to do this but its simple enough
+ *   a service that we kept the code references as the generic analysisConverter instead of 'maestro'.
+ *
+ *   But for current purposes, analysisConverter = Maestro.
+ *
+ *   https://github.com/overture-stack/maestro
+ *
+ */
+
 import fetch from 'node-fetch';
 import { getAppConfig } from '../config';
 import logger from '../logger';
@@ -41,8 +57,9 @@ export async function convertAnalysisToFileDocuments(
 ): Promise<{
   [k: string]: FileCentricDocument[];
 }> {
-  const url = (await getAppConfig()).analysisConverterUrl;
-  const timeout = (await getAppConfig()).analysisConverterTimeout;
+  const config = await getAppConfig();
+  const url = config.analysisConverterUrl;
+  const timeout = config.analysisConverterTimeout;
   if (!url) {
     throw new Error('a url for converter is not configured correctly');
   }
