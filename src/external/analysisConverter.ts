@@ -39,12 +39,11 @@ import fetch from 'node-fetch';
 import { getAppConfig } from '../config';
 import logger from '../logger';
 
-export type FileCentricDocument = { [k: string]: any } & {
-  fileId: string;
+export type FilePartialDocument = { [k: string]: any } & {
   objectId: string;
   studyId: string;
   repositories: { [k: string]: string }[];
-  analysis: { [k: string]: any };
+  analysis: { [k: string]: any; analysisState: string };
 };
 
 /**
@@ -56,7 +55,7 @@ export type FileCentricDocument = { [k: string]: any } & {
 export async function convertAnalysesToFileDocuments(
   analyses: any[],
   repoCode: string,
-): Promise<FileCentricDocument[]> {
+): Promise<FilePartialDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
@@ -75,12 +74,12 @@ export async function convertAnalysesToFileDocuments(
     throw new Error(`failed to convert files, got response ${result.status}`);
   }
   const response: {
-    [k: string]: FileCentricDocument[];
+    [k: string]: FilePartialDocument[];
   } = await result.json();
   logger.info(`done retrieving file documents from analysisConverter`);
 
   // Convert the Analysis response (StringMap of FileCentricDocuments)
-  let files: FileCentricDocument[] = [];
+  let files: FilePartialDocument[] = [];
 
   // get the file docs arrays from maestro response
   Object.keys(response).forEach((a: string) => {

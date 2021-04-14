@@ -18,40 +18,22 @@
  */
 
 import logger from '../logger';
-import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
+import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external/analysisConverter';
+import { buildDocument } from './fileCentricDocument';
 import { AnalysisUpdateEvent } from '../external/kafka';
 import * as indexer from './indexer';
-import { saveFilesAndIndex } from './manager';
-
-async function handleAnalysisPublishEvent(analysisEvent: AnalysisUpdateEvent) {
-  const analysis = analysisEvent.analysis;
-  const dataCenterId = analysisEvent.songServerId;
-
-  const files = await convertAnalysesToFileDocuments([analysis], dataCenterId);
-
-  await saveFilesAndIndex(files, dataCenterId);
-}
-
-async function handleAnalysisSupressedOrUnpublished(analysisEvent: AnalysisUpdateEvent) {
-  const analysis = analysisEvent.analysis;
-  const dataCenterId = analysisEvent.songServerId;
-
-  // get genomic files for an analysis
-  const files = await convertAnalysesToFileDocuments([analysis], dataCenterId);
-
-  // remove from elastic index
-  await indexer.remove(files);
-}
+import { saveAndIndexFiles } from './fileManager';
 
 /**
  * Song Kafka Message Handler
  * @param analysisEvent
  */
 const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
-  if (analysisEvent.analysis.analysisState == 'PUBLISHED') {
-    await handleAnalysisPublishEvent(analysisEvent);
-  } else {
-    await handleAnalysisSupressedOrUnpublished(analysisEvent);
-  }
+  const analysis = analysisEvent.analysis;
+  const dataCenterId = analysisEvent.songServerId;
+
+  const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
+
+  await saveAndIndexFiles(partialDocuments, dataCenterId);
 };
 export default analysisEventHandler;

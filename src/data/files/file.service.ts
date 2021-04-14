@@ -20,7 +20,8 @@
 import _ from 'lodash';
 import {
   File,
-  FileDocument,
+  FileInput,
+  FileMongooseDocument,
   FileLabel,
   QueryFilters,
   EmbargoStage,
@@ -28,31 +29,42 @@ import {
 } from './file.model';
 import * as fileModel from './file.model';
 
-export async function getFiles(filters: QueryFilters) {
+export async function getFiles(filters: QueryFilters): Promise<File[]> {
   return (await fileModel.getFiles(filters)).map(toPojo);
 }
 
-export async function getFileRecordById(fileId: string) {
+export async function getFileById(fileId: string): Promise<File> {
   const file = await getFileAsDoc(toNumericId(fileId));
   return toPojo(file);
 }
 
-export async function getFileRecordByObjId(objId: string) {
-  const file = await fileModel.getFileRecordByObjId(objId);
+export async function getFileByObjId(objId: string): Promise<File> {
+  const file = await fileModel.getFileByObjId(objId);
   if (!file) {
     throw new Errors.NotFound('no file found for objId: ' + objId);
   }
   return toPojo(file);
 }
 
-export async function getOrCreateFileRecordByObjId(fileToCreate: File) {
-  const file = await fileModel.getFileRecordByObjId(fileToCreate.objectId);
+export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<File> {
+  const file = await fileModel.getFileByObjId(fileToCreate.objectId);
   if (file != undefined) {
     return toPojo(file);
   }
 
   fileToCreate.labels = new Array<FileLabel>();
   return toPojo(await fileModel.create(fileToCreate));
+}
+
+/**
+ * Returns the updated File.
+ */
+type FileUpdates = { embargoStage?: EmbargoStage; releaseState?: ReleaseState };
+export async function updateFileReleaseProperties(
+  objectId: string,
+  updates: FileUpdates,
+): Promise<File> {
+  return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
 export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[]) {
@@ -72,17 +84,17 @@ export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[
     existingLabel.value = label.value || [];
     return;
   });
-  return toPojo(await fileModel.update(file));
+  return toPojo(await fileModel.save(file));
 }
 
-export async function removeLabel(fileId: string, keys: string[]) {
+export async function removeLabel(fileId: string, keys: string[]): Promise<File> {
   const file = await getFileAsDoc(toNumericId(fileId));
   file.labels = file.labels.filter(l => !keys.includes(l.key));
-  const updated = await fileModel.update(file);
+  const updated = await fileModel.save(file);
   return toPojo(updated);
 }
 
-export async function deleteAll(ids: string[]) {
+export async function deleteAll(ids: string[]): Promise<void> {
   await fileModel.deleteAll(ids.map(toNumericId));
 }
 
@@ -97,15 +109,15 @@ function toNumericId(id: string) {
   return numId;
 }
 
-async function getFileAsDoc(id: number): Promise<fileModel.FileDocument> {
-  const file = await fileModel.getFileRecordById(id);
+async function getFileAsDoc(id: number): Promise<fileModel.FileMongooseDocument> {
+  const file = await fileModel.getFileById(id);
   if (file == undefined) {
     throw new Errors.NotFound('no file found for this id ');
   }
   return file;
 }
 
-function toPojo(f: FileDocument): File {
+function toPojo(f: FileMongooseDocument): File {
   if (!f) {
     throw new Error('cannot convert undefined');
   }

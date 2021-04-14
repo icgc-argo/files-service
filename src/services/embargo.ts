@@ -18,25 +18,22 @@
  */
 
 import { differenceInMonths } from 'date-fns';
-
-import { EmbargoStage, File } from '../data/files';
+import { EmbargoStage, File, ReleaseState } from '../data/files';
 
 /**
- * Calculating the embargo stage a file should be in.
- *
  * Stage is calculated from a file's First Published Date, based on the following timeline:
  * 0-12 months  = PROGRAM_ONLY
  * 12-18 months = MEMBER_ACCESS
  * 18-24 months = ASSOCIATE_ACCESS
  * > 24 months  = PUBLIC
  *
- * Important Note: this calculates what stage a file should be put into, but transitioning
- *   from ASSOCIATE_ACCESS to PUBLIC requires a Release process. This method may return PUBLIC
- *   but that simply indicates it could become PUBLIC, the recorded file should not be immediately
- *   stored with embargoStage=PUBLIC.
+ * no published date = PROGRAM_ONLY
  */
-export const calculateEmbargoStage = (file: File): EmbargoStage => {
-  const monthsPublished = differenceInMonths(new Date(), file.firstPublished);
+const getEmbargoStageForPublishDate = (firstPublishedAt?: Date): EmbargoStage => {
+  if (!firstPublishedAt) {
+    return EmbargoStage.PROGRAM_ONLY;
+  }
+  const monthsPublished = differenceInMonths(new Date(), firstPublishedAt);
 
   // Set expectedStage based on time passed since published
   let expectedStage = EmbargoStage.PROGRAM_ONLY;
@@ -56,6 +53,28 @@ export const calculateEmbargoStage = (file: File): EmbargoStage => {
       expectedStage = EmbargoStage.PROGRAM_ONLY;
       break;
   }
+
+  return expectedStage;
+};
+
+/**
+ * For a file, determine what embarge stage it should be in.
+ * It is important that whatever calls this method does not directly set the file to PUBLIC
+ *   if that is the returned value. Only going through the release process should set the
+ *   embargoStage to PUBLIC.
+ * @param dbFile
+ */
+export const getEmbargoStage = (dbFile: File): EmbargoStage => {
+  // a releaseState of PUBLIC means EmbargoStage of PUBLIC
+  if (dbFile.releaseState === ReleaseState.PUBLIC) {
+    return EmbargoStage.PUBLIC;
+  }
+  // any other releaseState:
+  // get the expected embarge stage from the publish date
+  const expectedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
+
+  // modify this with any promote, limit, and hold rules on the file
+  // TODO: get rules from DB file.
 
   return expectedStage;
 };

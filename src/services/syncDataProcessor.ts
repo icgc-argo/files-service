@@ -22,7 +22,7 @@ import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesBatchesStream } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
-import { indexAnalyses } from './manager';
+import { saveAndIndexFiles } from './fileManager';
 
 export async function processReindexRequest(dataCenterId: string) {
   try {
@@ -42,7 +42,7 @@ export async function processReindexRequest(dataCenterId: string) {
           );
           const analysesObject = analyses.map((a: any) => a.value);
           const files = await convertAnalysesToFileDocuments(analysesObject, dataCenterId);
-          await indexAnalyses(files, dataCenterId);
+          await saveAndIndexFiles(files, dataCenterId);
         }
       } catch (err) {
         logger.error(`failed to index study ${study}, ${err}`, err);

@@ -4,8 +4,8 @@ export {
   ReleaseState,
   // File Types:
   File,
-  FileDocument,
   FileLabel,
+  FileInput,
   // Query Arguments:
   QueryFilters,
 } from './file.model';
@@ -14,8 +14,9 @@ export {
   addOrUpdateFileLabel,
   deleteAll,
   getFiles,
-  getFileRecordById,
-  getFileRecordByObjId,
-  getOrCreateFileRecordByObjId,
+  getFileById,
+  getFileByObjId,
+  getOrCreateFileByObjId,
+  updateFileReleaseProperties,
   removeLabel,
 } from './file.service';

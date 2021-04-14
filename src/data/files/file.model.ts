@@ -47,9 +47,11 @@ const LabelSchema = new mongoose.Schema(
     _id: false,
   },
 );
+
+// DbFile has the types we get back out  of the DB (before casting strings to enums)
 interface DbFile {
   objectId: string;
-  fileId?: number;
+  fileId: number;
   repoId: string;
   status: string;
 
@@ -57,7 +59,7 @@ interface DbFile {
   donorId: string;
   analysisId: string;
 
-  firstPublished: Date;
+  firstPublished?: Date;
 
   embargoStage: string;
   releaseState: string;
@@ -65,7 +67,28 @@ interface DbFile {
   labels: FileLabel[];
 }
 
+// File is the POJO with proper types for a document read from the DB
 export interface File {
+  fileId: string;
+  objectId: string;
+  repoId: string;
+  status: string;
+
+  programId: string;
+  donorId: string;
+  analysisId: string;
+
+  firstPublished?: Date;
+  embargoStage: EmbargoStage;
+  releaseState: ReleaseState;
+
+  labels: FileLabel[];
+}
+
+// FileInput matches the File object, but with optional fields where
+//  values may not want to be provided when doing an update or creating
+//  a new File and plannign to use the default values
+export interface FileInput {
   fileId?: string;
   objectId: string;
   repoId: string;
@@ -75,9 +98,9 @@ export interface File {
   donorId: string;
   analysisId: string;
 
-  firstPublished: Date;
-  embargoStage: EmbargoStage;
-  releaseState: ReleaseState;
+  firstPublished?: Date;
+  embargoStage?: EmbargoStage;
+  releaseState?: ReleaseState;
 
   labels: FileLabel[];
 }
@@ -87,6 +110,7 @@ const FileSchema = new mongoose.Schema(
     fileId: { type: Number, index: true, unique: true },
     objectId: { type: String, required: true, unique: true },
     repoId: { type: String, required: true },
+    status: { type: String, required: true },
 
     programId: { type: String, required: true },
     donorId: { type: String, required: true },
@@ -121,31 +145,35 @@ FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
 });
 
-export type FileDocument = mongoose.Document & DbFile;
+export type FileMongooseDocument = mongoose.Document & DbFile;
 
 export async function getFiles(filters: QueryFilters) {
-  return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileDocument[];
+  return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileMongooseDocument[];
 }
 
-export async function getFileRecordById(id: number) {
+export async function getFileById(id: number) {
   return await FileModel.findOne({ fileId: id });
 }
 
-export async function getFileRecordByObjId(objId: string) {
+export async function getFileByObjId(objId: string) {
   return await FileModel.findOne({
     objectId: objId,
   });
 }
 
-export async function create(file: File) {
+export async function create(file: FileInput) {
   const newFile = new FileModel(file);
   const createdFile = await newFile.save();
   return createdFile;
 }
 
-export async function update(toUpdate: FileDocument) {
+export async function save(toUpdate: FileMongooseDocument) {
   const updatedFile = await toUpdate.save();
   return updatedFile;
+}
+
+export async function updateByObjectId(objectId: string, updates: any, options: any) {
+  return await FileModel.updateOne({ objectId }, updates, options);
 }
 
 export async function deleteAll(ids: number[]) {
@@ -161,10 +189,10 @@ export async function deleteAll(ids: number[]) {
   });
 }
 
-export let FileModel = mongoose.model<FileDocument>('File', FileSchema);
+export let FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema);
 
 function buildQueryFilters(filters: QueryFilters) {
-  const queryFilters: mongoose.MongooseFilterQuery<FileDocument> = {};
+  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};
   if (filters.analysisId && filters.analysisId.length > 0) {
     queryFilters.analysisId = {
       $in: filters.analysisId,

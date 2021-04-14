@@ -18,9 +18,10 @@
  */
 
 import logger from '../logger';
-import { FileCentricDocument } from '../external/analysisConverter';
+// import { FilePartialDocument } from '../external/analysisConverter';
 import { getClient } from '../external/elasticsearch';
 import { getAppConfig } from '../config';
+import { FileCentricDocument } from './fileCentricDocument';
 
 const getIndexName = async () => {
   return (await getAppConfig()).elasticProperties.indexName;
@@ -47,7 +48,7 @@ export async function index(docs: FileCentricDocument[]) {
   }
 }
 
-export async function remove(docs: FileCentricDocument[]) {
+export async function remove(docs: { [k: string]: any; objectId: string }[]) {
   const client = await getClient();
   const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));
 

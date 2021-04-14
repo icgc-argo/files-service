@@ -17,13 +17,13 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Router, Request, Response, RequestHandler, NextFunction } from 'express';
+import { Router, Request, Response, RequestHandler } from 'express';
 
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import { AppConfig } from '../config';
 
-import { processReindexRequest } from '../services/manager';
+import { processReindexRequest } from '../services/syncDataProcessor';
 
 const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
