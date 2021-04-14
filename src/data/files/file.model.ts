@@ -58,11 +58,13 @@ interface DbFile {
   programId: string;
   donorId: string;
   analysisId: string;
-
   firstPublished?: Date;
 
   embargoStage: string;
   releaseState: string;
+
+  adminPromote?: EmbargoStage;
+  adminHold?: boolean;
 
   labels: FileLabel[];
 }
@@ -77,10 +79,13 @@ export interface File {
   programId: string;
   donorId: string;
   analysisId: string;
-
   firstPublished?: Date;
+
   embargoStage: EmbargoStage;
   releaseState: ReleaseState;
+
+  adminPromote?: EmbargoStage;
+  adminHold?: boolean;
 
   labels: FileLabel[];
 }
@@ -97,10 +102,13 @@ export interface FileInput {
   programId: string;
   donorId: string;
   analysisId: string;
-
   firstPublished?: Date;
+
   embargoStage?: EmbargoStage;
   releaseState?: ReleaseState;
+
+  adminPromote?: EmbargoStage;
+  adminHold?: boolean;
 
   labels: FileLabel[];
 }
@@ -126,9 +134,16 @@ const FileSchema = new mongoose.Schema(
     releaseState: {
       type: String,
       required: true,
-      enum: Object.values(EmbargoStage),
+      enum: Object.values(ReleaseState),
       default: ReleaseState.RESTRICTED,
     },
+
+    adminPromote: {
+      type: String,
+      required: false,
+      enum: Object.values(EmbargoStage),
+    },
+    adminHold: { type: Boolean, required: false },
 
     labels: [LabelSchema],
   },
@@ -172,8 +187,12 @@ export async function save(toUpdate: FileMongooseDocument) {
   return updatedFile;
 }
 
-export async function updateByObjectId(objectId: string, updates: any, options: any) {
-  return await FileModel.updateOne({ objectId }, updates, options);
+export async function updateByObjectId(
+  objectId: string,
+  updates: mongoose.UpdateQuery<FileMongooseDocument>,
+  options: any,
+) {
+  return await FileModel.findOneAndUpdate({ objectId }, updates, options);
 }
 
 export async function deleteAll(ids: number[]) {

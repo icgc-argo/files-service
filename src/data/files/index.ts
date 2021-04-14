@@ -18,5 +18,7 @@ export {
   getFileByObjId,
   getOrCreateFileByObjId,
   updateFileReleaseProperties,
+  updateFileAdminControls,
+  updateFilePublishStatus,
   removeLabel,
 } from './file.service';

@@ -53,7 +53,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     '/:id',
     authFilter([config.auth.readScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      return res.status(200).send(await fileService.getFileRecordById(req.params.id));
+      return res.status(200).send(await fileService.getFileById(req.params.id));
     }),
   );
 
@@ -66,7 +66,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body;
-      const result = await fileService.getOrCreateFileRecordByObjId(file);
+      const result = await fileService.getOrCreateFileByObjId(file);
       return res.status(200).send(result);
     }),
   );

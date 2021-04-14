@@ -28,6 +28,7 @@ import {
   ReleaseState,
 } from './file.model';
 import * as fileModel from './file.model';
+import logger from '../../logger';
 
 export async function getFiles(filters: QueryFilters): Promise<File[]> {
   return (await fileModel.getFiles(filters)).map(toPojo);
@@ -59,10 +60,27 @@ export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<F
 /**
  * Returns the updated File.
  */
-type FileUpdates = { embargoStage?: EmbargoStage; releaseState?: ReleaseState };
+type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: ReleaseState };
 export async function updateFileReleaseProperties(
   objectId: string,
-  updates: FileUpdates,
+  updates: ReleaseProperties,
+): Promise<File> {
+  const result = await fileModel.updateByObjectId(objectId, updates, { new: true });
+  return toPojo(result);
+}
+
+type AdminControls = { adminPromote?: EmbargoStage; adminHold?: boolean };
+export async function updateFileAdminControls(
+  objectId: string,
+  updates: AdminControls,
+): Promise<File> {
+  return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
+}
+
+type FilePublishStatus = { status?: string; firstPublished?: Date };
+export async function updateFilePublishStatus(
+  objectId: string,
+  updates: FilePublishStatus,
 ): Promise<File> {
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
