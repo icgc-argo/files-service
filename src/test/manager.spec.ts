@@ -21,7 +21,7 @@ import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
 import { AnalysisUpdateEvent } from '../external/kafka';
-import * as manager from '../services/manager';
+import analysisEventHandler from '../services/analysisEventHandler';
 import nock from 'nock';
 import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
@@ -76,8 +76,7 @@ describe('manager', () => {
   });
 
   it('can handle published analysis event', async () => {
-    const result = await manager.handleAnalysisPublishEvent(analysisEvent);
-    const id = result[0];
+    await analysisEventHandler(analysisEvent);
     const getFileById = await esClient.get({
       id: '4b509876-3f0d-57ae-b097-50d892bf268e',
       index: 'file_centric_test',
