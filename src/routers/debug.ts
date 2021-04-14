@@ -23,7 +23,7 @@ import { AppConfig } from '../config';
 
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import { handleAnalysisPublishEvent } from '../services/manager';
+import analysisEventHandler from '../services/analysisEventHandler';
 import * as fileService from '../data/files';
 
 const createDebugRouter = (
@@ -59,10 +59,8 @@ const createDebugRouter = (
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const analysisEvent = req.body;
-      const result = await handleAnalysisPublishEvent(analysisEvent);
-      return res.status(201).send({
-        fileDocuments: result,
-      });
+      const result = await analysisEventHandler(analysisEvent);
+      return res.status(201).send(result);
     }),
   );
 

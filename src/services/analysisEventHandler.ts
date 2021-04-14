@@ -28,12 +28,12 @@ import { saveAndIndexFiles } from './fileManager';
  * Song Kafka Message Handler
  * @param analysisEvent
  */
-const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
+const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   const analysis = analysisEvent.analysis;
   const dataCenterId = analysisEvent.songServerId;
 
   const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
 
-  await saveAndIndexFiles(partialDocuments, dataCenterId);
+  return await saveAndIndexFiles(partialDocuments, dataCenterId);
 };
 export default analysisEventHandler;
