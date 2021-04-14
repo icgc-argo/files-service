@@ -18,7 +18,22 @@
  */
 
 import { differenceInMonths } from 'date-fns';
+import logger from '../logger';
 import { EmbargoStage, File, ReleaseState } from '../data/files';
+import { first } from 'lodash';
+
+const stageOrder = {
+  [EmbargoStage.PROGRAM_ONLY]: 0,
+  [EmbargoStage.MEMBER_ACCESS]: 1,
+  [EmbargoStage.ASSOCIATE_ACCESS]: 2,
+  [EmbargoStage.PUBLIC]: 3,
+};
+export const sortStages = (stages: EmbargoStage[]): EmbargoStage[] => {
+  return stages.sort(compareStages);
+};
+export const compareStages = (stage: EmbargoStage, compareTo: EmbargoStage): 1 | -1 => {
+  return stageOrder[stage] > stageOrder[compareTo] ? 1 : -1;
+};
 
 /**
  * Stage is calculated from a file's First Published Date, based on the following timeline:
@@ -72,7 +87,6 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
   // any other releaseState:
   // get the expected embarge stage from the publish date
   const expectedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
-
   // modify this with any promote, limit, and hold rules on the file
   // TODO: get rules from DB file.
 
