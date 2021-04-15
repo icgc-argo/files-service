@@ -80,15 +80,39 @@ const getEmbargoStageForPublishDate = (firstPublishedAt?: Date): EmbargoStage =>
  * @param dbFile
  */
 export const getEmbargoStage = (dbFile: File): EmbargoStage => {
-  // a releaseState of PUBLIC means EmbargoStage of PUBLIC
+  logger.debug(`[Embargo] ${dbFile.fileId}: Recalculating embargo stage`);
+
+  // a releaseState of PUBLIC means this is already public, return EmbargoStage of PUBLIC
   if (dbFile.releaseState === ReleaseState.PUBLIC) {
+    logger.debug(`[Embargo] ${dbFile.fileId}: File is already public.`);
     return EmbargoStage.PUBLIC;
   }
-  // any other releaseState:
-  // get the expected embarge stage from the publish date
-  const expectedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
-  // modify this with any promote, limit, and hold rules on the file
-  // TODO: get rules from DB file.
 
-  return expectedStage;
+  // if adminHold is true then no change from the dbFile
+  if (dbFile.adminHold) {
+    logger.debug(
+      `[Embargo] ${dbFile.fileId}: File has admin hold. Returning current stage: ${dbFile.embargoStage}`,
+    );
+    return dbFile.embargoStage;
+  }
+
+  // get the expected embarge stage from the publish date
+  let calculatedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
+  logger.debug(
+    `[Embargo] ${dbFile.fileId}: Based on a published date of ${dbFile.firstPublished} the calculated embargo stage is: ${calculatedStage}`,
+  );
+
+  // modify this with any promote, limit, and hold rules on the file
+  if (dbFile.adminPromote) {
+    // Assign the most permissive of adminPromote and calculatedStage
+    calculatedStage =
+      stageOrder[dbFile.adminPromote] > stageOrder[calculatedStage]
+        ? dbFile.adminPromote
+        : calculatedStage;
+    logger.debug(
+      `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updatign calculated stage to: ${calculatedStage}`,
+    );
+  }
+  logger.debug(`[Embargo] ${dbFile.fileId}: Returning embargo stage: ${calculatedStage}`);
+  return calculatedStage;
 };
