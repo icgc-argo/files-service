@@ -156,13 +156,33 @@ export type QueryFilters = {
   objectId?: string[];
 };
 
+/**
+ * As described in swagger schema: #/components/schemas/FileFilter
+ */
+export interface FileFilterProperties {
+  analyses?: string[];
+  donors?: string[];
+  programs?: string[];
+  objectIds?: string[];
+  fileIds?: string[];
+}
+export interface FileFilter {
+  include?: FileFilterProperties;
+  exclude?: FileFilterProperties;
+}
+
 FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
 });
 
 export type FileMongooseDocument = mongoose.Document & DbFile;
 
-export async function getFiles(filters: QueryFilters) {
+export async function getFiles(filters: FileFilter) {
+  return (await FileModel.find(
+    convertFiltersForMongoose(filters),
+  ).exec()) as FileMongooseDocument[];
+}
+export async function getFilesQuery(filters: QueryFilters) {
   return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileMongooseDocument[];
 }
 
@@ -193,6 +213,18 @@ export async function updateByObjectId(
   options: any,
 ) {
   return await FileModel.findOneAndUpdate({ objectId }, updates, options);
+}
+
+export async function updateBulk(
+  filter: FileFilter,
+  updates: mongoose.UpdateQuery<FileMongooseDocument>,
+  options?: { returnDocuments: boolean },
+) {
+  const mongooseFilter = convertFiltersForMongoose(filter);
+  await FileModel.updateMany(mongooseFilter, updates);
+  if (options?.returnDocuments) {
+    return FileModel.find(mongooseFilter);
+  }
 }
 
 export async function deleteAll(ids: number[]) {
@@ -226,6 +258,69 @@ function buildQueryFilters(filters: QueryFilters) {
     queryFilters.objectId = {
       $in: filters.objectId,
     };
+  }
+  return queryFilters;
+}
+const fileIdFromString = (fileId: string): number => {
+  return parseInt(fileId.replace(/^FL/, ''));
+};
+
+function convertFiltersForMongoose(filters: FileFilter) {
+  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};
+  if (filters.include) {
+    if (filters.include.analyses && filters.include.analyses.length > 0) {
+      queryFilters.analysisId = {
+        $in: filters.include.analyses,
+      };
+    }
+    if (filters.include.programs && filters.include.programs.length > 0) {
+      queryFilters.programId = {
+        $in: filters.include.programs,
+      };
+    }
+    if (filters.include.donors && filters.include.donors.length > 0) {
+      queryFilters.donorId = {
+        $in: filters.include.donors,
+      };
+    }
+    if (filters.include.objectIds && filters.include.objectIds.length > 0) {
+      queryFilters.objectId = {
+        $in: filters.include.objectIds,
+      };
+    }
+    if (filters.include.fileIds && filters.include.fileIds.length > 0) {
+      queryFilters.fileId = {
+        $in: filters.include.fileIds.map(fileIdFromString),
+      };
+    }
+  }
+
+  if (filters.exclude) {
+    if (filters.exclude.analyses && filters.exclude.analyses.length > 0) {
+      queryFilters.analysisId = {
+        $nin: filters.exclude.analyses,
+      };
+    }
+    if (filters.exclude.programs && filters.exclude.programs.length > 0) {
+      queryFilters.programId = {
+        $nin: filters.exclude.programs,
+      };
+    }
+    if (filters.exclude.donors && filters.exclude.donors.length > 0) {
+      queryFilters.donorId = {
+        $nin: filters.exclude.donors,
+      };
+    }
+    if (filters.exclude.objectIds && filters.exclude.objectIds.length > 0) {
+      queryFilters.objectId = {
+        $nin: filters.exclude.objectIds,
+      };
+    }
+    if (filters.exclude.fileIds && filters.exclude.fileIds.length > 0) {
+      queryFilters.fileId = {
+        $nin: filters.exclude.fileIds.map(fileIdFromString),
+      };
+    }
   }
   return queryFilters;
 }

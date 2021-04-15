@@ -37,7 +37,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     authFilter([config.auth.readScope]),
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
-        await fileService.getFiles({
+        await fileService.getFilesQuery({
           analysisId: (req.query as any)?.analysisId?.split(','),
           objectId: (req.query as any)?.objectId?.split(','),
           programId: (req.query as any)?.programId?.split(','),

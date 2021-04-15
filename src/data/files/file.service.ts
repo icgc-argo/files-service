@@ -23,6 +23,7 @@ import {
   FileInput,
   FileMongooseDocument,
   FileLabel,
+  FileFilter,
   QueryFilters,
   EmbargoStage,
   ReleaseState,
@@ -30,8 +31,11 @@ import {
 import * as fileModel from './file.model';
 import logger from '../../logger';
 
-export async function getFiles(filters: QueryFilters): Promise<File[]> {
-  return (await fileModel.getFiles(filters)).map(toPojo);
+export async function getFilesQuery(filter: QueryFilters): Promise<File[]> {
+  return (await fileModel.getFilesQuery(filter)).map(toPojo);
+}
+export async function getFiles(filter: FileFilter): Promise<File[]> {
+  return (await fileModel.getFiles(filter)).map(toPojo);
 }
 
 export async function getFileById(fileId: string): Promise<File> {
@@ -85,6 +89,21 @@ export async function updateFilePublishStatus(
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
+export async function adminPromote(
+  filter: FileFilter,
+  stage: EmbargoStage,
+  options?: { returnDocuments: boolean },
+): Promise<File[] | void> {
+  // Perform bulk update
+  const response = await fileModel.updateBulk(filter, { adminPromote: stage }, options);
+  if (options?.returnDocuments) {
+    return response.map(toPojo);
+  }
+}
+
+/**
+ * LABEL MANAGEMENT
+ */
 export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[]) {
   const file = await getFileAsDoc(toNumericId(fileId));
   validateLabels(newLabels);
@@ -153,6 +172,9 @@ function toPojo(f: FileMongooseDocument): File {
 
     embargoStage: f.embargoStage as EmbargoStage,
     releaseState: f.releaseState as ReleaseState,
+
+    adminHold: f.adminHold,
+    adminPromote: f.adminPromote as EmbargoStage,
 
     labels: f.labels,
   };

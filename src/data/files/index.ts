@@ -7,12 +7,15 @@ export {
   FileLabel,
   FileInput,
   // Query Arguments:
-  QueryFilters,
+  FileFilter,
+  FileFilterProperties,
 } from './file.model';
 export {
   Errors,
   addOrUpdateFileLabel,
+  adminPromote,
   deleteAll,
+  getFilesQuery,
   getFiles,
   getFileById,
   getFileByObjId,
