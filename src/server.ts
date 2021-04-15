@@ -25,6 +25,7 @@ import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
 import { Consumer, Producer } from 'kafkajs';
 import * as kafka from './external/kafka';
+import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
 
 let server: Server;
@@ -68,12 +69,16 @@ let kafkaConnections: Promise<{
   const app = App(appConfig);
   server = app.listen(app.get('port'), () => {
     logger.info(`App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`);
+    logger.info(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
     logger.info('Press CTRL-C to stop');
   });
 
   if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
     kafkaConnections = kafka.setup(appConfig);
   }
+
+  // Init ES client
+  const esClient = getClient();
 })();
 
 // terminate kafka connections before exiting
