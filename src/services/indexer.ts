@@ -18,14 +18,30 @@
  */
 
 import logger from '../logger';
-// import { FilePartialDocument } from '../external/analysisConverter';
 import { getClient } from '../external/elasticsearch';
 import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
+import { File } from '../data/files';
 
 const getIndexName = async () => {
   return (await getAppConfig()).elasticProperties.indexName;
 };
+
+export async function updateDocFromFile(file: File) {
+  // updates for the file in ES
+  const doc = {
+    embargo_stage: file.embargoStage,
+    release_state: file.releaseState,
+  };
+
+  // TODO: get indexName from rollcall
+  const client = await getClient();
+  await client.update({
+    index: await getIndexName(),
+    id: file.objectId,
+    body: { doc },
+  });
+}
 
 export async function index(docs: FileCentricDocument[]) {
   const client = await getClient();
