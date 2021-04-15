@@ -9,7 +9,7 @@ import { getEmbargoStage } from './embargo';
 import * as indexer from './indexer';
 import logger from '../logger';
 
-export async function updateFile(
+export async function updateFileFromRdpcData(
   partialFile: FilePartialDocument,
   dataCenterId: string,
 ): Promise<File> {
@@ -41,45 +41,21 @@ export async function updateFile(
     });
   }
 
-  // If the file is not already released, lets update its embargo stage
-  const updates: any = {};
-  if (dbFile.releaseState !== ReleaseState.PUBLIC) {
-    const embargoStage = getEmbargoStage(dbFile);
-
-    // If this file is ready for PUBLIC access:
-    //  - set the embargo stage to ASSOCIATE_ACCESS (2nd highest)
-    //  - set the release state to queued
-    if (embargoStage === EmbargoStage.PUBLIC) {
-      updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-      updates.releaseState = ReleaseState.QUEUED;
-    } else {
-      updates.embargoStage = embargoStage;
-      updates.releaseState = ReleaseState.RESTRICTED;
-    }
-  }
-
-  if (
-    updates.embargoStage !== dbFile.embargoStage &&
-    updates.releaseState !== dbFile.releaseState
-  ) {
-    logger.info(`Updating file embargo stage: ${dbFile.fileId} - ${JSON.stringify(updates)}`);
-    return await fileService.updateFileReleaseProperties(dbFile.objectId, updates);
-  }
-  return dbFile;
+  return recalculateFileState(dbFile);
 }
 
 type SaveAndIndexResults = {
   indexed: string[];
   removed: string[];
 };
-export async function saveAndIndexFiles(
+export async function saveAndIndexFilesFromRdpcData(
   filePartialDocuments: FilePartialDocument[],
   dataCenterId: string,
 ): Promise<SaveAndIndexResults> {
   const fileCentricDocuments = await Promise.all(
     filePartialDocuments.map(async filePartialDocument => {
       // update local records
-      const dbFile = await updateFile(filePartialDocument, dataCenterId);
+      const dbFile = await updateFileFromRdpcData(filePartialDocument, dataCenterId);
       // convert to file centric documents
       return buildDocument({ dbFile, filePartialDocument });
     }),
@@ -107,6 +83,27 @@ export async function saveAndIndexFiles(
   };
 }
 
-export async function promoteFile(file: File, embargoStage: EmbargoStage): Promise<File> {
-  return await fileService.updateFileAdminControls(file.objectId, { adminPromote: embargoStage });
+export async function recalculateFileState(file: File) {
+  // If the file is not already released, lets update its embargo stage
+  const updates: any = {};
+  if (file.releaseState !== ReleaseState.PUBLIC) {
+    const embargoStage = getEmbargoStage(file);
+
+    // If this file is ready for PUBLIC access:
+    //  - set the embargo stage to ASSOCIATE_ACCESS (2nd highest)
+    //  - set the release state to queued
+    if (embargoStage === EmbargoStage.PUBLIC) {
+      updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
+      updates.releaseState = ReleaseState.QUEUED;
+    } else {
+      updates.embargoStage = embargoStage;
+      updates.releaseState = ReleaseState.RESTRICTED;
+    }
+  }
+
+  if (updates.embargoStage !== file.embargoStage && updates.releaseState !== file.releaseState) {
+    logger.info(`Updating file embargo stage: ${file.fileId} - ${JSON.stringify(updates)}`);
+    return await fileService.updateFileReleaseProperties(file.objectId, updates);
+  }
+  return file;
 }

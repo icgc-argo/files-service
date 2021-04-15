@@ -205,7 +205,7 @@ paths:
         - Admin
       parameters:
         - name: datacenter
-          description: Datacenter code (ex song.collab)
+          description: Datacenter code (ex song.collab) CURRENTLY ONLY ONE RDPC AND THE VALUE IS READ FROM CONFIG, THIS PARAMETER DOES NOTHING UNTIL THIS COMMENT IS UPDATED
           in: path
           required: true
           schema:
@@ -218,6 +218,41 @@ paths:
             application/json:
               schema:
                 type: string
+
+  /admin/promote/{stage}:
+    post:
+      tags:
+        - Admin
+      parameters:
+        - name: stage
+          description: The embargo stage that the selected files should be promoted to
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/EmbargoStage'
+        - name: dryRun
+          description: Set to "true" to retrieve details of the Donors and Analyses affected by the provided filters. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for promotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated and re-indexed
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
 
   /debug/handleAnalysisEvent:
     post:
@@ -298,6 +333,9 @@ components:
           type: string
         analysisId:
           type: string
+    EmbargoStage:
+      type: string
+      enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
     File:
       type: object
       properties:
@@ -315,6 +353,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Labels'
+    FileFilter:
+      type: object
+      description: Two sets of file property filters. If none are provided, all files will be found. If "include" values are provided, files will be filtered to match these values. If "exclude" values are provided, the files found will be filtered to not include matches to these values. It is valid to provide any number of these filters from none, to some, to all.
+      properties:
+        include:
+          $ref: '#/components/schemas/FileProperties'
+          description: Provided values will filter the files found to only include matches to these values
+        exclude:
+          $ref: '#/components/schemas/FileProperties'
+          description: Provided values will filter the files found to not include matches to these values
+    FileProperties:
+      type: object
+      properties:
+        analyses:
+          description: List of analysis Ids
+          type: array
+          items:
+            type: string
+        donors:
+          description: List of donor ids
+          type: array
+          items:
+            type: string
+        programs:
+          description: List of program short-names (ex. TEST-CA)
+          type: array
+          items:
+            type: string
+        fileIds:
+          description: List of file IDs (ex. FL123)
+          type: array
+          items:
+            type: string
+        objectIds:
+          description: List of objectIDs that are used as unique IDs for files in SONG and ES
+          type: array
+          items:
+            type: string
     Labels:
       type: object
       description: Arbitrary pair of a key and value(s) string
@@ -328,3 +404,18 @@ components:
           description: Label values array, can be empty if the label doesn't need values
           items:
             type: string
+    SelectedFilesResponse:
+      type: object
+      description: A summary of the files selected by the query
+      properties:
+        total:
+          description: Total number of files selected
+          type: integer
+        ids:
+          description: The objectIds of the files selected
+          type: array
+          items:
+            type: string
+        message:
+          description: Text description of action taken
+          type: string

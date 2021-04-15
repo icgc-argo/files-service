@@ -22,37 +22,36 @@ import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesBatchesStream } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
-import { saveAndIndexFiles } from './fileManager';
+import { saveAndIndexFilesFromRdpcData } from './fileManager';
 
-export async function processReindexRequest(dataCenterId: string) {
+export async function reindexDataCenter(dataCenterId: string) {
   try {
-    logger.info(`indexing repo ${dataCenterId}`);
+    logger.info(`Start: reindex data center ${dataCenterId}`);
     const { url } = await getDataCenter(dataCenterId);
-    logger.info(url);
+    logger.info(`Datacenter URL: ${url}`);
     const studies: string[] = await getStudies(url);
-    logger.info(`fetched all studies, count: ${studies?.length}`);
 
     for (const study of studies) {
+      logger.info(`Indexing study: ${study}`);
       try {
-        logger.info(`indexing study: ${study}`);
         const analysesStream = await generateStudyAnalyses(url, study);
-        for await (const analyses of analysesStream) {
-          logger.info(
-            `data =>>>>>> ${JSON.stringify(analyses.map((kv: any) => kv.value.analysisId))}`,
-          );
-          const analysesObject = analyses.map((a: any) => a.value);
-          const files = await convertAnalysesToFileDocuments(analysesObject, dataCenterId);
-          await saveAndIndexFiles(files, dataCenterId);
+        for await (const analysesData of analysesStream) {
+          const analyses = analysesData.map((a: { value: any }) => a.value);
+          const analysisIds = analyses.map((a: { analysisId: string }) => a.analysisId);
+          logger.info(`Retrieved analyses from song: ${analysisIds}`);
+
+          const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
+          await saveAndIndexFilesFromRdpcData(files, dataCenterId);
         }
       } catch (err) {
-        logger.error(`failed to index study ${study}, ${err}`, err);
+        logger.error(`Failed to index study ${study}, ${err}`, err);
       }
     }
   } catch (err) {
-    logger.error(`error while indexing repository ${dataCenterId}`);
+    logger.error(`Error while indexing repository ${dataCenterId}`);
     throw err;
   }
-  logger.info(`done indexing`);
+  logger.info(`Done indexing`);
 }
 
 async function generateStudyAnalyses(url: string, studyId: string) {

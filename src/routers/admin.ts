@@ -18,23 +18,98 @@
  */
 
 import { Router, Request, Response, RequestHandler } from 'express';
+import PromisePool from '@supercharge/promise-pool';
 
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import { AppConfig } from '../config';
+import validator from './common/validator';
+import * as fileService from '../data/files';
+import { EmbargoStage } from '../data/files';
 
-import { processReindexRequest } from '../services/syncDataProcessor';
+import { reindexDataCenter } from '../services/syncDataProcessor';
+import { recalculateFileState } from '../services/fileManager';
+import * as indexer from '../services/indexer';
+
+function fileSummaryResponse(files: fileService.File[]) {
+  const total = files.length;
+  const ids = files.map(file => file.objectId);
+  return { total, ids };
+}
 
 const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
+  // Ensure all routes in this router are restricted to those with WRITE scope only.
+  router.use(authFilter([config.auth.writeScope]));
+
+  /**
+   * Request to re-index all analyses from a datacenter.
+   */
   router.post(
     '/index/:datacenter',
-    authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
-      const dataCenterId = req.params.datacenter;
-      processReindexRequest(dataCenterId);
+      // const dataCenterId = req.params.datacenter;
+      // TODO: Current config hardcodes a single data center instead of retrieving connection details from data center registry
+      const dataCenterId = config.datacenter.dataCenterId;
+      reindexDataCenter(dataCenterId);
       return res.status(200).send(`submitted`);
+    }),
+  );
+
+  /**
+   * Add admin promote value to files based on a filter
+   */
+  router.post(
+    '/promote/:stage',
+    wrapAsync(async (req: Request, res: Response) => {
+      // Get Params:
+      try {
+        const filter = validator.fileFilter(req.body);
+        const stage = validator.embargoStage(req.params.stage);
+
+        const dryRun = req.query.dryRun === 'true';
+
+        if (dryRun) {
+          const selectedFiles = await fileService.getFiles(filter);
+          const fileSummary = fileSummaryResponse(selectedFiles);
+          const response = { message: 'DRY RUN ONLY - No changes made.', ...fileSummary };
+          return res.status(200).json(response);
+        }
+
+        try {
+          const updatedFiles = await fileService.adminPromote(filter, stage, {
+            returnDocuments: true,
+          });
+
+          if (!updatedFiles) {
+            return res.status(400).send(`No files updated.`);
+          }
+
+          const { results, errors } = await PromisePool.withConcurrency(20)
+            .for(updatedFiles)
+            .process(async file => {
+              logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
+              const recalculatedFile = await recalculateFileState(file);
+              await indexer.updateDocFromFile(recalculatedFile);
+              return file;
+            });
+
+          const fileSummary = fileSummaryResponse(results);
+          const response = {
+            message: `Successfully updated and re-indexed ${fileSummary.total} files. adminPromote value set to ${stage}`,
+            ...fileSummary,
+          };
+          return res.status(200).json(response);
+        } catch (e) {
+          return res.status(500).send(`Unexpected error updating files: ${e}`);
+        }
+
+        return res.status(200).json(filter);
+      } catch (error) {
+        // Catch Param Validation Errors
+        return res.status(400).send(error.toString());
+      }
     }),
   );
   return router;
