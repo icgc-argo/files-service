@@ -60,9 +60,10 @@ export async function convertAnalysesToFileDocuments(
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
   if (!url) {
-    throw new Error('a url for converter is not configured correctly');
+    throw new Error('[AnalysisConverter] URL is not provided in configuration');
   }
-  logger.info(`convert analysis to file documents `);
+
+  logger.debug(`[AnalysisConverter] Requesting analyses-to-file conversion from: ${url}`);
   const result = await fetch(url, {
     body: JSON.stringify({ analyses, repoCode }),
     method: 'POST',
@@ -70,13 +71,16 @@ export async function convertAnalysesToFileDocuments(
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {
-    logger.error(`response from converter: ${await result.text()}`);
-    throw new Error(`failed to convert files, got response ${result.status}`);
+    logger.error(`[AnalysisConverter] Error response from converter: ${await result.text()}`);
+    throw new Error(`[AnalysisConverter] Failed to convert files, got response ${result.status}`);
   }
+
   const response: {
     [k: string]: FilePartialDocument[];
   } = await result.json();
-  logger.info(`done retrieving file documents from analysisConverter`);
+  logger.debug(
+    `[AnalysisConverter] Conversion response received with ${Object.keys(response).length} files`,
+  );
 
   // Convert the Analysis response (StringMap of FileCentricDocuments)
   let files: FilePartialDocument[] = [];
