@@ -33,10 +33,10 @@ const createDebugRouter = (
   // Middleware to disable debug endpoints based on config
   const testEndpointFilter = (req: Request, res: Response, next: NextFunction) => {
     if (!config.debug.endpointsEnabled) {
-      logger.info(`DEBUG endpoints are DISABLED. ${req.url} denied.`);
+      logger.warn(`DEBUG endpoints are disabled. ${req.url} denied.`);
       return res.status(403).send('DEBUG endpoints are disabled.');
     }
-    logger.info(`DEBUG endpoints are ENABLED. ${req.url} requested.`);
+    logger.warn(`DEBUG endpoints are enabled. ${req.method} ${req.url} requested.`);
     return next();
   };
 
