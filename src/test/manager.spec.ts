@@ -175,6 +175,8 @@ const expectedResult = {
     file_type: 'VCF',
     file_access: 'open',
     file_id: 'FL1',
+    embargo_stage: 'PROGRAM_ONLY',
+    release_state: 'RESTRICTED',
   },
 };
 
