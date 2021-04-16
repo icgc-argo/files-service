@@ -20,10 +20,10 @@
 import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
-import { AnalysisUpdateEvent } from '../entity';
-import * as manager from '../manager';
+import { AnalysisUpdateEvent } from '../external/kafka';
+import analysisEventHandler from '../services/analysisEventHandler';
 import nock from 'nock';
-import * as db from '../dbConnection';
+import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
 const ES_PORT = 9200;
 
@@ -76,8 +76,7 @@ describe('manager', () => {
   });
 
   it('can handle published analysis event', async () => {
-    const result = await manager.handleAnalysisPublishEvent(analysisEvent);
-    const id = result[0];
+    await analysisEventHandler(analysisEvent);
     const getFileById = await esClient.get({
       id: '4b509876-3f0d-57ae-b097-50d892bf268e',
       index: 'file_centric_test',
@@ -176,6 +175,8 @@ const expectedResult = {
     file_type: 'VCF',
     file_access: 'open',
     file_id: 'FL1',
+    embargo_stage: 'PROGRAM_ONLY',
+    release_state: 'RESTRICTED',
   },
 };
 

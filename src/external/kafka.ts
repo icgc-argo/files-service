@@ -18,11 +18,15 @@
  */
 
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { AppConfig } from './config';
+import { AppConfig } from '../config';
 import retry from 'async-retry';
-import { AnalysisUpdateEvent } from './entity';
-import { handleAnalysisPublishEvent, handleAnalysisSupressedOrUnpublished } from './manager';
-import log from './logger';
+import analysisEventHandler from '../services/analysisEventHandler';
+import log from '../logger';
+
+export type AnalysisUpdateEvent = {
+  songServerId: string;
+  analysis: { [k: string]: any };
+};
 
 let analysisUpdatesConsumer: Consumer | undefined;
 let analysisUpdatesDlqProducer: Producer | undefined;
@@ -103,11 +107,7 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
       async (bail: Function) => {
         // todo validate message body
         const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
-        if (analysisEvent.analysis.analysisState == 'PUBLISHED') {
-          await handleAnalysisPublishEvent(analysisEvent);
-        } else {
-          await handleAnalysisSupressedOrUnpublished(analysisEvent);
-        }
+        await analysisEventHandler(analysisEvent);
       },
       {
         retries: 3,

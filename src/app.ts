@@ -16,20 +16,22 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
 import bodyParser from 'body-parser';
-import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import * as swaggerUi from 'swagger-ui-express';
 import yaml from 'yamljs';
-import { Errors, getFileRecordById, getFiles } from './service';
-import { AppConfig } from './config';
-import * as service from './service';
-import logger from './logger';
-import { File, Status } from './entity';
 import Auth from '@overture-stack/ego-token-middleware';
-import log from './logger';
-import { handleAnalysisPublishEvent, processReindexRequest } from './manager';
-import { dbHealth } from './dbConnection';
+
+import { Errors } from './data/files';
+import { AppConfig } from './config';
+import logger from './logger';
+
+import createAdminRouter from './routers/admin';
+import createFilesRouter from './routers/files';
+import HealthRouter from './routers/health';
+import createDebugRouter from './routers/debug';
 
 const App = (config: AppConfig): express.Express => {
   // Auth middleware
@@ -43,112 +45,13 @@ const App = (config: AppConfig): express.Express => {
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
 
-  app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
+  // app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
+  app.get('/', HealthRouter);
 
-  app.get('/health', (req, res) => {
-    const status = dbHealth.status == Status.OK ? 200 : 500;
-    const resBody = {
-      db: dbHealth,
-      version: `${process.env.npm_package_version || process.env.SVC_VERSION} - ${
-        process.env.SVC_COMMIT_ID
-      }`,
-    };
-    return res.status(status).send(resBody);
-  });
-
-  app.get(
-    '/files',
-    wrapAsync(async (req: Request, res: Response) => {
-      return res.status(200).send(
-        await getFiles({
-          analysisId: (req.query as any)?.analysisId?.split(','),
-          objectId: (req.query as any)?.objectId?.split(','),
-          programId: (req.query as any)?.programId?.split(','),
-        }),
-      );
-    }),
-  );
-
-  app.get(
-    '/files/:id',
-    wrapAsync(async (req: Request, res: Response) => {
-      return res.status(200).send(await getFileRecordById(req.params.id));
-    }),
-  );
-
-  app.post(
-    '/files',
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const file = req.body as File;
-      return res.status(200).send(await service.getOrCreateFileRecordByObjId(file));
-    }),
-  );
-
-  app.patch(
-    '/files/:id/labels',
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const labels = req.body as any;
-      const id = req.params.id;
-      if (!id) {
-        throw new Errors.InvalidArgument('id is required');
-      }
-      await service.addOrUpdateFileLabel(id, labels);
-      return res.status(200).send();
-    }),
-  );
-
-  app.delete(
-    '/files/:id/labels',
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const keys = (req.query?.keys as string)?.split(',');
-      if (keys == undefined) {
-        throw new Errors.InvalidArgument('keys list are required');
-      }
-      const id = req.params.id;
-      if (!id) {
-        throw new Errors.InvalidArgument('id is required');
-      }
-      await service.removeLabel(id, keys);
-      return res.status(200).send();
-    }),
-  );
-
-  app.post(
-    '/admin/index/:datacenter',
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const repoId = req.params.datacenter;
-      processReindexRequest(repoId);
-      return res.status(200).send(`submitted`);
-    }),
-  );
-
-  app.delete(
-    '/test/files/',
-    testEndpointFilter,
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const ids = (req.query.id as string | undefined)?.split(',') || [];
-      await service.deleteAll(ids);
-      return res.status(201).send();
-    }),
-  );
-
-  app.post(
-    '/test/handleAnalysisEvent',
-    testEndpointFilter,
-    authFilter([config.auth.writeScope]),
-    wrapAsync(async (req: Request, res: Response) => {
-      const analysisEvent = req.body;
-      const result = await handleAnalysisPublishEvent(analysisEvent);
-      return res.status(201).send({
-        fileDocuments: result,
-      });
-    }),
-  );
+  app.use('/health', HealthRouter);
+  app.use('/admin', createAdminRouter(config, authFilter));
+  app.use('/files', createFilesRouter(config, authFilter));
+  app.use('/debug', createDebugRouter(config, authFilter));
 
   app.use(
     config.openApiPath,
@@ -157,17 +60,11 @@ const App = (config: AppConfig): express.Express => {
   );
 
   app.use('/static', express.static(path.join(__dirname, 'resources')));
+
   // this has to be defined after all routes for it to work
   app.use(errorHandler);
 
   return app;
-};
-
-export const testEndpointFilter = (req: Request, res: Response, next: NextFunction) => {
-  if (process.env.ENABLE_TEST_ENDPOINT !== 'true') {
-    return res.status(403).send('Test endpoints are disabled');
-  }
-  return next();
 };
 
 // general catch all error handler
@@ -210,18 +107,8 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
   next(err);
 };
 
-// wrapper to handle errors from async express route handlers
-export const wrapAsync = (fn: RequestHandler): RequestHandler => {
-  return (req, res, next) => {
-    const routePromise = fn(req, res, next) as any;
-    if (routePromise.catch) {
-      routePromise.catch(next);
-    }
-  };
-};
-
 const noOpReqHandler: RequestHandler = (req, res, next) => {
-  log.warn('calling protected endpoint without auth enabled');
+  logger.warn(`Calling protected ( ${req.url} ) endpoint without auth enabled.`);
   next();
 };
 

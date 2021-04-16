@@ -17,27 +17,21 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { createLogger, LoggerOptions, transports, format } from 'winston';
+import { Router } from 'express';
+import { dbHealth } from '../data/dbConnection';
+import Status from '../types/Status';
 
-const { combine, timestamp, colorize, printf } = format;
-const options: LoggerOptions = {
-  format: combine(
-    colorize(),
-    timestamp(),
-    printf(info => `${info.timestamp} ${info.level}: ${info.message}`),
-  ),
-  transports: [
-    new transports.Console({
-      level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    }),
-    new transports.File({ filename: 'debug.log', level: 'debug' }),
-  ],
-};
+const router = Router();
 
-const logger = createLogger(options);
+router.get('/', (req, res) => {
+  const status = dbHealth.status === Status.OK ? 200 : 500;
+  const resBody = {
+    db: dbHealth,
+    version: `${process.env.npm_package_version || process.env.SVC_VERSION} - ${
+      process.env.SVC_COMMIT_ID
+    }`,
+  };
+  return res.status(status).send(resBody);
+});
 
-if (process.env.NODE_ENV !== 'production') {
-  logger.debug('Logging initialized at debug level.');
-}
-
-export default logger;
+export default router;

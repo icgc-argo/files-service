@@ -18,7 +18,7 @@
  */
 
 import * as dotenv from 'dotenv';
-import * as vault from './vault';
+import * as vault from './external/vault';
 
 let config: AppConfig | undefined = undefined;
 export interface AppConfig {
@@ -39,13 +39,15 @@ export interface AppConfig {
     username: string;
     password: string;
     indexName: string;
-    createSampleIndex: string;
+    createSampleIndex: boolean;
   };
   auth: {
     enabled: boolean;
     jwtKeyUrl: string;
     jwtKey: string;
+    policy: string;
     writeScope: string;
+    readScope: string;
   };
   analysisConverterUrl: string;
   analysisConverterTimeout: number;
@@ -55,6 +57,9 @@ export interface AppConfig {
     url: string;
     fetchTimeout: number;
     batchSize: number;
+  };
+  debug: {
+    endpointsEnabled: boolean;
   };
 }
 
@@ -74,7 +79,7 @@ export interface MongoProps {
 }
 
 const loadVaultSecrets = async () => {
-  const vaultEnabled = process.env.VAULT_ENABLED || false;
+  const vaultEnabled = process.env.VAULT_ENABLED === 'true';
   let secrets: any = {};
   /** Vault */
   if (vaultEnabled) {
@@ -95,6 +100,7 @@ const loadVaultSecrets = async () => {
 
 const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
   console.log('building app context');
+  const policy = process.env.EGO_POLICY || 'FILES-SVC';
   config = {
     serverPort: process.env.PORT || '3000',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
@@ -107,7 +113,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
-      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'false' ? false : true,
+      kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED !== 'false', // true unless set to 'false'
       kafkaClientId: process.env.KAFKA_CLIENT_ID || 'file-service',
       consumers: {
         analysisUpdates: {
@@ -127,13 +133,15 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       username: secrets.ES_USER || process.env.ES_USER,
       password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
       indexName: process.env.INDEX_NAME || 'file_centric_test',
-      createSampleIndex: process.env.CREATE_SAMPLE_INDEX || 'false',
+      createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
     },
     auth: {
-      enabled: process.env.AUTH_ENABLED !== 'false',
+      enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'
       jwtKeyUrl: process.env.JWT_KEY_URL || '',
       jwtKey: process.env.JWT_KEY || '',
-      writeScope: process.env.WRITE_SCOPE || 'FILES-SVC.WRITE',
+      policy,
+      writeScope: `${policy}.WRITE`,
+      readScope: `${policy}.READ`,
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
     analysisConverterTimeout: Number(process.env.ANALYSIS_CONVERTER_TIMEOUT || 30 * 1000),
@@ -143,6 +151,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       url: process.env.DC_URL || '',
       fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+    },
+    debug: {
+      endpointsEnabled: process.env.ENABLE_DEBUG_ENDPOINTS === 'true', // false unless set to 'true'
     },
   };
   return config;

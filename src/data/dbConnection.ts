@@ -17,10 +17,10 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { AppConfig, getAppConfig } from './config';
+import { AppConfig, getAppConfig } from '../config';
 import mongoose from 'mongoose';
-import logger from './logger';
-import { Status } from './entity';
+import logger from '../logger';
+import Status from '../types/Status';
 
 export const connectDb = async (appConfig: AppConfig) => {
   /** Mongoose setup */

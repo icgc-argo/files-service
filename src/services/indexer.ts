@@ -17,33 +17,30 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { getAppConfig } from './config';
-import { FileCentricDocument } from './entity';
-import { Client } from '@elastic/elasticsearch';
-import esMapping from './resources/file_centric_example.json';
-import logger from './logger';
+import logger from '../logger';
+import { getClient } from '../external/elasticsearch';
+import { getAppConfig } from '../config';
+import { FileCentricDocument } from './fileCentricDocument';
+import { File } from '../data/files';
 
-let esClient: Client;
-let indexName: string = '';
+const getIndexName = async () => {
+  return (await getAppConfig()).elasticProperties.indexName;
+};
 
-async function getClient() {
-  if (esClient) return esClient;
-  const config = await getAppConfig();
-  esClient = new Client({
-    node: config.elasticProperties.node,
-    auth: {
-      username: config.elasticProperties.username,
-      password: config.elasticProperties.password,
-    },
+export async function updateDocFromFile(file: File) {
+  // updates for the file in ES
+  const doc = {
+    embargo_stage: file.embargoStage,
+    release_state: file.releaseState,
+  };
+
+  // TODO: get indexName from rollcall
+  const client = await getClient();
+  await client.update({
+    index: await getIndexName(),
+    id: file.objectId,
+    body: { doc },
   });
-  await esClient.ping();
-  indexName = config.elasticProperties.indexName;
-  if (config.elasticProperties.createSampleIndex.toLowerCase() == 'true') {
-    await createSampleIndex(indexName, esClient);
-  } else {
-    await checkIndexExists(indexName, esClient);
-  }
-  return esClient;
 }
 
 export async function index(docs: FileCentricDocument[]) {
@@ -58,7 +55,7 @@ export async function index(docs: FileCentricDocument[]) {
 
   try {
     await client.bulk({
-      index: indexName,
+      index: await getIndexName(),
       body,
     });
   } catch (e) {
@@ -67,13 +64,13 @@ export async function index(docs: FileCentricDocument[]) {
   }
 }
 
-export async function remove(docs: FileCentricDocument[]) {
+export async function remove(docs: { [k: string]: any; objectId: string }[]) {
   const client = await getClient();
   const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));
 
   try {
     await client.bulk({
-      index: indexName,
+      index: await getIndexName(),
       body,
     });
   } catch (e) {
@@ -105,37 +102,3 @@ function camelCaseKeysToUnderscore(obj: any) {
   }
   return obj;
 }
-
-const checkIndexExists = async (index: string, esClient: Client) => {
-  try {
-    await esClient.indices.get({
-      index: index,
-    });
-    logger.info(`index ${index} exists`);
-  } catch (e) {
-    if (e.name == 'ResponseError' && e.message == 'index_not_found_exception') {
-      logger.error(`index ${index} doesn't exist.`);
-      throw e;
-    } else {
-      logger.error(`failed to check index ${index} ${e}`);
-      throw e;
-    }
-  }
-};
-
-const createSampleIndex = async (index: string, esClient: Client) => {
-  try {
-    await esClient.indices.create({
-      index: index,
-      body: esMapping,
-    });
-    logger.info(`index ${index} exists`);
-  } catch (e) {
-    if (e.name == 'ResponseError' && e.message == 'resource_already_exists_exception') {
-      logger.info(`index ${index} already exist.`);
-    } else {
-      logger.error(`failed to check index ${index} ${e}`);
-      throw e;
-    }
-  }
-};

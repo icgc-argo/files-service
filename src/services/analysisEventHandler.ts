@@ -16,34 +16,24 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import fetch from 'node-fetch';
-import { getAppConfig } from './config';
-import { FileCentricDocument } from './entity';
-import logger from './logger';
 
-export async function convertAnalysisToFileDocuments(
-  analyses: any[],
-  repoCode: string,
-): Promise<{
-  [k: string]: FileCentricDocument[];
-}> {
-  const url = (await getAppConfig()).analysisConverterUrl;
-  const timeout = (await getAppConfig()).analysisConverterTimeout;
-  if (!url) {
-    throw new Error('a url for converter is not configured correctly');
-  }
-  logger.info(`convert analysis to file documents `);
-  const result = await fetch(url, {
-    body: JSON.stringify({ analyses, repoCode }),
-    method: 'POST',
-    timeout: timeout,
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (result.status != 201) {
-    logger.error(`response from converter: ${await result.text()}`);
-    throw new Error(`failed to convert files, got response ${result.status}`);
-  }
-  const response = await result.json();
-  logger.info(`done convert analysis to file documents `);
-  return response;
-}
+import logger from '../logger';
+import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external/analysisConverter';
+import { buildDocument } from './fileCentricDocument';
+import { AnalysisUpdateEvent } from '../external/kafka';
+import * as indexer from './indexer';
+import { saveAndIndexFilesFromRdpcData } from './fileManager';
+
+/**
+ * Song Kafka Message Handler
+ * @param analysisEvent
+ */
+const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
+  const analysis = analysisEvent.analysis;
+  const dataCenterId = analysisEvent.songServerId;
+
+  const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
+
+  return await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId);
+};
+export default analysisEventHandler;
