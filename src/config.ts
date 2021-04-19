@@ -58,6 +58,11 @@ export interface AppConfig {
     fetchTimeout: number;
     batchSize: number;
   };
+  rollcall: {
+    url: string;
+    aliasName: string;
+    entity: string;
+  };
   debug: {
     endpointsEnabled: boolean;
   };
@@ -151,6 +156,11 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       url: process.env.DC_URL || '',
       fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+    },
+    rollcall: {
+      url: process.env.ROLLCALL_URL || 'http://localhost:9001',
+      aliasName: process.env.ROLLCALL_FILE_ALIAS || 'file_service_placeholder_alias',
+      entity: process.env.ROLLCALL_FILE_ENTITY || 'fileserviceplaceholder',
     },
     debug: {
       endpointsEnabled: process.env.ENABLE_DEBUG_ENDPOINTS === 'true', // false unless set to 'true'
