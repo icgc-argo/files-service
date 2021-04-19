@@ -66,6 +66,7 @@ services:
       ROLLCALL_ALIASES_0_ALIAS: file_centric
       ROLLCALL_ALIASES_0_ENTITY: file
       ROLLCALL_ALIASES_0_TYPE: centric
+      ROLLCALL_ALIASES_0_RELEASEROTATION: 2
       SPRING_CLOUD_VAULT_ENABLED: 'false'
 
   ################################
