@@ -27,7 +27,7 @@ import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
 const ES_PORT = 9200;
 
-describe('manager', () => {
+describe('analysisEventHandler', () => {
   let esClient: Client;
   let esContainer: StartedTestContainer;
   let mongoContainer: StartedTestContainer;
