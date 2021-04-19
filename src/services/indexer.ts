@@ -103,7 +103,6 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
       release_state: file.releaseState,
     };
 
-    // TODO: get indexName from rollcall
     const client = await getClient();
     await client.update({
       index: await getIndexName(file.programId, false),
@@ -112,13 +111,11 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
     });
   }
 
-  // TODO: Split the docs into programs then bulk index for each program
   async function indexFiles(docs: FileCentricDocument[]) {
     const sortedFiles = sortFilesIntoPrograms(docs);
 
     const client = await getClient();
 
-    // TODO: configure concurrency for ES requests.
     PromisePool.withConcurrency(20)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
