@@ -25,7 +25,6 @@ import esMapping from '../resources/file_centric_example.json';
 import logger from '../logger';
 
 let esClient: Client;
-let indexName: string = '';
 
 export async function getClient() {
   if (esClient) return esClient;
@@ -38,12 +37,6 @@ export async function getClient() {
     },
   });
   await esClient.ping();
-  indexName = config.elasticProperties.indexName;
-  if (config.elasticProperties.createSampleIndex) {
-    await createSampleIndex(indexName, esClient);
-  } else {
-    await checkIndexExists(indexName, esClient);
-  }
   return esClient;
 }
 
