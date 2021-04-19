@@ -21,7 +21,9 @@ import fetch from 'node-fetch';
 import urljoin from 'url-join';
 
 import logger from '../logger';
-import { AppConfig } from '../config';
+import { getAppConfig } from '../config';
+import { getClient } from './elasticsearch';
+import fileCentricConfig from '../file-centric-index-mapping.json';
 
 // Rollcall builds the index name as `entity_type_shardPrefix_shard_releasePrefix_release`,
 // release is not in the request because rollcall will calculate it
@@ -57,6 +59,7 @@ export type RollCallClient = {
     programShortName: string,
     options: { isPublic: boolean; cloneFromReleasedIndex: boolean },
   ) => Promise<Index>;
+  fetchCurrentIndex: (programShortName: string, isPublic: boolean) => Promise<Index | undefined>;
   release: (indexName: Index) => Promise<boolean>;
 };
 
@@ -65,12 +68,34 @@ const RELEASE = {
   RESTRICTED: 'restricted',
 };
 
-export default (config: AppConfig): RollCallClient => {
+export default async (): Promise<RollCallClient> => {
+  const config = await getAppConfig();
+
   const rootUrl = config.rollcall.url;
   const aliasName = config.rollcall.aliasName;
   const indexEntity = config.rollcall.entity;
   const indexType = 'centric';
   const shardPrefix = 'program';
+
+  const client = await getClient();
+
+  const fetchCurrentIndex = async (
+    programShortName: string,
+    isPublic: boolean,
+  ): Promise<Index | undefined> => {
+    const url = urljoin(rootUrl, `/indices/resolved`);
+
+    const shard = formatProgramShortName(programShortName);
+    const releasePrefix = isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED;
+
+    const response = (await fetch(url).then(res => res.json())) as Index[];
+
+    const latestIndex = response
+      .filter(index => index.shard === shard && index.releasePrefix === releasePrefix)
+      .sort((a, b) => (a.release > b.release ? 1 : -1))
+      .pop();
+    return latestIndex;
+  };
 
   const fetchNextIndex = async (
     programShortName: string,
@@ -82,27 +107,30 @@ export default (config: AppConfig): RollCallClient => {
     logger.info(
       `Fetching from Rollcall next index for ${programShortName}. Public=${isPublic}. Cloned=${cloneFromReleasedIndex}.`,
     );
-    const url = urljoin(`${rootUrl}`, `/indices/create`);
+    const url = urljoin(rootUrl, `/indices/create`);
 
     const req: CreateResolvableIndexRequest = {
       shardPrefix: shardPrefix,
-      shard: await formatProgramShortName(programShortName),
+      shard: formatProgramShortName(programShortName),
       entity: indexEntity,
       type: indexType,
       cloneFromReleasedIndex: cloneFromReleasedIndex || false,
       releasePrefix: isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED,
     };
-
     try {
-      const newResolvedIndex = (await fetch(url, {
+      const newIndex = (await fetch(url, {
         method: 'POST',
         body: JSON.stringify(req),
         headers: { 'Content-Type': 'application/json' },
       }).then(res => res.json())) as Index;
 
-      return newResolvedIndex;
+      // Set the mapping and update settings
+      await configureIndex(newIndex);
+
+      logger.info(`[Rollcall] New index: ${newIndex.indexName}`);
+      return newIndex;
     } catch (err) {
-      logger.error('Failed to get new index from rollcall: ' + err);
+      logger.error('[Rollcall] Failed to get new index from rollcall: ' + err);
       throw err;
     }
   };
@@ -124,6 +152,24 @@ export default (config: AppConfig): RollCallClient => {
     return acknowledged;
   };
 
+  const configureIndex = async (index: Index): Promise<void> => {
+    try {
+      await client.indices.close({ index: index.indexName });
+
+      await client.indices.putSettings({
+        index: index.indexName,
+        body: fileCentricConfig.settings,
+      });
+      await client.indices.putMapping({
+        index: index.indexName,
+        body: fileCentricConfig.mappings,
+      });
+      await client.indices.open({ index: index.indexName });
+    } catch (e) {
+      console.error(JSON.stringify(e));
+    }
+  };
+
   const convertResolvedIndexToIndexReleaseRequest = async (
     resovledIndex: Index,
   ): Promise<IndexReleaseRequest> => {
@@ -134,7 +180,7 @@ export default (config: AppConfig): RollCallClient => {
     return { alias, release, shards: [shard] };
   };
 
-  const formatProgramShortName = async (programShortName: string) => {
+  const formatProgramShortName = (programShortName: string) => {
     return programShortName
       .replace('-', '')
       .trim()
@@ -143,6 +189,7 @@ export default (config: AppConfig): RollCallClient => {
 
   return {
     fetchNextIndex,
+    fetchCurrentIndex,
     release,
   };
 };

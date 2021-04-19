@@ -39,7 +39,7 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
   // Default doClone to true.
   const doClone = options ? options.doClone : true;
 
-  const rollcall = getRollcall(await getAppConfig());
+  const rollcall = await getRollcall();
 
   type IndexNameHolder = {
     public: { [programId: string]: Index };
@@ -137,7 +137,7 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
             body,
           });
         } catch (e) {
-          logger.error(`failed bulk indexing request: ${JSON.stringify(e)}`, e);
+          logger.error(`Failed bulk indexing request: ${JSON.stringify(e)}`, e);
           throw e;
         }
       });
@@ -160,7 +160,7 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
             body,
           });
         } catch (e) {
-          logger.error(`failed bulk delete request: ${JSON.stringify(e)}`, e);
+          logger.error(`Failed bulk delete request: ${JSON.stringify(e)}`, e);
           throw e;
         }
       });

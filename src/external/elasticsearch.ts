@@ -27,7 +27,9 @@ import logger from '../logger';
 let esClient: Client;
 
 export async function getClient() {
-  if (esClient) return esClient;
+  if (esClient) {
+    return esClient;
+  }
   const config = await getAppConfig();
   esClient = new Client({
     node: config.elasticProperties.node,
