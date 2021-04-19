@@ -29,7 +29,7 @@ import { EmbargoStage } from '../data/files';
 
 import { reindexDataCenter } from '../services/syncDataProcessor';
 import { recalculateFileState } from '../services/fileManager';
-import * as indexer from '../services/indexer';
+import { getIndexer } from '../services/indexer';
 
 function fileSummaryResponse(files: fileService.File[]) {
   const total = files.length;
@@ -78,6 +78,8 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         }
 
         try {
+          const indexer = await getIndexer();
+
           const updatedFiles = await fileService.adminPromote(filter, stage, {
             returnDocuments: true,
           });
@@ -91,9 +93,11 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             .process(async file => {
               logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
               const recalculatedFile = await recalculateFileState(file);
-              await indexer.updateDocFromFile(recalculatedFile);
+              await indexer.updateFile(recalculatedFile);
               return file;
             });
+
+          await indexer.release();
 
           const fileSummary = fileSummaryResponse(results);
           const response = {
