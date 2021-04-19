@@ -21,6 +21,7 @@ import fetch from 'node-fetch';
 import urljoin from 'url-join';
 
 import logger from '../logger';
+import { AppConfig } from '../config';
 
 // Rollcall builds the index name as `entity_type_shardPrefix_shard_releasePrefix_release`,
 // release is not in the request because rollcall will calculate it
@@ -64,18 +65,12 @@ const RELEASE = {
   RESTRICTED: 'restricted',
 };
 
-export default (config: {
-  url: string;
-  aliasName: string;
-  entity: string;
-  type: string;
-  shardPrefix: string;
-}): RollCallClient => {
-  const rootUrl = config.url;
-  const aliasName = config.aliasName || 'file_centric';
-  const indexEntity = config?.entity || 'file';
-  const indexType = config?.type || 'centric';
-  const shardPrefix = config?.shardPrefix || 'program';
+export default (config: AppConfig): RollCallClient => {
+  const rootUrl = config.rollcall.url;
+  const aliasName = config.rollcall.aliasName;
+  const indexEntity = config.rollcall.entity;
+  const indexType = 'centric';
+  const shardPrefix = 'program';
 
   const fetchNextIndex = async (
     programShortName: string,
