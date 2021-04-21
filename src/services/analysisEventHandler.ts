@@ -19,10 +19,9 @@
 
 import logger from '../logger';
 import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external/analysisConverter';
-import { buildDocument } from './fileCentricDocument';
 import { AnalysisUpdateEvent } from '../external/kafka';
-import * as indexer from './indexer';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
+import { getIndexer } from './indexer';
 
 /**
  * Song Kafka Message Handler
@@ -32,8 +31,18 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   const analysis = analysisEvent.analysis;
   const dataCenterId = analysisEvent.songServerId;
 
+  logger.info(
+    `[analysisEventHandler] START - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
+  );
+
   const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
 
-  return await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId);
+  const indexer = await getIndexer();
+  const response = await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId, indexer);
+  indexer.release();
+  logger.info(
+    `[analysisEventHandler] DONE - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
+  );
+  return response;
 };
 export default analysisEventHandler;

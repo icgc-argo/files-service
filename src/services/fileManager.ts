@@ -6,7 +6,7 @@ import { FilePartialDocument } from '../external/analysisConverter';
 import * as fileService from '../data/files';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
 import { getEmbargoStage } from './embargo';
-import * as indexer from './indexer';
+import { getIndexer, Indexer } from './indexer';
 import logger from '../logger';
 
 export async function updateFileFromRdpcData(
@@ -51,6 +51,7 @@ type SaveAndIndexResults = {
 export async function saveAndIndexFilesFromRdpcData(
   filePartialDocuments: FilePartialDocument[],
   dataCenterId: string,
+  indexer: Indexer,
 ): Promise<SaveAndIndexResults> {
   const fileCentricDocuments = await Promise.all(
     filePartialDocuments.map(async filePartialDocument => {
@@ -70,15 +71,16 @@ export async function saveAndIndexFilesFromRdpcData(
   );
 
   if (addDocuments.length) {
-    await indexer.index(addDocuments);
+    await indexer.indexFiles(addDocuments);
   }
   if (removeDocuments.length) {
-    await indexer.remove(removeDocuments);
+    await indexer.removeFiles(removeDocuments);
   }
+
   // Note: the indexed documents have had all property keys converted to snake case,
   //       so file_id for indexed docs and fileId for removed docs
   return {
-    indexed: addDocuments.map(doc => doc.file_id),
+    indexed: addDocuments.map(doc => doc.objectId),
     removed: removeDocuments.map(doc => doc.fileId),
   };
 }

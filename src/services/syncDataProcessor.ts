@@ -23,6 +23,7 @@ import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesBatchesStream } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
+import { getIndexer } from './indexer';
 
 export async function reindexDataCenter(dataCenterId: string) {
   try {
@@ -30,6 +31,8 @@ export async function reindexDataCenter(dataCenterId: string) {
     const { url } = await getDataCenter(dataCenterId);
     logger.info(`Datacenter URL: ${url}`);
     const studies: string[] = await getStudies(url);
+
+    const indexer = await getIndexer();
 
     for (const study of studies) {
       logger.info(`Indexing study: ${study}`);
@@ -41,12 +44,15 @@ export async function reindexDataCenter(dataCenterId: string) {
           logger.info(`Retrieved analyses from song: ${analysisIds}`);
 
           const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
-          await saveAndIndexFilesFromRdpcData(files, dataCenterId);
+          await saveAndIndexFilesFromRdpcData(files, dataCenterId, indexer);
         }
       } catch (err) {
         logger.error(`Failed to index study ${study}, ${err}`, err);
       }
     }
+
+    // Release all file updates.
+    indexer.release();
   } catch (err) {
     logger.error(`Error while indexing repository ${dataCenterId}`);
     throw err;

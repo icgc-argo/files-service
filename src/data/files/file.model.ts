@@ -212,7 +212,10 @@ export async function updateByObjectId(
   updates: mongoose.UpdateQuery<FileMongooseDocument>,
   options: any,
 ) {
-  return await FileModel.findOneAndUpdate({ objectId }, updates, options);
+  return await FileModel.findOneAndUpdate({ objectId }, updates, {
+    ...options,
+    useFindAndModify: false,
+  });
 }
 
 export async function updateBulk(
