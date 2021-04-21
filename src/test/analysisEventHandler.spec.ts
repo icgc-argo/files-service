@@ -25,12 +25,13 @@ import analysisEventHandler from '../services/analysisEventHandler';
 import nock from 'nock';
 import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
-const ES_PORT = 9200;
+const ES_PORT = 9500;
 
 describe('analysisEventHandler', () => {
   let esClient: Client;
   let esContainer: StartedTestContainer;
   let mongoContainer: StartedTestContainer;
+  let rollcallContainer: StartedTestContainer;
 
   const startContainers = async () => {
     esContainer = await new GenericContainer('elasticsearch', '7.5.0')
@@ -40,13 +41,26 @@ describe('analysisEventHandler', () => {
       .withHealthCheck({
         test: `curl -f http://localhost:${ES_PORT} || exit 1`, // this is executed inside the container
         startPeriod: 10000,
-        retries: 5,
+        retries: 10,
         interval: 2000,
         timeout: 5000,
       })
       .withWaitStrategy(Wait.forHealthCheck())
       .start();
     mongoContainer = await new GenericContainer('mongo', '4.0').withExposedPorts(27017).start();
+    rollcallContainer = await new GenericContainer('overture/rollcall', '2.6.0')
+      .withExposedPorts(9001)
+      .withEnv('ROLLCALL_ALIASES_0_ALIAS', 'file_centric')
+      .withEnv('ROLLCALL_ALIASES_0_ENTITY', 'file')
+      .withEnv('ROLLCALL_ALIASES_0_TYPE', 'centric')
+      .withEnv('ROLLCALL_ALIASES_0_RELEASEROTATION', '2')
+      .withEnv('SPRING_CLOUD_VAULT_ENABLED', 'false')
+      .start();
+  };
+  const stopContainers = async () => {
+    await esContainer.stop();
+    await mongoContainer.stop();
+    await rollcallContainer.stop();
   };
 
   before(async () => {
@@ -72,7 +86,7 @@ describe('analysisEventHandler', () => {
   });
 
   after(async () => {
-    await esContainer.stop();
+    await stopContainers();
   });
 
   it('can handle published analysis event', async () => {
