@@ -26,7 +26,7 @@ import {
   FileFilter,
   QueryFilters,
   EmbargoStage,
-  ReleaseState,
+  FileReleaseState,
 } from './file.model';
 import * as fileModel from './file.model';
 import logger from '../../logger';
@@ -64,11 +64,14 @@ export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<F
 /**
  * Returns the updated File.
  */
-type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: ReleaseState };
+type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: FileReleaseState };
 export async function updateFileReleaseProperties(
   objectId: string,
   updates: ReleaseProperties,
 ): Promise<File> {
+  logger.debug(
+    `[File.Service] Updating file emabrgo and release properties: ${JSON.stringify(updates)}`,
+  );
   const result = await fileModel.updateByObjectId(objectId, updates, { new: true });
   return toPojo(result);
 }
@@ -171,7 +174,7 @@ function toPojo(f: FileMongooseDocument): File {
     status: f.status,
 
     embargoStage: f.embargoStage as EmbargoStage,
-    releaseState: f.releaseState as ReleaseState,
+    releaseState: f.releaseState as FileReleaseState,
 
     adminHold: f.adminHold,
     adminPromote: f.adminPromote as EmbargoStage,

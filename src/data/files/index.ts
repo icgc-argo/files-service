@@ -1,7 +1,7 @@
 export {
   // Enums:
   EmbargoStage,
-  ReleaseState,
+  FileReleaseState,
   // File Types:
   File,
   FileLabel,

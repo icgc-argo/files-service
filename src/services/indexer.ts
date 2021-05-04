@@ -25,6 +25,7 @@ import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { Index } from '../external/rollcall';
+import { timeout } from 'promise-tools';
 
 type ReleaseOptions = {
   publicRelease: boolean;
@@ -44,27 +45,46 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
   type IndexNameHolder = {
     public: { [programId: string]: Index };
     restricted: { [programId: string]: Index };
+    fetching: Set<string>;
   };
   const resolvedIndices: IndexNameHolder = {
     public: {},
     restricted: {},
+    fetching: new Set<string>(),
   };
 
   const getIndexName = async (program: string, isPublic: boolean): Promise<string> => {
     const publicIdentifier = isPublic ? 'public' : 'restricted'; // for choosing correct section of resolvedIndices
+
+    // No reason to have concurrent requests to getIndexName all fetch from Rollcall
+    // resolvedIndices has a record of which program names are currently being fetched.
+    // while those are being fetched, just idle in this while loop
+    while (resolvedIndices.fetching.has(program)) {
+      await new Promise(resolve => {
+        setTimeout(() => resolve(undefined), 20);
+      });
+    }
 
     const existingIndex: Index | undefined = resolvedIndices[publicIdentifier][program];
     if (existingIndex) {
       return existingIndex.indexName;
     }
 
-    // Index hasn't been fetched yet, lets go grab it.
-    const nextIndex = await rollcall.fetchNextIndex(program, {
-      isPublic,
-      cloneFromReleasedIndex: doClone,
-    });
-    resolvedIndices[publicIdentifier][program] = nextIndex;
-    return nextIndex.indexName;
+    // Index name hasn't been retrieved, so this one instance can fetch.
+    try {
+      resolvedIndices.fetching.add(program);
+
+      // Index hasn't been fetched yet, lets go grab it.
+      const nextIndex = await rollcall.fetchNextIndex(program, {
+        isPublic,
+        cloneFromReleasedIndex: doClone,
+      });
+      resolvedIndices[publicIdentifier][program] = nextIndex;
+
+      return nextIndex.indexName;
+    } finally {
+      resolvedIndices.fetching.delete(program);
+    }
   };
 
   async function release(options?: ReleaseOptions) {
@@ -103,7 +123,11 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
       release_state: file.releaseState,
     };
 
+    const body = [{ update: { _id: file.objectId } }, { doc }];
+
     const client = await getClient();
+    const index = await getIndexName(file.programId, false);
+    logger.debug(`Update doc ${index} ${file.objectId} ${JSON.stringify(doc)}`);
     await client.update({
       index: await getIndexName(file.programId, false),
       id: file.objectId,
@@ -116,7 +140,7 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
 
     const client = await getClient();
 
-    PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(20)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
         const index = await getIndexName(program, false);
@@ -146,7 +170,7 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
     const client = await getClient();
 
     // TODO: configure concurrency for ES requests.
-    PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(20)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
         const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));

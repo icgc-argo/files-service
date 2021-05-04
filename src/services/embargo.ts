@@ -19,7 +19,7 @@
 
 import { differenceInMonths } from 'date-fns';
 import logger from '../logger';
-import { EmbargoStage, File, ReleaseState } from '../data/files';
+import { EmbargoStage, File, FileReleaseState } from '../data/files';
 import { first } from 'lodash';
 
 const stageOrder = {
@@ -83,7 +83,7 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
   logger.debug(`[Embargo] ${dbFile.fileId}: Recalculating embargo stage`);
 
   // a releaseState of PUBLIC means this is already public, return EmbargoStage of PUBLIC
-  if (dbFile.releaseState === ReleaseState.PUBLIC) {
+  if (dbFile.releaseState === FileReleaseState.PUBLIC) {
     logger.debug(`[Embargo] ${dbFile.fileId}: File is already public.`);
     return EmbargoStage.PUBLIC;
   }
