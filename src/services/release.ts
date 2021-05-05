@@ -17,33 +17,35 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { File, FileReleaseState, EmbargoStage } from '../data/files';
+import * as fileService from '../data/files';
+import { Release } from '../data/releases';
+import * as releaseService from '../data/releases';
 import logger from '../logger';
-import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external/analysisConverter';
-import { AnalysisUpdateEvent } from '../external/kafka';
-import { saveAndIndexFilesFromRdpcData } from './fileManager';
-import { getIndexer } from './indexer';
 
-/**
- * Song Kafka Message Handler
- * @param analysisEvent
- */
-const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
-  const analysis = analysisEvent.analysis;
-  const dataCenterId = analysisEvent.songServerId;
+function toFileId(file: File) {
+  return file.objectId;
+}
 
-  logger.info(
-    `[analysisEventHandler] START - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
-  );
+export async function calculateRelease(): Promise<Release> {
+  /**
+   * Get files that are currently public, and those queued for public release
+   * Add these to the active release. Release service handles creating new release if active release not available.
+   */
+  const publicFiles = await fileService.getFilesByState({
+    releaseState: FileReleaseState.PUBLIC,
+  });
+  const queuedFiles = await fileService.getFilesByState({
+    releaseState: FileReleaseState.QUEUED,
+  });
+  const kept = publicFiles.map(toFileId);
+  const added = queuedFiles.map(toFileId);
 
-  const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
-  logger.debug('converted to files');
+  const release = releaseService.updateActiveRelease({
+    kept,
+    added,
+    removed: [], //TODO: Implement removed files after we build a "withdraw" mechanism for files.
+  });
 
-  const indexer = await getIndexer();
-  const response = await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId, indexer);
-  await indexer.release();
-  logger.info(
-    `[analysisEventHandler] DONE - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
-  );
-  return response;
-};
-export default analysisEventHandler;
+  return release;
+}

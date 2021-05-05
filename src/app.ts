@@ -32,6 +32,7 @@ import createAdminRouter from './routers/admin';
 import createFilesRouter from './routers/files';
 import HealthRouter from './routers/health';
 import createDebugRouter from './routers/debug';
+import createReleaseRouter from './routers/release';
 
 const App = (config: AppConfig): express.Express => {
   // Auth middleware
@@ -45,6 +46,7 @@ const App = (config: AppConfig): express.Express => {
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
 
+  // Cool matrix background for homepage:
   // app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
   app.get('/', HealthRouter);
 
@@ -52,6 +54,7 @@ const App = (config: AppConfig): express.Express => {
   app.use('/admin', createAdminRouter(config, authFilter));
   app.use('/files', createFilesRouter(config, authFilter));
   app.use('/debug', createDebugRouter(config, authFilter));
+  app.use('/release', createReleaseRouter(config, authFilter));
 
   app.use(
     config.openApiPath,

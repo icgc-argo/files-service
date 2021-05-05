@@ -199,6 +199,88 @@ paths:
         '200':
           description: delete successful
 
+  /release:
+    get:
+      tags:
+        - Release
+      summary: Get list of Releases
+      responses:
+        '200':
+          description: List of releases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/active:
+    get:
+      tags:
+        - Release
+      summary: Get details of the current active release without calculating
+      responses:
+        '200':
+          description: Details of the active release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/calculate:
+    post:
+      tags:
+        - Release
+      summary: Calculate all details for next release. This will update the active release.
+      responses:
+        '200':
+          description: Details of the updated active release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/publish/{version}:
+    post:
+      tags:
+        - Release
+      summary: Publish the active release. Will only success if the provided version number matches the version in the active release
+      responses:
+        '200':
+          description: Summary of the published release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '400':
+          description: Publishing error details
+          content:
+            application/json:
+              type: object
+              properties:
+                error:
+                  type: object
+              required:
+                - error
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /admin/index/{datacenter}:
     post:
       tags:
@@ -391,6 +473,34 @@ components:
           type: array
           items:
             type: string
+    ReleaseSummary:
+      type: object
+      properties:
+        state:
+          type: string
+        version:
+          type: string
+        label:
+          type: string
+        calculatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          fromat: date-time
+        filesKept:
+          type: number
+        filesAdded:
+          type: number
+        filesRemoved:
+          type: number
+      required:
+        - state
+        - version
+        - calculatedAt
+        - filesKept
+        - filesAdded
+        - filesRemoved
     Labels:
       type: object
       description: Arbitrary pair of a key and value(s) string

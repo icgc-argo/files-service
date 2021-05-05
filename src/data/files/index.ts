@@ -19,6 +19,7 @@ export {
   getFiles,
   getFileById,
   getFileByObjId,
+  getFilesByState,
   getOrCreateFileByObjId,
   updateFileReleaseProperties,
   updateFileAdminControls,

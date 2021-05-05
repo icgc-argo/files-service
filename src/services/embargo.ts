@@ -110,7 +110,7 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
         ? dbFile.adminPromote
         : calculatedStage;
     logger.debug(
-      `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updatign calculated stage to: ${calculatedStage}`,
+      `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
     );
   }
   logger.debug(`[Embargo] ${dbFile.fileId}: Returning embargo stage: ${calculatedStage}`);

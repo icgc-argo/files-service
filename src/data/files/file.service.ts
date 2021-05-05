@@ -27,6 +27,7 @@ import {
   QueryFilters,
   EmbargoStage,
   FileReleaseState,
+  FileStateFilter,
 } from './file.model';
 import * as fileModel from './file.model';
 import logger from '../../logger';
@@ -59,6 +60,10 @@ export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<F
 
   fileToCreate.labels = new Array<FileLabel>();
   return toPojo(await fileModel.create(fileToCreate));
+}
+
+export async function getFilesByState(filter: FileStateFilter): Promise<File[]> {
+  return (await fileModel.getFilesByState(filter)).map(toPojo);
 }
 
 /**

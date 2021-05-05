@@ -123,12 +123,12 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       consumers: {
         analysisUpdates: {
           topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'song_analysis',
-          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-svc-analysis',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-service-placeholder-analysis',
           dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
         reindexing: {
           topic: process.env.KAFKA_REINDEXING_TOPIC || 'files_reindexing',
-          group: process.env.KAFKA_REINDEXING_GROUP || 'files-svc-reindexing',
+          group: process.env.KAFKA_REINDEXING_GROUP || 'files-service-placeholder-reindexing',
           dlq: process.env.KAFKA_REINDEXING_DLQ,
         },
       },
