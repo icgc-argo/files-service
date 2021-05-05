@@ -158,7 +158,7 @@ export default async (): Promise<RollCallClient> => {
 
       await client.indices.putSettings({
         index: index.indexName,
-        body: fileCentricConfig.settings,
+        body: { ...fileCentricConfig.settings, 'index.blocks.write': false },
       });
       await client.indices.putMapping({
         index: index.indexName,
