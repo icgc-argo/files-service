@@ -22,6 +22,7 @@ import PromisePool from '@supercharge/promise-pool';
 
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
+import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
@@ -87,9 +88,15 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
           if (!updatedFiles) {
             return res.status(400).send(`No files updated.`);
           }
+          const errors: StringMap<Error> = {};
 
-          const { results, errors } = await PromisePool.withConcurrency(20)
+          const { results } = await PromisePool.withConcurrency(20)
             .for(updatedFiles)
+            .handleError((e, file) => {
+              logger.error(`Update Doc Error: ${e}`);
+              logger.error(`Update Doc Error: ${e.stack}`);
+              errors[file.objectId] = e;
+            })
             .process(async file => {
               logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
               const recalculatedFile = await recalculateFileState(file);
@@ -103,6 +110,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
           const response = {
             message: `Successfully updated and re-indexed ${fileSummary.total} files. adminPromote value set to ${stage}`,
             ...fileSummary,
+            errors,
           };
           return res.status(200).json(response);
         } catch (e) {
