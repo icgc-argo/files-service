@@ -63,7 +63,7 @@ export type RollCallClient = {
   release: (indexName: Index) => Promise<boolean>;
 };
 
-const RELEASE = {
+const RELEASE_STATE = {
   PUBLIC: 'public',
   RESTRICTED: 'restricted',
 };
@@ -75,7 +75,9 @@ export default async (): Promise<RollCallClient> => {
   const aliasName = config.rollcall.aliasName;
   const indexEntity = config.rollcall.entity;
   const indexType = 'centric';
-  const shardPrefix = 'program';
+  const shardPrefix = (isPublic: boolean) =>
+    isPublic ? RELEASE_STATE.PUBLIC : RELEASE_STATE.RESTRICTED;
+  const releasePrefix = 're';
 
   const client = await getClient();
 
@@ -83,17 +85,18 @@ export default async (): Promise<RollCallClient> => {
     programShortName: string,
     isPublic: boolean,
   ): Promise<Index | undefined> => {
+    logger.debug(`Fetching current index ${programShortName} isPublic:${isPublic}`);
     const url = urljoin(rootUrl, `/indices/resolved`);
 
     const shard = formatProgramShortName(programShortName);
-    const releasePrefix = isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED;
 
     const response = (await fetch(url).then(res => res.json())) as Index[];
 
     const latestIndex = response
-      .filter(index => index.shard === shard && index.releasePrefix === releasePrefix)
+      .filter(index => index.shard === shard && index.shardPrefix === shardPrefix(isPublic))
       .sort((a, b) => (a.release > b.release ? 1 : -1))
       .pop();
+
     return latestIndex;
   };
 
@@ -110,12 +113,12 @@ export default async (): Promise<RollCallClient> => {
     const url = urljoin(rootUrl, `/indices/create`);
 
     const req: CreateResolvableIndexRequest = {
-      shardPrefix: shardPrefix,
+      shardPrefix: shardPrefix(isPublic),
       shard: formatProgramShortName(programShortName),
       entity: indexEntity,
       type: indexType,
       cloneFromReleasedIndex: cloneFromReleasedIndex || false,
-      releasePrefix: isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED,
+      releasePrefix,
     };
     try {
       const newIndex = (await fetch(url, {
