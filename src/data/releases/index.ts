@@ -1,2 +1,8 @@
 export { Release, ReleaseState } from './release.model';
-export { getReleases, getActiveRelease, updateActiveRelease } from './release.service';
+export {
+  getReleases,
+  getActiveRelease,
+  updateActiveReleaseFiles,
+  updateActiveReleaseIndices,
+  updateActiveReleaseLabel,
+} from './release.service';
