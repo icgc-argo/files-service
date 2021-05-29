@@ -6,7 +6,7 @@ import { FilePartialDocument } from '../external/analysisConverter';
 import * as fileService from '../data/files';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
 import { getEmbargoStage } from './embargo';
-import { getIndexer, Indexer } from './indexer';
+import { Indexer } from './indexer';
 import logger from '../logger';
 
 export async function updateFileFromRdpcData(
@@ -72,10 +72,10 @@ export async function saveAndIndexFilesFromRdpcData(
 
   logger.debug(`START - Indexing/Removing files`);
   if (addDocuments.length) {
-    await indexer.indexFiles(addDocuments);
+    await indexer.indexFileDocs(addDocuments);
   }
   if (removeDocuments.length) {
-    await indexer.removeFiles(removeDocuments);
+    await indexer.removeFileDocs(removeDocuments);
   }
   logger.debug(`DONE - Indexing/Removing files`);
 
