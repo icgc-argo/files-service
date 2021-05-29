@@ -20,13 +20,14 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
 
+import querystring from 'querystring';
+
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
-import { EmbargoStage } from '../data/files';
 
 import { reindexDataCenter } from '../services/syncDataProcessor';
 import { recalculateFileState } from '../services/fileManager';
@@ -52,8 +53,11 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     wrapAsync(async (req: Request, res: Response) => {
       // const dataCenterId = req.params.datacenter;
       // TODO: Current config hardcodes a single data center instead of retrieving connection details from data center registry
+
+      const studies: string[] = (req.query.study || []) as string[];
+
       const dataCenterId = config.datacenter.dataCenterId;
-      reindexDataCenter(dataCenterId);
+      reindexDataCenter(dataCenterId, studies);
       return res.status(200).send(`submitted`);
     }),
   );
