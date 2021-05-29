@@ -20,6 +20,7 @@
 import PromisePool from '@supercharge/promise-pool';
 
 import logger from '../logger';
+import { EmbargoStage, FileReleaseState } from '../data/files';
 import { getClient } from '../external/elasticsearch';
 import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
@@ -304,6 +305,11 @@ export const getIndexer = async () => {
           dest: {
             index: publicIndex,
           },
+          // This script makes the indexed document change releaseState and embargoStage to PUBLIC
+          // This is the only mechanism used to put a file document into a public index, so this is responsible for making sure the Stage is correct.
+          script: {
+            source: `ctx._source.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.embargo_stage = "${EmbargoStage.PUBLIC}";`,
+          },
         };
 
         const response = await client.reindex({
@@ -347,22 +353,22 @@ export const getIndexer = async () => {
 
     // remove the nextIndices and currentIndices references to these indexNames
     indices.forEach(indexName => {
-      for (let programId in currentIndices.public) {
+      for (const programId in currentIndices.public) {
         if (currentIndices.public[programId].indexName === indexName) {
           delete currentIndices.public[programId];
         }
       }
-      for (let programId in currentIndices.restricted) {
+      for (const programId in currentIndices.restricted) {
         if (currentIndices.restricted[programId].indexName === indexName) {
           delete currentIndices.restricted[programId];
         }
       }
-      for (let programId in nextIndices.public) {
+      for (const programId in nextIndices.public) {
         if (nextIndices.public[programId].indexName === indexName) {
           delete nextIndices.public[programId];
         }
       }
-      for (let programId in nextIndices.restricted) {
+      for (const programId in nextIndices.restricted) {
         if (nextIndices.restricted[programId].indexName === indexName) {
           delete nextIndices.restricted[programId];
         }
