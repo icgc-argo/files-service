@@ -253,11 +253,64 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '500':
           $ref: '#/components/responses/ServerError'
-  /release/publish/{version}:
+  /release/build/{version}/{label}:
     post:
       tags:
         - Release
       summary: Publish the active release. Will only success if the provided version number matches the version in the active release
+      parameters:
+        - name: version
+          description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: label
+          description: An identifying label for the release. Typically this is the numeric version identifier given for the release. This will be used for labelling a backup archive for the release and to track releases more easily in the DB.
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary of the published release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '400':
+          description: Publishing error details
+          content:
+            application/json:
+              type: object
+              properties:
+                error:
+                  type: object
+              required:
+                - error
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/publish/{version}/{label}:
+    post:
+      tags:
+        - Release
+      summary: Publish the active release. Will only success if the provided version number matches the version in the active release
+      parameters:
+        - name: version
+          description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: label
+          description: An identifying label for the release. Typically this is the numeric version identifier given for the release. This will be used for backup labelling and to track releases more easily.
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Summary of the published release
@@ -292,7 +345,14 @@ paths:
           required: true
           schema:
             type: string
-
+        - name: study
+          description: Array of study IDs to index. If not provided, all studies will be indexed. ex. ?study=PACA-CA&study=LUCA-KR
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         '200':
           description: Submitted, will run in background
@@ -473,9 +533,24 @@ components:
           type: array
           items:
             type: string
+    ReleaseCounts:
+      type: object
+      properties:
+        kept:
+          type: number
+        added:
+          type: number
+        removed:
+          type: number
+      required:
+        - kept
+        - added
+        - removed
     ReleaseSummary:
       type: object
       properties:
+        id:
+          type: string
         state:
           type: string
         version:
@@ -487,20 +562,64 @@ components:
           format: date-time
         publishedAt:
           type: string
-          fromat: date-time
-        filesKept:
-          type: number
-        filesAdded:
-          type: number
-        filesRemoved:
-          type: number
+          format: date-time
+        files:
+          $ref: '#/components/ReleaseCounts'
       required:
+        - id
         - state
         - version
         - calculatedAt
-        - filesKept
-        - filesAdded
-        - filesRemoved
+        - files
+    ReleaseDetails:
+      type: object
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+        version:
+          type: string
+        label:
+          type: string
+        calculatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        totals:
+          type: object
+          properties:
+            files:
+              $ref: '#/components/ReleaseCounts'
+            donors:
+              $ref: '#/components/ReleaseCounts'
+          required:
+            - files
+            - donors
+        programs:
+          type: array
+          items:
+            type: object
+          properties:
+            program:
+              type: string
+            files:
+              $ref: '#/components/ReleaseCounts'
+            donors:
+              $ref: '#/components/ReleaseCounts'
+          required:
+            - program
+            - files
+            - donors
+      required:
+        - id
+        - state
+        - version
+        - calculatedAt
+        - totals
+        - programs
     Labels:
       type: object
       description: Arbitrary pair of a key and value(s) string
