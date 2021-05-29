@@ -38,6 +38,10 @@ export async function getFilesQuery(filter: QueryFilters): Promise<File[]> {
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);
 }
+export async function getFilesFromObjectIds(objectIds: string[]): Promise<File[]> {
+  const results = objectIds.length ? await fileModel.getFiles({ include: { objectIds } }) : [];
+  return results.map(toPojo);
+}
 
 export async function getFileById(fileId: string): Promise<File> {
   const file = await getFileAsDoc(toNumericId(fileId));

@@ -92,6 +92,7 @@ export type ReleaseFilesInput = {
 export type ReleaseUpdates = {
   files?: ReleaseFilesInput;
   label?: string;
+  indices?: string[];
 };
 
 export async function create(files: ReleaseFilesInput): Promise<ReleaseMongooseDocument> {
@@ -127,9 +128,13 @@ export async function updateRelease(
     updatedRelease.filesKept = updates.files.kept;
     updatedRelease.filesAdded = updates.files.added;
     updatedRelease.filesRemoved = updates.files.removed;
+    updatedRelease.version = calculateVersion(updates.files);
   }
   if (updates.label) {
     updatedRelease.label = updates.label;
+  }
+  if (updates.indices) {
+    updatedRelease.indices = updates.indices;
   }
   return (await ReleaseModel.findOneAndUpdate({ _id: release._id }, updatedRelease, {
     new: true,

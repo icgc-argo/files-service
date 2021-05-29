@@ -27,19 +27,34 @@ export async function getReleases(): Promise<Release[]> {
 
 export async function getActiveRelease(): Promise<Release | undefined> {
   const release = await releaseModel.getRelease({ state: ReleaseState.ACTIVE });
-  if (release.id) {
+  if (release) {
     return toPojo(release);
   }
 
   return undefined;
 }
 
-export async function updateActiveRelease(files: ReleaseFilesInput): Promise<Release> {
+export async function updateActiveReleaseFiles(files: ReleaseFilesInput): Promise<Release> {
   const activeRelease = await getActiveRelease();
   if (activeRelease) {
     return toPojo(await releaseModel.updateRelease(activeRelease, { files }));
   }
   return toPojo(await releaseModel.create(files));
+}
+
+export async function updateActiveReleaseIndices(indices: string[]): Promise<Release> {
+  const activeRelease = await getActiveRelease();
+  if (!activeRelease) {
+    throw new Error('No active release.');
+  }
+  return toPojo(await releaseModel.updateRelease(activeRelease, { indices }));
+}
+export async function updateActiveReleaseLabel(label: string): Promise<Release> {
+  const activeRelease = await getActiveRelease();
+  if (!activeRelease) {
+    throw new Error('No active release.');
+  }
+  return toPojo(await releaseModel.updateRelease(activeRelease, { label }));
 }
 
 function toPojo(releaseDoc: ReleaseMongooseDocument): Release {

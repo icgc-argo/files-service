@@ -26,7 +26,7 @@ import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
 import { File } from '../data/files';
 import * as fileService from '../data/files';
-import { calculateRelease } from '../services/release';
+import { calculateRelease, buildActiveRelease } from '../services/release';
 
 const createReleaseRouter = (
   config: AppConfig,
@@ -40,7 +40,7 @@ const createReleaseRouter = (
   };
 
   /**
-   * Get Releseases
+   * Get Releases
    * Provides list of releases stored in DB, includes:
    *  - their status
    *  - creation and publish date
@@ -71,7 +71,7 @@ const createReleaseRouter = (
   );
 
   /**
-   * Calculate release
+   * Calculate Release
    * Find the files that are queued for release and record their IDs
    * Provide a report with a summary of what is in the release and what will be added
    */
@@ -81,14 +81,49 @@ const createReleaseRouter = (
     wrapAsync(async (req, res) => {
       const release = await calculateRelease();
       const output = await buildReleaseDetails(release);
-      return res.status(200).send(output);
+      return res.status(200).json(output);
     }),
   );
 
   /**
-   * Publish release
-   * Create new public release indices for each program and attach to alias
-   * This should also trigger a backup of the indices to make sure we have a reserved copy
+   * Build Release
+   * Create new public release indices for each program. Does not attach to alias, that is done by Publish.
+   * The requester must provide a label for this release, which will be used as the release
+   * TODO: This should also trigger a backup of the indices to make sure we have a reserved copy
+   */
+  router.post(
+    '/build/:version/:label',
+    authFilters.write,
+    wrapAsync(async (req, res) => {
+      const { version, label } = req.params;
+      if (!version) {
+        return res.status(400).json({ error: `Missing path parameter: version` });
+      }
+      if (!label) {
+        return res.status(400).json({ error: `Missing path parameter: label` });
+      }
+
+      const release = await releaseService.getActiveRelease();
+      if (!release) {
+        return res
+          .status(400)
+          .json({ error: `No Active Release. Calculate the release and try again.` });
+      }
+      if (version !== release.version) {
+        return res
+          .status(400)
+          .json({ error: `Active release's version does not match the provided version.` });
+      }
+      const builtRelease = await buildActiveRelease(label);
+      // const output = await buildReleaseDetails(builtRelease);
+      // return res.status(200).json(output);
+      return res.status(200).json(builtRelease);
+    }),
+  );
+
+  /**
+   * Publish Release
+   * Attach built public indices to the file centric alias
    */
   router.post(
     '/publish/:version',
@@ -117,7 +152,7 @@ type ReleaseSummary = {
   label?: string;
   calculatedAt: Date;
   publishedAt?: Date;
-  totals: ReleaseCounts;
+  files: ReleaseCounts;
 };
 function summarizeRelease(release: Release): ReleaseSummary {
   return {
@@ -127,7 +162,7 @@ function summarizeRelease(release: Release): ReleaseSummary {
     label: release.version,
     calculatedAt: release.calculatedAt,
     publishedAt: release.publishedAt,
-    totals: {
+    files: {
       kept: release.filesKept.length,
       added: release.filesAdded.length,
       removed: release.filesRemoved.length,
@@ -138,7 +173,7 @@ function summarizeRelease(release: Release): ReleaseSummary {
 /**
  * Release Details
  * Shows the expanded release counts by program and donor
- *  */
+ */
 interface ProgramDetails {
   program: string;
   files: ReleaseCounts;
@@ -161,11 +196,12 @@ function countDonors(files: File[]): number {
 }
 function summarizePrograms(kept: File[], added: File[], removed: File[]) {
   /**
-   * Some Reducer magic to accumulate all the files sorted by program
+   * Reducer to accumulate all the files sorted by program
    */
   type ProgramAccumulator = StringMap<{ kept: File[]; added: File[]; removed: File[] }>;
   const programAccumulator: ProgramAccumulator = {};
 
+  // Create a reducer for the kept, added, or removed list
   const programSortReducer = (key: 'kept' | 'added' | 'removed') => (
     accumulator: ProgramAccumulator,
     file: File,
@@ -184,9 +220,9 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
 
   /**
    * Now format the data for use in the expanded release details
-   * */
+   */
   const output: ProgramDetails[] = [];
-  for (let program in programAccumulator) {
+  for (const program in programAccumulator) {
     const { kept, added, removed } = programAccumulator[program];
     const files: ReleaseCounts = {
       kept: kept.length,
@@ -208,15 +244,9 @@ async function buildReleaseDetails(release: Release): Promise<ReleaseDetails> {
   const { state, version, label, calculatedAt, publishedAt } = release;
 
   // We need to get the donor and program details of our files
-  const filesKept: File[] = release.filesKept.length
-    ? await fileService.getFiles({ include: { objectIds: release.filesKept } })
-    : [];
-  const filesAdded: File[] = release.filesAdded.length
-    ? await fileService.getFiles({ include: { objectIds: release.filesAdded } })
-    : [];
-  const filesRemoved: File[] = release.filesRemoved.length
-    ? await fileService.getFiles({ include: { objectIds: release.filesRemoved } })
-    : [];
+  const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
+  const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
+  const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
   const totals = {
     files: {
