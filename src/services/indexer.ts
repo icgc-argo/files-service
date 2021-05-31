@@ -25,11 +25,12 @@ import { getClient } from '../external/elasticsearch';
 import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
-import getRollcall, { Index } from '../external/rollcall';
+import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
 import { timeout } from 'promise-tools';
 
 type ReleaseOptions = {
-  publicRelease: boolean;
+  publicRelease?: boolean;
+  indices?: string[];
 };
 
 export interface Indexer {
@@ -151,6 +152,7 @@ export const getIndexer = async () => {
   async function release(options?: ReleaseOptions): Promise<void> {
     // Default publicRelease to false;
     const publicRelease = options ? options.publicRelease : false;
+    const additionalIndices: string[] = options && options.indices ? options.indices : [];
 
     const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
@@ -166,6 +168,17 @@ export const getIndexer = async () => {
       .process(async indexName => {
         await rollcall.release(indexName);
       });
+
+    await PromisePool.withConcurrency(5)
+      .for(additionalIndices)
+      .handleError((error, indexName) => {
+        logger.error(`Failed to release index: ${indexName}`);
+      })
+      .process(async indexName => {
+        const index = getIndexFromIndexName(indexName);
+        await rollcall.release(index);
+      });
+
     // Clear stored index names to prevent repeat releases.
     nextIndices.public = {};
     nextIndices.restricted = {};
@@ -198,6 +211,10 @@ export const getIndexer = async () => {
     });
   }
 
+  /**
+   * For indexing updates as they come in from
+   * @param docs
+   */
   async function indexFileDocs(docs: FileCentricDocument[]): Promise<void> {
     const sortedFiles = sortFileDocsIntoPrograms(docs);
 
@@ -348,6 +365,31 @@ export const getIndexer = async () => {
       });
   }
 
+  async function removeFilesFromRestricted(files: File[]): Promise<void> {
+    const sortedFiles = sortFilesIntoPrograms(files);
+
+    // TODO: Configure ES request concurrency
+    await PromisePool.withConcurrency(20)
+      .for(sortedFiles)
+      .process(async programData => {
+        const body = programData.files.map(file => ({ delete: { _id: file.objectId } }));
+        const index = await getNextIndex(programData.program, {
+          isPublic: false,
+          clone: true,
+        });
+
+        try {
+          await client.bulk({
+            index,
+            body,
+          });
+        } catch (e) {
+          logger.error(`Failed bulk delete request: ${JSON.stringify(e)}`, e);
+          throw e;
+        }
+      });
+  }
+
   async function deleteIndices(indices: string[]): Promise<void> {
     await client.indices.delete({ index: indices });
 
@@ -377,6 +419,7 @@ export const getIndexer = async () => {
   }
 
   return {
+    // By FileDocument
     indexFileDocs,
     removeFileDocs,
 
@@ -387,6 +430,7 @@ export const getIndexer = async () => {
     preparePublicIndices,
     copyFilesToPublic,
     removeFilesFromPublic,
+    removeFilesFromRestricted,
     release,
   };
 };
