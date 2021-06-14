@@ -79,7 +79,9 @@ export async function updateFileReleaseProperties(
   updates: ReleaseProperties,
 ): Promise<File> {
   logger.debug(
-    `[File.Service] Updating file emabrgo and release properties: ${JSON.stringify(updates)}`,
+    `[File.Service] Updating file emabrgo and release properties: ${objectId} ${JSON.stringify(
+      updates,
+    )}`,
   );
   const result = await fileModel.updateByObjectId(objectId, updates, { new: true });
   return toPojo(result);
@@ -93,10 +95,10 @@ export async function updateFileAdminControls(
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
-type FilePublishStatus = { status?: string; firstPublished?: Date };
-export async function updateFilePublishStatus(
+type FileSongPublishStatus = { status?: string; firstPublished?: Date };
+export async function updateFileSongPublishStatus(
   objectId: string,
-  updates: FilePublishStatus,
+  updates: FileSongPublishStatus,
 ): Promise<File> {
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }

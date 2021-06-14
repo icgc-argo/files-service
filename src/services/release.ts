@@ -16,6 +16,7 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+import PromisePool from '@supercharge/promise-pool';
 
 import { File, FileReleaseState, EmbargoStage } from '../data/files';
 import * as fileService from '../data/files';
@@ -63,7 +64,7 @@ export async function calculateRelease(): Promise<Release> {
  *  - Update the embargoStage or releaseState of any files
  *  - Remove files from the restricted indices
  *
- * @param release
+ * @param label
  */
 export async function buildActiveRelease(label: string): Promise<Release> {
   let release = await releaseService.getActiveRelease();
@@ -115,6 +116,68 @@ export async function buildActiveRelease(label: string): Promise<Release> {
 
   await indexer.copyFilesToPublic(filesAdded);
   await indexer.removeFilesFromPublic(filesRemoved);
+
+  return release;
+}
+
+/**
+ * Publish release will add the public indices created in the build step to the file alias
+ *   This will also modify the restricted indices by:
+ *     - TODO: Any files removed from public will be added to a new restricted index
+ *     - Any files move to public will be removed from the new restricted index
+ *     - The new restricted indices will be aliased
+ *   This will modify the files in the database by:
+ *     - Update the embargo_stage and release_state of any files that have been moved to public/restricted
+ */
+export async function publishActiveRelease(): Promise<Release> {
+  let release = await releaseService.getActiveRelease();
+  if (!release) {
+    throw new Error('No Active release available.');
+  }
+  if (!(release.indices.length > 0)) {
+    throw new Error('Active release has no public indices. Nothing to publish.');
+  }
+
+  const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
+  const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
+
+  const indexer = await getIndexer();
+
+  // 1. Added files - Remove from restricted index
+  await indexer.removeFilesFromRestricted(filesAdded);
+  logger.debug(`[Release.Publish] ${filesAdded.length} Files removed from restricted index`);
+
+  // TODO: Getting the add to public working before circling back to removing and updating out of date files.
+  // 2. Removed files
+  //  2a. Fetch file data from RDPC
+  //  2b. Add file data to restricted index
+
+  // 3. Release all indices (public and restricted)
+  await indexer.release({ publicRelease: true, indices: release.indices });
+  logger.debug(`[Release.Publish] Release Indices have been aliased.`);
+
+  // 4. Update DB with published changes
+  await PromisePool.withConcurrency(20)
+    .for(release.filesAdded)
+    .handleError((error, file) => {
+      logger.error(`Failed to update release status in DB for ${file}`);
+    })
+    .process(async file => {
+      await fileService.updateFileReleaseProperties(file, {
+        embargoStage: EmbargoStage.PUBLIC,
+        releaseState: FileReleaseState.PUBLIC,
+      });
+    });
+  logger.debug(`[Release.Publish] File records in DB updated with new published states.`);
+  // TODO: when implementing the filesRemoved logic, check if the release_state needs to be updated in DB or
+  //  if that change is handled when the embargoStage calculation is redone when the file was modified to no
+  //  longer be public. I.E. We may need to update the DB with releaseState that is not PUBLIC
+
+  // 5. Update the release to track the changed status
+  // 5a. release.state should now be PUBLISHED
+  // 5b. record publishedAt date
+  release = await releaseService.publishActiveRelease();
+  logger.debug(`[Release.Publish] Release marked as published.`);
 
   return release;
 }

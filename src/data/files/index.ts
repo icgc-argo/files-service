@@ -24,6 +24,6 @@ export {
   getOrCreateFileByObjId,
   updateFileReleaseProperties,
   updateFileAdminControls,
-  updateFilePublishStatus,
+  updateFileSongPublishStatus,
   removeLabel,
 } from './file.service';

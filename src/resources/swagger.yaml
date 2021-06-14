@@ -257,7 +257,7 @@ paths:
     post:
       tags:
         - Release
-      summary: Publish the active release. Will only success if the provided version number matches the version in the active release
+      summary: Publish the active release. Requires the provided version number matches the version in the active release.
       parameters:
         - name: version
           description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
@@ -293,20 +293,14 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '500':
           $ref: '#/components/responses/ServerError'
-  /release/publish/{version}/{label}:
+  /release/publish/{version}:
     post:
       tags:
         - Release
-      summary: Publish the active release. Will only success if the provided version number matches the version in the active release
+      summary: Publish the active release. Will only succeed if the provided version number matches the version in the active release
       parameters:
         - name: version
           description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: label
-          description: An identifying label for the release. Typically this is the numeric version identifier given for the release. This will be used for backup labelling and to track releases more easily.
           in: path
           required: true
           schema:

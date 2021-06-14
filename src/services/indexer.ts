@@ -149,32 +149,58 @@ export const getIndexer = async () => {
     }
   };
 
+  /**
+   * Add prepared indices to the file alias. By default, this will add all indices in the nextIndices.restricted map to the alias.
+   *   Optionally, a publicRelease can be requested and will also include the nextInidces.public map.
+   *   Additional indices can be specified int eh request options to also be released. This is done when releasing an index prepared during a previous process (not by this indexer object)
+   * @param options
+   */
   async function release(options?: ReleaseOptions): Promise<void> {
     // Default publicRelease to false;
     const publicRelease = options ? options.publicRelease : false;
     const additionalIndices: string[] = options && options.indices ? options.indices : [];
 
+    logger.info(
+      `[Indexer] Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
+        nextIndices.restricted,
+      )}`,
+    );
     const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
+      logger.info(
+        `[Indexer] Preparing to release... adding public indices to release list: ${Object.keys(
+          nextIndices.public,
+        )}`,
+      );
       toRelease.concat(Object.values(nextIndices.public));
     }
 
+    if (additionalIndices.length) {
+      logger.info(
+        `[Indexer]  Preparing to release... Additional indices requested to release: ${additionalIndices}`,
+      );
+    }
+
     // TODO: config for max simultaneous release?
+    // release indices tracked in nextIndices
     await PromisePool.withConcurrency(5)
       .for(toRelease)
       .handleError((error, index) => {
         logger.error(`Failed to release index: ${index.indexName}`);
       })
-      .process(async indexName => {
-        await rollcall.release(indexName);
+      .process(async index => {
+        logger.info(`[Indexer] Releasing index to file alias: ${index.indexName}`);
+        await rollcall.release(index);
       });
 
+    // release indices requested in options.additionalIndices
     await PromisePool.withConcurrency(5)
       .for(additionalIndices)
       .handleError((error, indexName) => {
         logger.error(`Failed to release index: ${indexName}`);
       })
       .process(async indexName => {
+        logger.debug(`[Indexer] Releasing index to file alias: ${indexName}`);
         const index = getIndexFromIndexName(indexName);
         await rollcall.release(index);
       });
@@ -185,9 +211,10 @@ export const getIndexer = async () => {
   }
 
   /**
-   * Update tfile properties maintained by this file-manager application:
+   * Update file properties maintained by this file-manager application:
    *   - embargo_stage
    *   - release_state
+   * Also update these values in the document meta data object.
    * @param file
    */
   async function updateFile(file: File): Promise<void> {
@@ -200,6 +227,10 @@ export const getIndexer = async () => {
     const doc = {
       embargo_stage: file.embargoStage,
       release_state: file.releaseState,
+      meta: {
+        embargo_stage: file.embargoStage,
+        release_state: file.releaseState,
+      },
     };
 
     const body = [{ update: { _id: file.objectId } }, { doc }];
@@ -208,7 +239,6 @@ export const getIndexer = async () => {
       isPublic: false,
       clone: true,
     });
-    logger.debug(`Update doc ${index} ${file.objectId} ${JSON.stringify(doc)}`);
     await client.update({
       index,
       id: file.objectId,
@@ -233,7 +263,9 @@ export const getIndexer = async () => {
           isPublic: false,
           clone: true,
         });
-        const body = files.map(camelCaseKeysToUnderscore).flatMap(file => [
+        const camelcased = files.map(camelCaseKeysToUnderscore);
+        logger.debug(`camelcased: ${JSON.stringify(camelcased)}`);
+        const body = camelcased.flatMap(file => [
           { update: { _id: file.object_id } },
           {
             doc_as_upsert: true,
@@ -292,8 +324,6 @@ export const getIndexer = async () => {
   async function copyFilesToPublic(files: File[]): Promise<void> {
     const sortedFiles = sortFilesIntoPrograms(files);
 
-    logger.debug(`Copying sorted files into public indices`);
-
     // TODO: Configure ES request concurrency
     await PromisePool.withConcurrency(5)
       .for(sortedFiles)
@@ -301,15 +331,11 @@ export const getIndexer = async () => {
         const program = programData.program;
         const fileIds = programData.files.map(file => file.objectId);
 
-        logger.debug(`pre restricted index, program: ${program} , fileIds: ${fileIds}`);
         const restrictedIndex = await getCurrentIndex(program, { isPublic: false });
-        logger.debug(`restricted index: ${restrictedIndex}`);
         const publicIndex = await getNextIndex(program, {
           isPublic: true,
           clone: true,
         });
-        logger.debug(`public index: ${publicIndex}`);
-        logger.debug(`Indices for copy... From ${restrictedIndex} to ${publicIndex}`);
 
         if (!restrictedIndex) {
           throw new Error(
@@ -336,7 +362,7 @@ export const getIndexer = async () => {
           // This script makes the indexed document change releaseState and embargoStage to PUBLIC
           // This is the only mechanism used to put a file document into a public index, so this is responsible for making sure the Stage is correct.
           script: {
-            source: `ctx._source.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.embargo_stage = "${EmbargoStage.PUBLIC}";`,
+            source: `ctx._source.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.embargo_stage = "${EmbargoStage.PUBLIC}";ctx._source.meta.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.meta.embargo_stage = "${EmbargoStage.PUBLIC}";`,
           },
         };
 
@@ -346,7 +372,6 @@ export const getIndexer = async () => {
           body,
         });
 
-        logger.debug(`Done copy.`);
         return;
       });
   }
@@ -402,6 +427,9 @@ export const getIndexer = async () => {
   }
 
   async function deleteIndices(indices: string[]): Promise<void> {
+    if (!indices || !indices.length) {
+      return;
+    }
     await client.indices.delete({ index: indices });
 
     // remove the nextIndices and currentIndices references to these indexNames

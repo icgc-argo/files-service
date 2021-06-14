@@ -35,7 +35,7 @@ export async function updateFileFromRdpcData(
   const newStatus = partialFile.analysis.analysisState;
   const newPublishDate = partialFile.analysis.firstPublishedAt;
   if (dbFile.status !== newStatus || dbFile.firstPublished !== newPublishDate) {
-    dbFile = await fileService.updateFilePublishStatus(partialFile.objectId, {
+    dbFile = await fileService.updateFileSongPublishStatus(partialFile.objectId, {
       status: partialFile.analysis.analysisState,
       firstPublished: partialFile.analysis.firstPublishedAt,
     });

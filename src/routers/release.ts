@@ -26,7 +26,28 @@ import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
 import { File } from '../data/files';
 import * as fileService from '../data/files';
-import { calculateRelease, buildActiveRelease } from '../services/release';
+import { calculateRelease, buildActiveRelease, publishActiveRelease } from '../services/release';
+
+/**
+ * Check for an existing ACTIVE release, and confirm that the provided version string matches.
+ * @param version
+ * @returns data object with result of validation check
+ */
+async function validateActiveAuthVersion(
+  version: string,
+): Promise<{ success: boolean; error?: string }> {
+  const release = await releaseService.getActiveRelease();
+  if (!release) {
+    return { success: false, error: `No Active Release. Calculate the release and try again.` };
+  }
+  if (version !== release.version) {
+    return {
+      success: false,
+      error: `Active release's version does not match the provided version.`,
+    };
+  }
+  return { success: true };
+}
 
 const createReleaseRouter = (
   config: AppConfig,
@@ -65,7 +86,7 @@ const createReleaseRouter = (
     authFilters.read,
     wrapAsync(async (req, res) => {
       const release = await releaseService.getActiveRelease();
-      const output = release ? await buildReleaseDetails(release) : {};
+      const output = release ? await getReleaseDetails(release) : {};
       return res.status(200).json(output);
     }),
   );
@@ -80,7 +101,7 @@ const createReleaseRouter = (
     authFilters.write,
     wrapAsync(async (req, res) => {
       const release = await calculateRelease();
-      const output = await buildReleaseDetails(release);
+      const output = await getReleaseDetails(release);
       return res.status(200).json(output);
     }),
   );
@@ -88,8 +109,6 @@ const createReleaseRouter = (
   /**
    * Build Release
    * Create new public release indices for each program. Does not attach to alias, that is done by Publish.
-   * The requester must provide a label for this release, which will be used as the release
-   * TODO: This should also trigger a backup of the indices to make sure we have a reserved copy
    */
   router.post(
     '/build/:version/:label',
@@ -102,21 +121,13 @@ const createReleaseRouter = (
       if (!label) {
         return res.status(400).json({ error: `Missing path parameter: label` });
       }
+      const validationResult = await validateActiveAuthVersion(version);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: validationResult.error });
+      }
 
-      const release = await releaseService.getActiveRelease();
-      if (!release) {
-        return res
-          .status(400)
-          .json({ error: `No Active Release. Calculate the release and try again.` });
-      }
-      if (version !== release.version) {
-        return res
-          .status(400)
-          .json({ error: `Active release's version does not match the provided version.` });
-      }
       const builtRelease = await buildActiveRelease(label);
-      // const output = await buildReleaseDetails(builtRelease);
-      // return res.status(200).json(output);
+
       return res.status(200).json(builtRelease);
     }),
   );
@@ -129,7 +140,18 @@ const createReleaseRouter = (
     '/publish/:version',
     authFilters.write,
     wrapAsync(async (req, res) => {
-      return res.status(500).send(`Not Implemented`);
+      const { version } = req.params;
+      if (!version) {
+        return res.status(400).json({ error: `Missing path parameter: version` });
+      }
+      const validationResult = await validateActiveAuthVersion(version);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: validationResult.error });
+      }
+
+      const publishedRelease = await publishActiveRelease();
+
+      return res.status(200).json(publishedRelease);
     }),
   );
   return router;
@@ -137,6 +159,9 @@ const createReleaseRouter = (
 
 export default createReleaseRouter;
 
+/**
+ * Request and Response Types:
+ */
 type ReleaseCounts = {
   kept: number;
   added: number;
@@ -240,7 +265,7 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
   return output;
 }
 
-async function buildReleaseDetails(release: Release): Promise<ReleaseDetails> {
+async function getReleaseDetails(release: Release): Promise<ReleaseDetails> {
   const { state, version, label, calculatedAt, publishedAt } = release;
 
   // We need to get the donor and program details of our files
