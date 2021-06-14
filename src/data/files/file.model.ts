@@ -63,8 +63,9 @@ interface DbFile {
   embargoStage: string;
   releaseState: string;
 
-  adminPromote?: string;
   adminHold?: boolean;
+  adminPromote?: string;
+  adminDemote?: string;
 
   labels: FileLabel[];
 }
@@ -84,8 +85,9 @@ export interface File {
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
 
-  adminPromote?: EmbargoStage;
   adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
 
   labels: FileLabel[];
 }
@@ -107,8 +109,9 @@ export interface FileInput {
   embargoStage?: EmbargoStage;
   releaseState?: FileReleaseState;
 
-  adminPromote?: EmbargoStage;
   adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
 
   labels: FileLabel[];
 }
@@ -139,6 +142,11 @@ const FileSchema = new mongoose.Schema(
     },
 
     adminPromote: {
+      type: String,
+      required: false,
+      enum: Object.values(EmbargoStage),
+    },
+    adminDemote: {
       type: String,
       required: false,
       enum: Object.values(EmbargoStage),

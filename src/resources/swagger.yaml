@@ -359,6 +359,7 @@ paths:
     post:
       tags:
         - Admin
+      description: Promote the selected files to be AT LEAST the specified Embargo Stage. The Embargo Stage for the selected files will be re-calculated with this promotion stage being the minimum. On successful completion, the files will be re-indexed with their new embargo stage, but no changes will be made to the Public data release. Note that if a file has a promotion AND a deomotion applied, the demotion will take priority when they conflict.
       parameters:
         - name: stage
           description: The embargo stage that the selected files should be promoted to
@@ -382,7 +383,42 @@ paths:
 
       responses:
         '200':
-          description: Files updated and re-indexed
+          description: Files updated and re-indexed. NOTE that files promoted to PUBLIC are re-indexed as ASSOCIATE_ACCESS and re-index as QUEUED, not yet PUBLIC.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
+  /admin/demote/{stage}:
+    post:
+      tags:
+        - Admin
+      description: Demote the selected files to be AT MOST the specified Embargo Stage. The embargo stage for the selected files will be re-calculated with this demotion stage being the maximum. On successful completion, the files will be re-indexed with their new embargo stage, but no changes will be made to the Public data release. Note that if a file has a promotion AND a deomotion applied, the demotion will take priority when they conflict.
+      parameters:
+        - name: stage
+          description: The embargo stage that the selected files should be demoted to
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/EmbargoStage'
+        - name: dryRun
+          description: Set to "true" to retrieve details of the Donors and Analyses affected by the provided filters. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for demotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated and re-indexed. NOTE that publicly released files that have been demoted are not re-indexed.
           content:
             application/json:
               schema:

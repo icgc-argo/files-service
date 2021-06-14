@@ -87,7 +87,11 @@ export async function updateFileReleaseProperties(
   return toPojo(result);
 }
 
-type AdminControls = { adminPromote?: EmbargoStage; adminHold?: boolean };
+type AdminControls = {
+  adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
+};
 export async function updateFileAdminControls(
   objectId: string,
   updates: AdminControls,
@@ -110,6 +114,18 @@ export async function adminPromote(
 ): Promise<File[] | void> {
   // Perform bulk update
   const response = await fileModel.updateBulk(filter, { adminPromote: stage }, options);
+  if (options?.returnDocuments) {
+    return response.map(toPojo);
+  }
+}
+
+export async function adminDemote(
+  filter: FileFilter,
+  stage: EmbargoStage,
+  options?: { returnDocuments: boolean },
+): Promise<File[] | void> {
+  // Perform bulk update
+  const response = await fileModel.updateBulk(filter, { adminDemote: stage }, options);
   if (options?.returnDocuments) {
     return response.map(toPojo);
   }
@@ -189,6 +205,7 @@ function toPojo(f: FileMongooseDocument): File {
 
     adminHold: f.adminHold,
     adminPromote: f.adminPromote as EmbargoStage,
+    adminDemote: f.adminDemote as EmbargoStage,
 
     labels: f.labels,
   };

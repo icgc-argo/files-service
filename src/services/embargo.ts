@@ -113,6 +113,17 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
       `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
     );
   }
+  if (dbFile.adminDemote) {
+    // Assign the least permissive of adminDemote and calculatedStage
+    // This is done AFTER the adminPromote check to make sure the adminDemote value overrides any promotions
+    calculatedStage =
+      stageOrder[dbFile.adminDemote] < stageOrder[calculatedStage]
+        ? dbFile.adminDemote
+        : calculatedStage;
+    logger.debug(
+      `[Embargo] ${dbFile.fileId}: File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
+    );
+  }
   logger.debug(`[Embargo] ${dbFile.fileId}: Returning embargo stage: ${calculatedStage}`);
   return calculatedStage;
 };

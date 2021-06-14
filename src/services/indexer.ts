@@ -219,7 +219,7 @@ export const getIndexer = async () => {
    */
   async function updateFile(file: File): Promise<void> {
     // Don't update a file if it is PUBLIC already
-    if (file.embargoStage === EmbargoStage.PUBLIC) {
+    if (file.releaseState === FileReleaseState.PUBLIC) {
       return;
     }
 
@@ -253,7 +253,7 @@ export const getIndexer = async () => {
   async function indexFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are not PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.embargoStage !== EmbargoStage.PUBLIC),
+      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
     );
 
     await PromisePool.withConcurrency(20)
@@ -288,7 +288,7 @@ export const getIndexer = async () => {
   async function removeFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only removing files that are not public
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.embargoStage !== EmbargoStage.PUBLIC),
+      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
     );
 
     // TODO: configure concurrency for ES requests.

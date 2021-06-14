@@ -14,6 +14,7 @@ export {
   Errors,
   addOrUpdateFileLabel,
   adminPromote,
+  adminDemote,
   deleteAll,
   getFilesQuery,
   getFiles,
