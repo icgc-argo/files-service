@@ -67,6 +67,11 @@ export const buildDocument = ({
     fileId: dbFile.fileId,
     embargoStage: dbFile.embargoStage,
     releaseState: dbFile.releaseState,
+    meta: {
+      embargoStage: dbFile.embargoStage,
+      releaseState: dbFile.releaseState,
+      studyId: filePartialDocument.studyId,
+    },
   };
 
   return output;
