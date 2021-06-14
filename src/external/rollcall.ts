@@ -25,6 +25,23 @@ import { getAppConfig } from '../config';
 import { getClient } from './elasticsearch';
 import fileCentricConfig from '../file-centric-index-mapping.json';
 
+export function getIndexFromIndexName(indexName: string): Index {
+  const parts = indexName.split('_');
+  if (parts.length !== 6) {
+    throw new Error(`Provided indexName ${indexName} cannot be converted into Rollcall Index`);
+  }
+  return {
+    indexName,
+    entity: parts[0],
+    type: parts[1],
+    shardPrefix: parts[2],
+    shard: parts[3],
+    releasePrefix: parts[4],
+    release: parts[5],
+    valid: true,
+  };
+}
+
 // Rollcall builds the index name as `entity_type_shardPrefix_shard_releasePrefix_release`,
 // release is not in the request because rollcall will calculate it
 export type CreateResolvableIndexRequest = {
