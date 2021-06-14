@@ -57,6 +57,20 @@ export async function updateActiveReleaseLabel(label: string): Promise<Release> 
   return toPojo(await releaseModel.updateRelease(activeRelease, { label }));
 }
 
+export async function publishActiveRelease(): Promise<Release> {
+  const activeRelease = await getActiveRelease();
+  if (!activeRelease) {
+    throw new Error('No active release.');
+  }
+
+  return toPojo(
+    await releaseModel.updateRelease(activeRelease, {
+      publishedAt: new Date(),
+      state: ReleaseState.PUBLISHED,
+    }),
+  );
+}
+
 function toPojo(releaseDoc: ReleaseMongooseDocument): Release {
   if (!releaseDoc) {
     throw new Error('cannot convert undefined');

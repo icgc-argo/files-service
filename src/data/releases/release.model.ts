@@ -93,6 +93,8 @@ export type ReleaseUpdates = {
   files?: ReleaseFilesInput;
   label?: string;
   indices?: string[];
+  publishedAt?: Date;
+  state?: ReleaseState;
 };
 
 export async function create(files: ReleaseFilesInput): Promise<ReleaseMongooseDocument> {
@@ -135,6 +137,12 @@ export async function updateRelease(
   }
   if (updates.indices) {
     updatedRelease.indices = updates.indices;
+  }
+  if (updates.state) {
+    updatedRelease.state = updates.state;
+  }
+  if (updates.publishedAt) {
+    updatedRelease.publishedAt = updates.publishedAt;
   }
   return (await ReleaseModel.findOneAndUpdate({ _id: release._id }, updatedRelease, {
     new: true,
