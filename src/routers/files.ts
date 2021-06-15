@@ -28,8 +28,10 @@ import { Errors } from '../data/files';
 const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
-  const authFilter_read = authFilter([config.auth.readScope, config.auth.writeScope]);
-  const authFilter_write = authFilter([config.auth.writeScope]);
+  const authFilters = {
+    read: authFilter([config.auth.readScope, config.auth.writeScope]),
+    write: authFilter([config.auth.writeScope]),
+  };
 
   /**
    * Get stored files using analyusisId, objectId, or programId as provided in query params
@@ -37,7 +39,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.get(
     '/',
-    authFilter_read,
+    authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
         await fileService.getFilesQuery({
@@ -54,7 +56,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.get(
     '/:id',
-    authFilter_read,
+    authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(await fileService.getFileById(req.params.id));
     }),
@@ -66,7 +68,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.post(
     '/',
-    authFilter_write,
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body;
       const result = await fileService.getOrCreateFileByObjId(file);
@@ -79,7 +81,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.patch(
     '/:id/labels',
-    authFilter_write,
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const labels = req.body as any;
       const id = req.params.id;
@@ -96,7 +98,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.delete(
     '/:id/labels',
-    authFilter_write,
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const keys = (req.query?.keys as string)?.split(',');
       if (keys == undefined) {
