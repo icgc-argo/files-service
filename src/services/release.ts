@@ -22,6 +22,7 @@ import { File, FileReleaseState, EmbargoStage } from '../data/files';
 import * as fileService from '../data/files';
 import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
+import { createSnapshot } from '../external/elasticsearch';
 import StringMap from '../utils/StringMap';
 import { getIndexer } from './indexer';
 import getRollcall, { Index } from '../external/rollcall';
@@ -116,6 +117,12 @@ export async function buildActiveRelease(label: string): Promise<Release> {
 
   await indexer.copyFilesToPublic(filesAdded);
   await indexer.removeFilesFromPublic(filesRemoved);
+
+  // 4. Make snapshot!
+  const snapshot = await createSnapshot({ indices: release.indices, label: release.label });
+  if (snapshot) {
+    release = await releaseService.updateActiveReleaseSnapshot(snapshot);
+  }
 
   return release;
 }

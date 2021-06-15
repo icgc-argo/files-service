@@ -45,6 +45,7 @@ services:
       - discovery.type=single-node
       - cluster.name=files.elasticsearch
       - 'ES_JAVA_OPTS=-Xms512m -Xmx2048m'
+      - path.repo=/usr/share/elasticsearch
 
   kibana:
     image: 'kibana:7.5.0'

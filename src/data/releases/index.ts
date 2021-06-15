@@ -5,5 +5,6 @@ export {
   updateActiveReleaseFiles,
   updateActiveReleaseIndices,
   updateActiveReleaseLabel,
+  updateActiveReleaseSnapshot,
   publishActiveRelease,
 } from './release.service';

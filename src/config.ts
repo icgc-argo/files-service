@@ -40,6 +40,7 @@ export interface AppConfig {
     password: string;
     indexName: string;
     createSampleIndex: boolean;
+    repository?: string;
   };
   auth: {
     enabled: boolean;
@@ -139,6 +140,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
       indexName: process.env.INDEX_NAME || 'file_centric_test',
       createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
+      repository: process.env.ES_SNAPSHOT_REPOSITORY,
     },
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'

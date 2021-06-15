@@ -41,6 +41,7 @@ export interface Release {
   publishedAt: Date;
   indices: string[];
   label: string;
+  snapshot: string;
 }
 
 interface DbRelease {
@@ -55,6 +56,7 @@ interface DbRelease {
   publishedAt: Date;
   indices: string[];
   label: string;
+  snapshot: string;
 }
 
 const ReleaseSchema = new mongoose.Schema(
@@ -75,6 +77,7 @@ const ReleaseSchema = new mongoose.Schema(
     publishedAt: { type: Date, required: false },
     label: { type: String, required: false, unique: true, trim: true, sparse: true },
     indices: { type: [String], required: false },
+    snapshot: { type: String, required: false },
   },
   { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
 );
@@ -95,6 +98,7 @@ export type ReleaseUpdates = {
   indices?: string[];
   publishedAt?: Date;
   state?: ReleaseState;
+  snapshot?: string;
 };
 
 export async function create(files: ReleaseFilesInput): Promise<ReleaseMongooseDocument> {
@@ -123,7 +127,7 @@ export async function updateRelease(
   release: Release,
   updates: ReleaseUpdates,
 ): Promise<ReleaseMongooseDocument> {
-  const updatedRelease = {
+  const updatedRelease: Release = {
     ...release,
   };
   if (updates.files) {
@@ -134,6 +138,9 @@ export async function updateRelease(
   }
   if (updates.label) {
     updatedRelease.label = updates.label;
+  }
+  if (updates.snapshot) {
+    updatedRelease.snapshot = updates.snapshot;
   }
   if (updates.indices) {
     updatedRelease.indices = updates.indices;

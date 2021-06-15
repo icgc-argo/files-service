@@ -56,6 +56,13 @@ export async function updateActiveReleaseLabel(label: string): Promise<Release> 
   }
   return toPojo(await releaseModel.updateRelease(activeRelease, { label }));
 }
+export async function updateActiveReleaseSnapshot(snapshot: string): Promise<Release> {
+  const activeRelease = await getActiveRelease();
+  if (!activeRelease) {
+    throw new Error('No active release.');
+  }
+  return toPojo(await releaseModel.updateRelease(activeRelease, { snapshot }));
+}
 
 export async function publishActiveRelease(): Promise<Release> {
   const activeRelease = await getActiveRelease();
@@ -83,6 +90,7 @@ function toPojo(releaseDoc: ReleaseMongooseDocument): Release {
     calculatedAt: releaseDoc.calculatedAt,
     publishedAt: releaseDoc.publishedAt,
     indices: releaseDoc.indices,
+    snapshot: releaseDoc.snapshot,
     filesKept: releaseDoc.filesKept,
     filesAdded: releaseDoc.filesAdded,
     filesRemoved: releaseDoc.filesRemoved,

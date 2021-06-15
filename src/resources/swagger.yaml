@@ -612,6 +612,8 @@ components:
           type: string
         label:
           type: string
+        snapshot:
+          type: string
         calculatedAt:
           type: string
           format: date-time

@@ -209,6 +209,7 @@ type ReleaseDetails = {
   state: string;
   version: string;
   label?: string;
+  snapshot?: string;
   calculatedAt: Date;
   publishedAt?: Date;
   programs: ProgramDetails[];
@@ -266,7 +267,7 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
 }
 
 async function getReleaseDetails(release: Release): Promise<ReleaseDetails> {
-  const { state, version, label, calculatedAt, publishedAt } = release;
+  const { state, version, label, snapshot, calculatedAt, publishedAt } = release;
 
   // We need to get the donor and program details of our files
   const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
@@ -296,6 +297,9 @@ async function getReleaseDetails(release: Release): Promise<ReleaseDetails> {
   };
   if (label) {
     details.label = label;
+  }
+  if (snapshot) {
+    details.snapshot = snapshot;
   }
   if (publishedAt) {
     details.publishedAt = publishedAt;

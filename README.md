@@ -14,6 +14,23 @@ A makefile is provided with several tools to quickly get working locally. Run `m
 
 The docker-compose configuration is provided in the `/compose` path. To run the docker setup without starting the service, you can run `make dcompose`.
 
+## ES Snapshot Setup
+
+When building release indices, the service can optionally create ElasticSearch snapshots for the new indices. To do this, a snapshot repository is required. The .env variable `ES_SNAPSHOT_REPOSITORY` defines the name of this repository, if no value is provided then no snapshot will be created.
+
+To create a snapshot repository named `backups` in your local elasticsearch cluster, you can use the following command:
+
+```
+curl -X PUT "http://localhost:9200/_snapshot/backups" -H 'Content-Type: application/json' -d'
+{
+  "type": "fs",
+  "settings": {
+    "location": "backups"
+  }
+}
+'
+```
+
 # Code Structure
 
 `server.ts` is the entry point for this service. It is responsible for:
