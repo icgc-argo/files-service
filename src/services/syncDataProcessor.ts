@@ -25,7 +25,7 @@ import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
 import { getIndexer } from './indexer';
 
-export async function reindexDataCenter(dataCenterId: string) {
+export async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
   try {
     logger.info(`Start: reindex data center ${dataCenterId}`);
     const { url } = await getDataCenter(dataCenterId);
@@ -35,6 +35,11 @@ export async function reindexDataCenter(dataCenterId: string) {
     const indexer = await getIndexer();
 
     for (const study of studies) {
+      if (studyFilter.length > 0 && !studyFilter.includes(study)) {
+        // Skip studies not in our requested list
+        logger.debug(`Skipping study not included in re-index request: ${study}`);
+        continue;
+      }
       logger.info(`Indexing study: ${study}`);
       try {
         const analysesStream = await generateStudyAnalyses(url, study);
@@ -46,6 +51,7 @@ export async function reindexDataCenter(dataCenterId: string) {
           const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
           await saveAndIndexFilesFromRdpcData(files, dataCenterId, indexer);
         }
+        logger.info(`Done indexing study: ${study}`);
       } catch (err) {
         logger.error(`Failed to index study ${study}, ${err}`, err);
       }

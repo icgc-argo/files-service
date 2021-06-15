@@ -36,10 +36,11 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   );
 
   const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
+  logger.debug('converted to files');
 
   const indexer = await getIndexer();
   const response = await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId, indexer);
-  indexer.release();
+  await indexer.release();
   logger.info(
     `[analysisEventHandler] DONE - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
   );

@@ -20,111 +20,256 @@
 import PromisePool from '@supercharge/promise-pool';
 
 import logger from '../logger';
+import { EmbargoStage, FileReleaseState } from '../data/files';
 import { getClient } from '../external/elasticsearch';
 import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
-import getRollcall, { Index } from '../external/rollcall';
+import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
+import { timeout } from 'promise-tools';
 
 type ReleaseOptions = {
-  publicRelease: boolean;
+  publicRelease?: boolean;
+  indices?: string[];
 };
+
 export interface Indexer {
+  indexFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
+  removeFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
+
   updateFile: (file: File) => Promise<void>;
-  indexFiles: (docs: FileCentricDocument[]) => Promise<void>;
-  removeFiles: (docs: FileCentricDocument[]) => Promise<void>;
+
+  preparePublicIndices: (programs: string[]) => Promise<string[]>;
+  copyFilesToPublic: (files: File[]) => Promise<void>;
+  removeFilesFromPublic: (files: File[]) => Promise<void>;
   release: (options?: ReleaseOptions) => Promise<void>;
 }
-export const getIndexer = async (options?: { doClone: boolean }) => {
-  // Default doClone to true.
-  const doClone = options ? options.doClone : true;
-
+export const getIndexer = async () => {
   const rollcall = await getRollcall();
+  const client = await getClient();
 
+  // No reason to have concurrent requests to getNextIndex and getCurrentIndex, so for all fetch from Rollcall
+  // nextIndices and currentIndices store a record of which program names are currently being fetched.
+  // These also store the resolved names so that repeat fetches are not needed.
   type IndexNameHolder = {
     public: { [programId: string]: Index };
     restricted: { [programId: string]: Index };
+    fetching: Set<string>;
   };
-  const resolvedIndices: IndexNameHolder = {
+  const nextIndices: IndexNameHolder = {
     public: {},
     restricted: {},
+    fetching: new Set<string>(),
+  };
+  const currentIndices: IndexNameHolder = {
+    public: {},
+    restricted: {},
+    fetching: new Set<string>(),
   };
 
-  const getIndexName = async (program: string, isPublic: boolean): Promise<string> => {
+  async function getCurrentIndex(
+    program: string,
+    options: { isPublic: boolean },
+  ): Promise<string | undefined> {
+    const { isPublic } = options;
     const publicIdentifier = isPublic ? 'public' : 'restricted'; // for choosing correct section of resolvedIndices
 
-    const existingIndex: Index | undefined = resolvedIndices[publicIdentifier][program];
+    // Idle while waiting for other fetching requests to resolve
+    while (currentIndices.fetching.has(program)) {
+      await new Promise(resolve => {
+        setTimeout(() => resolve(undefined), 20);
+      });
+    }
+
+    // Nothing currently fetching, check for a previously resolved name
+    const existingIndex: Index | undefined = currentIndices[publicIdentifier][program];
     if (existingIndex) {
       return existingIndex.indexName;
     }
 
-    // Index hasn't been fetched yet, lets go grab it.
-    const nextIndex = await rollcall.fetchNextIndex(program, {
-      isPublic,
-      cloneFromReleasedIndex: doClone,
-    });
-    resolvedIndices[publicIdentifier][program] = nextIndex;
-    return nextIndex.indexName;
+    // Index name hasn't been retrieved, so this one instance can fetch.
+    try {
+      currentIndices.fetching.add(program);
+
+      // Index hasn't been fetched yet, lets go grab it.
+      const currentIndex = await rollcall.fetchCurrentIndex(program, isPublic);
+      if (!currentIndex) {
+        return undefined;
+      }
+
+      currentIndices[publicIdentifier][program] = currentIndex;
+
+      return currentIndex.indexName;
+    } finally {
+      currentIndices.fetching.delete(program);
+    }
+  }
+
+  /**
+   * If the index does not yet exist, this will create that index.
+   * When creating an index, it will clone from current if clone = true.
+   * @param program
+   * @param options public = false, current = false, clone = true
+   * @returns
+   */
+  const getNextIndex = async (
+    program: string,
+    options: { isPublic: boolean; clone: boolean },
+  ): Promise<string> => {
+    const { isPublic: isPublic, clone: cloneFromReleasedIndex } = options;
+    const publicIdentifier = isPublic ? 'public' : 'restricted'; // for choosing correct section of resolvedIndices
+
+    // While concurrent requests are fetching, just idle in this while loop
+    while (nextIndices.fetching.has(program)) {
+      await new Promise(resolve => {
+        setTimeout(() => resolve(undefined), 20);
+      });
+    }
+
+    // Nothing currently fetching, check for a previously resolved name
+    const existingIndex: Index | undefined = nextIndices[publicIdentifier][program];
+    if (existingIndex) {
+      return existingIndex.indexName;
+    }
+
+    // Index name hasn't been retrieved, so this one instance can fetch.
+    try {
+      nextIndices.fetching.add(program);
+
+      // Index hasn't been fetched yet, lets go grab it.
+      const nextIndex = await rollcall.fetchNextIndex(program, {
+        isPublic,
+        cloneFromReleasedIndex,
+      });
+      nextIndices[publicIdentifier][program] = nextIndex;
+
+      return nextIndex.indexName;
+    } finally {
+      nextIndices.fetching.delete(program);
+    }
   };
 
-  async function release(options?: ReleaseOptions) {
+  /**
+   * Add prepared indices to the file alias. By default, this will add all indices in the nextIndices.restricted map to the alias.
+   *   Optionally, a publicRelease can be requested and will also include the nextInidces.public map.
+   *   Additional indices can be specified int eh request options to also be released. This is done when releasing an index prepared during a previous process (not by this indexer object)
+   * @param options
+   */
+  async function release(options?: ReleaseOptions): Promise<void> {
     // Default publicRelease to false;
     const publicRelease = options ? options.publicRelease : false;
+    const additionalIndices: string[] = options && options.indices ? options.indices : [];
 
-    const toRelease = Object.values(resolvedIndices.restricted);
+    logger.info(
+      `[Indexer] Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
+        nextIndices.restricted,
+      )}`,
+    );
+    const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
-      toRelease.concat(Object.values(resolvedIndices.public));
+      logger.info(
+        `[Indexer] Preparing to release... adding public indices to release list: ${Object.keys(
+          nextIndices.public,
+        )}`,
+      );
+      toRelease.concat(Object.values(nextIndices.public));
+    }
+
+    if (additionalIndices.length) {
+      logger.info(
+        `[Indexer]  Preparing to release... Additional indices requested to release: ${additionalIndices}`,
+      );
     }
 
     // TODO: config for max simultaneous release?
+    // release indices tracked in nextIndices
     await PromisePool.withConcurrency(5)
       .for(toRelease)
       .handleError((error, index) => {
         logger.error(`Failed to release index: ${index.indexName}`);
       })
-      .process(async indexName => {
-        await rollcall.release(indexName);
+      .process(async index => {
+        logger.info(`[Indexer] Releasing index to file alias: ${index.indexName}`);
+        await rollcall.release(index);
       });
+
+    // release indices requested in options.additionalIndices
+    await PromisePool.withConcurrency(5)
+      .for(additionalIndices)
+      .handleError((error, indexName) => {
+        logger.error(`Failed to release index: ${indexName}`);
+      })
+      .process(async indexName => {
+        logger.debug(`[Indexer] Releasing index to file alias: ${indexName}`);
+        const index = getIndexFromIndexName(indexName);
+        await rollcall.release(index);
+      });
+
     // Clear stored index names to prevent repeat releases.
-    resolvedIndices.public = {};
-    resolvedIndices.restricted = {};
+    nextIndices.public = {};
+    nextIndices.restricted = {};
   }
 
   /**
-   * Update the parts of the file managed by this service:
+   * Update file properties maintained by this file-manager application:
    *   - embargo_stage
    *   - release_state
+   * Also update these values in the document meta data object.
    * @param file
    */
-  async function updateFile(file: File) {
+  async function updateFile(file: File): Promise<void> {
+    // Don't update a file if it is PUBLIC already
+    if (file.releaseState === FileReleaseState.PUBLIC) {
+      return;
+    }
+
     // updates for the file in ES
     const doc = {
       embargo_stage: file.embargoStage,
       release_state: file.releaseState,
+      meta: {
+        embargo_stage: file.embargoStage,
+        release_state: file.releaseState,
+      },
     };
 
-    const client = await getClient();
+    const body = [{ update: { _id: file.objectId } }, { doc }];
+
+    const index = await getNextIndex(file.programId, {
+      isPublic: false,
+      clone: true,
+    });
     await client.update({
-      index: await getIndexName(file.programId, false),
+      index,
       id: file.objectId,
       body: { doc },
     });
   }
 
-  async function indexFiles(docs: FileCentricDocument[]) {
-    const sortedFiles = sortFilesIntoPrograms(docs);
+  /**
+   * For indexing updates as they come in from
+   * @param docs
+   */
+  async function indexFileDocs(docs: FileCentricDocument[]): Promise<void> {
+    // Only indexing docs that are not PUBLIC
+    const sortedFiles = sortFileDocsIntoPrograms(
+      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
+    );
 
-    const client = await getClient();
-
-    PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(20)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
-        const index = await getIndexName(program, false);
-        const body = files.map(camelCaseKeysToUnderscore).flatMap(doc => [
-          { update: { _id: doc.object_id } },
+        const index = await getNextIndex(program, {
+          isPublic: false,
+          clone: true,
+        });
+        const camelcased = files.map(camelCaseKeysToUnderscore);
+        logger.debug(`camelcased: ${JSON.stringify(camelcased)}`);
+        const body = camelcased.flatMap(file => [
+          { update: { _id: file.object_id } },
           {
             doc_as_upsert: true,
-            doc,
+            doc: file,
           },
         ]);
 
@@ -140,20 +285,22 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
       });
   }
 
-  async function removeFiles(docs: FileCentricDocument[]) {
-    const sortedFiles = sortFilesIntoPrograms(docs);
-
-    const client = await getClient();
+  async function removeFileDocs(docs: FileCentricDocument[]): Promise<void> {
+    // Only removing files that are not public
+    const sortedFiles = sortFileDocsIntoPrograms(
+      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
+    );
 
     // TODO: configure concurrency for ES requests.
-    PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(5)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
-        const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));
+        const body = files.map(file => ({ delete: { _id: file.objectId } }));
+        const index = await getNextIndex(program, { isPublic: false, clone: true });
 
         try {
           await client.bulk({
-            index: await getIndexName(program, false),
+            index,
             body,
           });
         } catch (e) {
@@ -163,10 +310,166 @@ export const getIndexer = async (options?: { doClone: boolean }) => {
       });
   }
 
+  async function preparePublicIndices(programs: string[]): Promise<string[]> {
+    const publicIndices: string[] = [];
+    await PromisePool.withConcurrency(5)
+      .for(programs)
+      .process(async program => {
+        const index = await getNextIndex(program, { isPublic: true, clone: true });
+        publicIndices.push(index);
+      });
+    return publicIndices;
+  }
+
+  async function copyFilesToPublic(files: File[]): Promise<void> {
+    const sortedFiles = sortFilesIntoPrograms(files);
+
+    // TODO: Configure ES request concurrency
+    await PromisePool.withConcurrency(5)
+      .for(sortedFiles)
+      .process(async programData => {
+        const program = programData.program;
+        const fileIds = programData.files.map(file => file.objectId);
+
+        const restrictedIndex = await getCurrentIndex(program, { isPublic: false });
+        const publicIndex = await getNextIndex(program, {
+          isPublic: true,
+          clone: true,
+        });
+
+        if (!restrictedIndex) {
+          throw new Error(
+            `Failed to move file from restricted to public: no restricted index aliased for ${program}`,
+          );
+        }
+
+        const body = {
+          source: {
+            index: restrictedIndex,
+            query: {
+              bool: {
+                filter: {
+                  terms: {
+                    object_id: fileIds,
+                  },
+                },
+              },
+            },
+          },
+          dest: {
+            index: publicIndex,
+          },
+          // This script makes the indexed document change releaseState and embargoStage to PUBLIC
+          // This is the only mechanism used to put a file document into a public index, so this is responsible for making sure the Stage is correct.
+          script: {
+            source: `ctx._source.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.embargo_stage = "${EmbargoStage.PUBLIC}";ctx._source.meta.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.meta.embargo_stage = "${EmbargoStage.PUBLIC}";`,
+          },
+        };
+
+        const response = await client.reindex({
+          wait_for_completion: true,
+          refresh: true,
+          body,
+        });
+
+        return;
+      });
+  }
+
+  async function removeFilesFromPublic(files: File[]): Promise<void> {
+    const sortedFiles = sortFilesIntoPrograms(files);
+
+    // TODO: Configure ES request concurrency
+    await PromisePool.withConcurrency(20)
+      .for(sortedFiles)
+      .process(async programData => {
+        const body = programData.files.map(file => ({ delete: { _id: file.objectId } }));
+        const index = await getNextIndex(programData.program, {
+          isPublic: true,
+          clone: true,
+        });
+
+        try {
+          await client.bulk({
+            index,
+            body,
+          });
+        } catch (e) {
+          logger.error(`Failed bulk delete request: ${JSON.stringify(e)}`, e);
+          throw e;
+        }
+      });
+  }
+
+  async function removeFilesFromRestricted(files: File[]): Promise<void> {
+    const sortedFiles = sortFilesIntoPrograms(files);
+
+    // TODO: Configure ES request concurrency
+    await PromisePool.withConcurrency(20)
+      .for(sortedFiles)
+      .process(async programData => {
+        const body = programData.files.map(file => ({ delete: { _id: file.objectId } }));
+        const index = await getNextIndex(programData.program, {
+          isPublic: false,
+          clone: true,
+        });
+
+        try {
+          await client.bulk({
+            index,
+            body,
+          });
+        } catch (e) {
+          logger.error(`Failed bulk delete request: ${JSON.stringify(e)}`, e);
+          throw e;
+        }
+      });
+  }
+
+  async function deleteIndices(indices: string[]): Promise<void> {
+    if (!indices || !indices.length) {
+      return;
+    }
+    await client.indices.delete({ index: indices });
+
+    // remove the nextIndices and currentIndices references to these indexNames
+    indices.forEach(indexName => {
+      for (const programId in currentIndices.public) {
+        if (currentIndices.public[programId].indexName === indexName) {
+          delete currentIndices.public[programId];
+        }
+      }
+      for (const programId in currentIndices.restricted) {
+        if (currentIndices.restricted[programId].indexName === indexName) {
+          delete currentIndices.restricted[programId];
+        }
+      }
+      for (const programId in nextIndices.public) {
+        if (nextIndices.public[programId].indexName === indexName) {
+          delete nextIndices.public[programId];
+        }
+      }
+      for (const programId in nextIndices.restricted) {
+        if (nextIndices.restricted[programId].indexName === indexName) {
+          delete nextIndices.restricted[programId];
+        }
+      }
+    });
+  }
+
   return {
+    // By FileDocument
+    indexFileDocs,
+    removeFileDocs,
+
     updateFile,
-    indexFiles,
-    removeFiles,
+
+    // Public Index Management
+    deleteIndices,
+    preparePublicIndices,
+    copyFilesToPublic,
+    removeFilesFromPublic,
+    removeFilesFromRestricted,
     release,
   };
 };
@@ -195,13 +498,35 @@ function camelCaseKeysToUnderscore(obj: any) {
   return obj;
 }
 // Separate list of file documents into distinct list per program.
-type FilesSortedByProgramsArray = Array<{ files: FileCentricDocument[]; program: string }>;
-function sortFilesIntoPrograms(files: FileCentricDocument[]): FilesSortedByProgramsArray {
-  const output: FilesSortedByProgramsArray = [];
+type FileDocsSortedByProgramsArray = Array<{ files: FileCentricDocument[]; program: string }>;
+function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedByProgramsArray {
+  const output: FileDocsSortedByProgramsArray = [];
 
   // Sort Files into programs
   const programMap = files.reduce((acc: { [program: string]: FileCentricDocument[] }, file) => {
     const program = file.studyId;
+    if (acc[program]) {
+      acc[program].push(file);
+    } else {
+      acc[program] = [file];
+    }
+    return acc;
+  }, {});
+
+  // For each program, add an element to output array
+  Object.entries(programMap).forEach(([program, files]) => {
+    output.push({ program, files });
+  });
+  return output;
+}
+// Separate list of files into distinct list per program.
+type FilesSortedByProgramsArray = Array<{ files: File[]; program: string }>;
+function sortFilesIntoPrograms(files: File[]): FilesSortedByProgramsArray {
+  const output: FilesSortedByProgramsArray = [];
+
+  // Sort Files into programs
+  const programMap = files.reduce((acc: { [program: string]: File[] }, file) => {
+    const program = file.programId;
     if (acc[program]) {
       acc[program].push(file);
     } else {

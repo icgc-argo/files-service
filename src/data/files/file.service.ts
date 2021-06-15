@@ -26,7 +26,8 @@ import {
   FileFilter,
   QueryFilters,
   EmbargoStage,
-  ReleaseState,
+  FileReleaseState,
+  FileStateFilter,
 } from './file.model';
 import * as fileModel from './file.model';
 import logger from '../../logger';
@@ -36,6 +37,10 @@ export async function getFilesQuery(filter: QueryFilters): Promise<File[]> {
 }
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);
+}
+export async function getFilesFromObjectIds(objectIds: string[]): Promise<File[]> {
+  const results = objectIds.length ? await fileModel.getFiles({ include: { objectIds } }) : [];
+  return results.map(toPojo);
 }
 
 export async function getFileById(fileId: string): Promise<File> {
@@ -61,19 +66,32 @@ export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<F
   return toPojo(await fileModel.create(fileToCreate));
 }
 
+export async function getFilesByState(filter: FileStateFilter): Promise<File[]> {
+  return (await fileModel.getFilesByState(filter)).map(toPojo);
+}
+
 /**
  * Returns the updated File.
  */
-type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: ReleaseState };
+type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: FileReleaseState };
 export async function updateFileReleaseProperties(
   objectId: string,
   updates: ReleaseProperties,
 ): Promise<File> {
+  logger.debug(
+    `[File.Service] Updating file emabrgo and release properties: ${objectId} ${JSON.stringify(
+      updates,
+    )}`,
+  );
   const result = await fileModel.updateByObjectId(objectId, updates, { new: true });
   return toPojo(result);
 }
 
-type AdminControls = { adminPromote?: EmbargoStage; adminHold?: boolean };
+type AdminControls = {
+  adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
+};
 export async function updateFileAdminControls(
   objectId: string,
   updates: AdminControls,
@@ -81,10 +99,10 @@ export async function updateFileAdminControls(
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
-type FilePublishStatus = { status?: string; firstPublished?: Date };
-export async function updateFilePublishStatus(
+type FileSongPublishStatus = { status?: string; firstPublished?: Date };
+export async function updateFileSongPublishStatus(
   objectId: string,
-  updates: FilePublishStatus,
+  updates: FileSongPublishStatus,
 ): Promise<File> {
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
@@ -96,6 +114,18 @@ export async function adminPromote(
 ): Promise<File[] | void> {
   // Perform bulk update
   const response = await fileModel.updateBulk(filter, { adminPromote: stage }, options);
+  if (options?.returnDocuments) {
+    return response.map(toPojo);
+  }
+}
+
+export async function adminDemote(
+  filter: FileFilter,
+  stage: EmbargoStage,
+  options?: { returnDocuments: boolean },
+): Promise<File[] | void> {
+  // Perform bulk update
+  const response = await fileModel.updateBulk(filter, { adminDemote: stage }, options);
   if (options?.returnDocuments) {
     return response.map(toPojo);
   }
@@ -171,10 +201,11 @@ function toPojo(f: FileMongooseDocument): File {
     status: f.status,
 
     embargoStage: f.embargoStage as EmbargoStage,
-    releaseState: f.releaseState as ReleaseState,
+    releaseState: f.releaseState as FileReleaseState,
 
     adminHold: f.adminHold,
     adminPromote: f.adminPromote as EmbargoStage,
+    adminDemote: f.adminDemote as EmbargoStage,
 
     labels: f.labels,
   };

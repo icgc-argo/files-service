@@ -19,7 +19,7 @@
 
 import { differenceInMonths } from 'date-fns';
 import logger from '../logger';
-import { EmbargoStage, File, ReleaseState } from '../data/files';
+import { EmbargoStage, File, FileReleaseState } from '../data/files';
 import { first } from 'lodash';
 
 const stageOrder = {
@@ -83,7 +83,7 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
   logger.debug(`[Embargo] ${dbFile.fileId}: Recalculating embargo stage`);
 
   // a releaseState of PUBLIC means this is already public, return EmbargoStage of PUBLIC
-  if (dbFile.releaseState === ReleaseState.PUBLIC) {
+  if (dbFile.releaseState === FileReleaseState.PUBLIC) {
     logger.debug(`[Embargo] ${dbFile.fileId}: File is already public.`);
     return EmbargoStage.PUBLIC;
   }
@@ -110,7 +110,18 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
         ? dbFile.adminPromote
         : calculatedStage;
     logger.debug(
-      `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updatign calculated stage to: ${calculatedStage}`,
+      `[Embargo] ${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
+    );
+  }
+  if (dbFile.adminDemote) {
+    // Assign the least permissive of adminDemote and calculatedStage
+    // This is done AFTER the adminPromote check to make sure the adminDemote value overrides any promotions
+    calculatedStage =
+      stageOrder[dbFile.adminDemote] < stageOrder[calculatedStage]
+        ? dbFile.adminDemote
+        : calculatedStage;
+    logger.debug(
+      `[Embargo] ${dbFile.fileId}: File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
     );
   }
   logger.debug(`[Embargo] ${dbFile.fileId}: Returning embargo stage: ${calculatedStage}`);

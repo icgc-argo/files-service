@@ -73,13 +73,13 @@ export const setup = async (config: AppConfig) => {
       autoCommitThreshold: 10,
       autoCommitInterval: 10000,
       eachMessage: async ({ message }) => {
-        log.info(`new message received offset : ${message.offset}`);
+        log.info(`[Kafka] new message received offset : ${message.offset}`);
         await handleAnalysisUpdate(message, analysisDlq);
-        log.debug(`message handled ok`);
+        log.debug(`[Kafka] message handled ok`);
       },
     })
     .catch(e => {
-      log.error('failed to run consumer ' + e.message, e);
+      log.error('[Kafka] Failed to run consumer ' + e.message, e);
       throw e;
     });
 
@@ -98,7 +98,7 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
       },
     ],
   });
-  log.debug(`dlq ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
+  log.debug(`[Kafka] dlq ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
 };
 
 async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string | undefined) {
@@ -116,14 +116,14 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
     );
   } catch (err) {
     log.error(
-      `failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
+      `[Kafka] failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
       err,
     );
     if (analysisDlq && analysisUpdatesDlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
         : { message: `invalid body, original offset: ${message.offset}` };
-      log.debug(`sending message to dlq...`);
+      log.debug(`[Kafka] sending message to dlq...`);
       await sendDlqMessage(analysisUpdatesDlqProducer, analysisDlq, msg);
     }
   }

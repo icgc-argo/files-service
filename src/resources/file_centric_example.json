@@ -68,7 +68,10 @@
       "file_type": {
         "type": "keyword"
       },
-      "release_stage": {
+      "release_state": {
+        "type": "keyword"
+      },
+      "embargo_stage": {
         "type": "keyword"
       },
       "program_access_date": {

@@ -28,13 +28,18 @@ import { Errors } from '../data/files';
 const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
+  const authFilters = {
+    read: authFilter([config.auth.readScope, config.auth.writeScope]),
+    write: authFilter([config.auth.writeScope]),
+  };
+
   /**
    * Get stored files using analyusisId, objectId, or programId as provided in query params
    * TODO: May need refactoring to consider pagination or to remove ability to filter only by programId, responses could get huge.
    */
   router.get(
     '/',
-    authFilter([config.auth.readScope]),
+    authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
         await fileService.getFilesQuery({
@@ -51,7 +56,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.get(
     '/:id',
-    authFilter([config.auth.readScope]),
+    authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(await fileService.getFileById(req.params.id));
     }),
@@ -63,7 +68,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.post(
     '/',
-    authFilter([config.auth.writeScope]),
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const file = req.body;
       const result = await fileService.getOrCreateFileByObjId(file);
@@ -76,7 +81,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.patch(
     '/:id/labels',
-    authFilter([config.auth.writeScope]),
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const labels = req.body as any;
       const id = req.params.id;
@@ -93,7 +98,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
    */
   router.delete(
     '/:id/labels',
-    authFilter([config.auth.writeScope]),
+    authFilters.write,
     wrapAsync(async (req: Request, res: Response) => {
       const keys = (req.query?.keys as string)?.split(',');
       if (keys == undefined) {

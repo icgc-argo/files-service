@@ -1,7 +1,7 @@
 export {
   // Enums:
   EmbargoStage,
-  ReleaseState,
+  FileReleaseState,
   // File Types:
   File,
   FileLabel,
@@ -14,14 +14,17 @@ export {
   Errors,
   addOrUpdateFileLabel,
   adminPromote,
+  adminDemote,
   deleteAll,
   getFilesQuery,
   getFiles,
+  getFilesFromObjectIds,
   getFileById,
   getFileByObjId,
+  getFilesByState,
   getOrCreateFileByObjId,
   updateFileReleaseProperties,
   updateFileAdminControls,
-  updateFilePublishStatus,
+  updateFileSongPublishStatus,
   removeLabel,
 } from './file.service';

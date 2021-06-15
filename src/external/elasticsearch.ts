@@ -42,6 +42,34 @@ export async function getClient() {
   return esClient;
 }
 
+export async function createSnapshot(content: {
+  indices: string[];
+  label: string;
+}): Promise<string | void> {
+  const {
+    elasticProperties: { repository },
+  } = await getAppConfig();
+
+  if (repository) {
+    const snapshot = `release_${content.label}_${Date.now()}`;
+    logger.info(`[Elasticsearch] Creating snapshot ${snapshot} for indices: ${content.indices}`);
+    await esClient.snapshot.create({
+      repository,
+      snapshot,
+      wait_for_completion: true,
+      body: {
+        indices: content.indices.join(','),
+        ignore_unavailable: true,
+        include_global_state: false,
+        metadata: {},
+      },
+    });
+    logger.info(`[Elasticsearch] Snapshot ${snapshot} created successfully.`);
+    return snapshot;
+  }
+  return;
+}
+
 const checkIndexExists = async (index: string, esClient: Client) => {
   try {
     await esClient.indices.get({

@@ -40,6 +40,7 @@ export interface AppConfig {
     password: string;
     indexName: string;
     createSampleIndex: boolean;
+    repository?: string;
   };
   auth: {
     enabled: boolean;
@@ -123,12 +124,12 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       consumers: {
         analysisUpdates: {
           topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'song_analysis',
-          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-svc-analysis',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-service-placeholder-analysis',
           dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
         reindexing: {
           topic: process.env.KAFKA_REINDEXING_TOPIC || 'files_reindexing',
-          group: process.env.KAFKA_REINDEXING_GROUP || 'files-svc-reindexing',
+          group: process.env.KAFKA_REINDEXING_GROUP || 'files-service-placeholder-reindexing',
           dlq: process.env.KAFKA_REINDEXING_DLQ,
         },
       },
@@ -139,6 +140,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
       indexName: process.env.INDEX_NAME || 'file_centric_test',
       createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
+      repository: process.env.ES_SNAPSHOT_REPOSITORY,
     },
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'

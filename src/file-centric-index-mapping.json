@@ -27,7 +27,22 @@
     }
   },
   "mappings": {
+    "dynamic": "false",
+    "date_detection": false,
     "properties": {
+      "meta": {
+        "properties": {
+          "study_id": {
+            "type": "keyword"
+          },
+          "release_state": {
+            "type": "keyword"
+          },
+          "embargo_stage": {
+            "type": "keyword"
+          }
+        }
+      },
       "analysis": {
         "properties": {
           "analysis_id": {
@@ -491,10 +506,8 @@
         }
       },
       "file": {
-        "type": "nested",
         "properties": {
           "index_file": {
-            "type": "nested",
             "properties": {
               "file_type": {
                 "type": "keyword"
@@ -561,7 +574,10 @@
       "program_access_date": {
         "type": "date"
       },
-      "release_stage": {
+      "release_state": {
+        "type": "keyword"
+      },
+      "embargo_stage": {
         "type": "keyword"
       },
       "repositories": {

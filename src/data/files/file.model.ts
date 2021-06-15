@@ -27,7 +27,7 @@ export enum EmbargoStage {
   PUBLIC = 'PUBLIC',
 }
 
-export enum ReleaseState {
+export enum FileReleaseState {
   RESTRICTED = 'RESTRICTED',
   QUEUED = 'QUEUED',
   PUBLIC = 'PUBLIC',
@@ -63,8 +63,9 @@ interface DbFile {
   embargoStage: string;
   releaseState: string;
 
-  adminPromote?: EmbargoStage;
   adminHold?: boolean;
+  adminPromote?: string;
+  adminDemote?: string;
 
   labels: FileLabel[];
 }
@@ -82,10 +83,11 @@ export interface File {
   firstPublished?: Date;
 
   embargoStage: EmbargoStage;
-  releaseState: ReleaseState;
+  releaseState: FileReleaseState;
 
-  adminPromote?: EmbargoStage;
   adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
 
   labels: FileLabel[];
 }
@@ -105,10 +107,11 @@ export interface FileInput {
   firstPublished?: Date;
 
   embargoStage?: EmbargoStage;
-  releaseState?: ReleaseState;
+  releaseState?: FileReleaseState;
 
-  adminPromote?: EmbargoStage;
   adminHold?: boolean;
+  adminPromote?: EmbargoStage;
+  adminDemote?: EmbargoStage;
 
   labels: FileLabel[];
 }
@@ -134,11 +137,16 @@ const FileSchema = new mongoose.Schema(
     releaseState: {
       type: String,
       required: true,
-      enum: Object.values(ReleaseState),
-      default: ReleaseState.RESTRICTED,
+      enum: Object.values(FileReleaseState),
+      default: FileReleaseState.RESTRICTED,
     },
 
     adminPromote: {
+      type: String,
+      required: false,
+      enum: Object.values(EmbargoStage),
+    },
+    adminDemote: {
       type: String,
       required: false,
       enum: Object.values(EmbargoStage),
@@ -170,6 +178,10 @@ export interface FileFilter {
   include?: FileFilterProperties;
   exclude?: FileFilterProperties;
 }
+export interface FileStateFilter {
+  embargoStage?: EmbargoStage;
+  releaseState?: FileReleaseState;
+}
 
 FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
@@ -196,10 +208,13 @@ export async function getFileByObjId(objId: string) {
   });
 }
 
+export async function getFilesByState(filter: FileStateFilter) {
+  return (await FileModel.find(filter).exec()) as FileMongooseDocument[];
+}
+
 export async function create(file: FileInput) {
   const newFile = new FileModel(file);
-  const createdFile = await newFile.save();
-  return createdFile;
+  return await newFile.save();
 }
 
 export async function save(toUpdate: FileMongooseDocument) {
@@ -243,7 +258,7 @@ export async function deleteAll(ids: number[]) {
   });
 }
 
-export let FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema);
+const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema);
 
 function buildQueryFilters(filters: QueryFilters) {
   const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};

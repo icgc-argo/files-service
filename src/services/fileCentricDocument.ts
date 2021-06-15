@@ -19,12 +19,12 @@
 
 import logger from '../logger';
 import { File } from '../data/files';
-import { EmbargoStage, ReleaseState } from '../data/files';
+import { EmbargoStage, FileReleaseState } from '../data/files';
 import { FilePartialDocument } from '../external/analysisConverter';
 
 export type FileCentricDocument = FilePartialDocument & {
   embargoStage: EmbargoStage;
-  releaseState: ReleaseState;
+  releaseState: FileReleaseState;
 };
 
 type SearchDocumentInputs = {
@@ -67,6 +67,11 @@ export const buildDocument = ({
     fileId: dbFile.fileId,
     embargoStage: dbFile.embargoStage,
     releaseState: dbFile.releaseState,
+    meta: {
+      embargoStage: dbFile.embargoStage,
+      releaseState: dbFile.releaseState,
+      studyId: filePartialDocument.studyId,
+    },
   };
 
   return output;

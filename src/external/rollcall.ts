@@ -25,6 +25,23 @@ import { getAppConfig } from '../config';
 import { getClient } from './elasticsearch';
 import fileCentricConfig from '../file-centric-index-mapping.json';
 
+export function getIndexFromIndexName(indexName: string): Index {
+  const parts = indexName.split('_');
+  if (parts.length !== 6) {
+    throw new Error(`Provided indexName ${indexName} cannot be converted into Rollcall Index`);
+  }
+  return {
+    indexName,
+    entity: parts[0],
+    type: parts[1],
+    shardPrefix: parts[2],
+    shard: parts[3],
+    releasePrefix: parts[4],
+    release: parts[5],
+    valid: true,
+  };
+}
+
 // Rollcall builds the index name as `entity_type_shardPrefix_shard_releasePrefix_release`,
 // release is not in the request because rollcall will calculate it
 export type CreateResolvableIndexRequest = {
@@ -63,7 +80,7 @@ export type RollCallClient = {
   release: (indexName: Index) => Promise<boolean>;
 };
 
-const RELEASE = {
+const RELEASE_STATE = {
   PUBLIC: 'public',
   RESTRICTED: 'restricted',
 };
@@ -75,7 +92,9 @@ export default async (): Promise<RollCallClient> => {
   const aliasName = config.rollcall.aliasName;
   const indexEntity = config.rollcall.entity;
   const indexType = 'centric';
-  const shardPrefix = 'program';
+  const shardPrefix = (isPublic: boolean) =>
+    isPublic ? RELEASE_STATE.PUBLIC : RELEASE_STATE.RESTRICTED;
+  const releasePrefix = 're';
 
   const client = await getClient();
 
@@ -83,17 +102,18 @@ export default async (): Promise<RollCallClient> => {
     programShortName: string,
     isPublic: boolean,
   ): Promise<Index | undefined> => {
+    logger.debug(`Fetching current index ${programShortName} isPublic:${isPublic}`);
     const url = urljoin(rootUrl, `/indices/resolved`);
 
     const shard = formatProgramShortName(programShortName);
-    const releasePrefix = isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED;
 
     const response = (await fetch(url).then(res => res.json())) as Index[];
 
     const latestIndex = response
-      .filter(index => index.shard === shard && index.releasePrefix === releasePrefix)
+      .filter(index => index.shard === shard && index.shardPrefix === shardPrefix(isPublic))
       .sort((a, b) => (a.release > b.release ? 1 : -1))
       .pop();
+
     return latestIndex;
   };
 
@@ -110,12 +130,12 @@ export default async (): Promise<RollCallClient> => {
     const url = urljoin(rootUrl, `/indices/create`);
 
     const req: CreateResolvableIndexRequest = {
-      shardPrefix: shardPrefix,
+      shardPrefix: shardPrefix(isPublic),
       shard: formatProgramShortName(programShortName),
       entity: indexEntity,
       type: indexType,
       cloneFromReleasedIndex: cloneFromReleasedIndex || false,
-      releasePrefix: isPublic ? RELEASE.PUBLIC : RELEASE.RESTRICTED,
+      releasePrefix,
     };
     try {
       const newIndex = (await fetch(url, {
@@ -158,7 +178,7 @@ export default async (): Promise<RollCallClient> => {
 
       await client.indices.putSettings({
         index: index.indexName,
-        body: fileCentricConfig.settings,
+        body: { ...fileCentricConfig.settings, 'index.blocks.write': false },
       });
       await client.indices.putMapping({
         index: index.indexName,
