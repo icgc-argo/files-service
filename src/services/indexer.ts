@@ -264,7 +264,6 @@ export const getIndexer = async () => {
           clone: true,
         });
         const camelcased = files.map(camelCaseKeysToUnderscore);
-        logger.debug(`camelcased: ${JSON.stringify(camelcased)}`);
         const body = camelcased.flatMap(file => [
           { update: { _id: file.object_id } },
           {
