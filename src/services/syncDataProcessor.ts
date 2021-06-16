@@ -58,7 +58,7 @@ export async function reindexDataCenter(dataCenterId: string, studyFilter: strin
     }
 
     // Release all file updates.
-    indexer.release();
+    await indexer.release();
   } catch (err) {
     logger.error(`Error while indexing repository ${dataCenterId}`);
     throw err;
