@@ -18,11 +18,15 @@
  */
 
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { AppConfig } from './config';
+import { AppConfig } from '../config';
 import retry from 'async-retry';
-import { AnalysisUpdateEvent } from './entity';
-import { handleAnalysisPublishEvent, handleAnalysisSupressedOrUnpublished } from './manager';
-import log from './logger';
+import analysisEventHandler from '../services/analysisEventHandler';
+import log from '../logger';
+
+export type AnalysisUpdateEvent = {
+  songServerId: string;
+  analysis: { [k: string]: any };
+};
 
 let analysisUpdatesConsumer: Consumer | undefined;
 let analysisUpdatesDlqProducer: Producer | undefined;
@@ -69,13 +73,13 @@ export const setup = async (config: AppConfig) => {
       autoCommitThreshold: 10,
       autoCommitInterval: 10000,
       eachMessage: async ({ message }) => {
-        log.info(`new message received offset : ${message.offset}`);
+        log.info(`[Kafka] new message received offset : ${message.offset}`);
         await handleAnalysisUpdate(message, analysisDlq);
-        log.debug(`message handled ok`);
+        log.debug(`[Kafka] message handled ok`);
       },
     })
     .catch(e => {
-      log.error('failed to run consumer ' + e.message, e);
+      log.error('[Kafka] Failed to run consumer ' + e.message, e);
       throw e;
     });
 
@@ -94,7 +98,7 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
       },
     ],
   });
-  log.debug(`dlq ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
+  log.debug(`[Kafka] dlq ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
 };
 
 async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string | undefined) {
@@ -103,11 +107,7 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
       async (bail: Function) => {
         // todo validate message body
         const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
-        if (analysisEvent.analysis.analysisState == 'PUBLISHED') {
-          await handleAnalysisPublishEvent(analysisEvent);
-        } else {
-          await handleAnalysisSupressedOrUnpublished(analysisEvent);
-        }
+        await analysisEventHandler(analysisEvent);
       },
       {
         retries: 3,
@@ -116,14 +116,14 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
     );
   } catch (err) {
     log.error(
-      `failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
+      `[Kafka] failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
       err,
     );
     if (analysisDlq && analysisUpdatesDlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
         : { message: `invalid body, original offset: ${message.offset}` };
-      log.debug(`sending message to dlq...`);
+      log.debug(`[Kafka] sending message to dlq...`);
       await sendDlqMessage(analysisUpdatesDlqProducer, analysisDlq, msg);
     }
   }

@@ -28,35 +28,36 @@ paths:
     get:
       tags:
         - Health
-      summary: get status of app and various app components
+      summary: Get status of app and various app components
       responses:
         '500':
-          description: 'app is not fully healthy'
+          description: 'App is not fully healthy'
         '200':
-          description: 'all components reporting healthy status'
+          description: 'All components reporting healthy status'
           content:
             application/json:
               schema:
                 type: object
+
   /files:
     get:
       parameters:
         - name: analysisId
-          description: list of analysis ids, csv
+          description: List of analysis ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
         - name: objectId
-          description: list of file object Ids, csv
+          description: List of file object Ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
         - name: programId
-          description: list of file program Ids, csv
+          description: List of file program Ids, csv
           in: query
           required: false
           schema:
@@ -64,7 +65,7 @@ paths:
             format: csv
       tags:
         - Files
-      summary: get all files, filtered by the query parameters if provided
+      summary: Get all files, filtered by the query parameters if provided
       responses:
         '404':
           description: Requested resource not found
@@ -87,8 +88,8 @@ paths:
     post:
       tags:
         - Files
-      summary: create a File or just fetch it if the object id exists
-      description: creates a file, if the file already exists (same obj Id) it will just fetch it.
+      summary: Create a File or fetch it if the object id exists
+      description: Creates a file, if the file already exists (same obj Id) it will just fetch it.
       requestBody:
         content:
           application/json:
@@ -106,7 +107,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
         '200':
-          description: 'the file that was created or found already.'
+          description: The file that was created or found already.
           content:
             application/json:
               schema:
@@ -140,68 +141,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/File'
-
-  /admin/index/{datacenter}:
-    tags:
-      - Admin
-    post:
-      parameters:
-        - name: datacenter
-          description: datacenter code (ex song.collab)
-          in: path
-          required: true
-          schema:
-            type: string
-
-      responses:
-        '200':
-          description: submitted, will run in background
-          content:
-            application/json:
-              schema:
-                type: string
-
-  /test/handleAnalysisEvent:
-    post:
-      tags:
-        - Testing
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AnalysisEvent'
-      responses:
-        '200':
-          description:
-          content:
-            application/json:
-              schema:
-                type: object
-  /test/files:
-    delete:
-      parameters:
-        - name: id
-          description: list of file Ids, csv (if not provided all will be deleted)
-          in: query
-          required: false
-          schema:
-            type: string
-            format: csv
-      tags:
-        - Testing
-      summary: deletes all files, filtered by the query parameters if provided
-      responses:
-        '400':
-          description: Invalid parameters or body request
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
-        '403':
-          $ref: '#/components/responses/ForbiddenError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-        '201':
-          description: files deleted
-
   /files/{id}/labels:
     parameters:
       - name: id
@@ -259,6 +198,275 @@ paths:
           $ref: '#/components/responses/ServerError'
         '200':
           description: delete successful
+
+  /release:
+    get:
+      tags:
+        - Release
+      summary: Get list of Releases
+      responses:
+        '200':
+          description: List of releases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/active:
+    get:
+      tags:
+        - Release
+      summary: Get details of the current active release without calculating
+      responses:
+        '200':
+          description: Details of the active release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/calculate:
+    post:
+      tags:
+        - Release
+      summary: Calculate all details for next release. This will update the active release.
+      responses:
+        '200':
+          description: Details of the updated active release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/build/{version}/{label}:
+    post:
+      tags:
+        - Release
+      summary: Publish the active release. Requires the provided version number matches the version in the active release.
+      parameters:
+        - name: version
+          description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: label
+          description: An identifying label for the release. Typically this is the numeric version identifier given for the release. This will be used for labelling a backup archive for the release and to track releases more easily in the DB.
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary of the published release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '400':
+          description: Publishing error details
+          content:
+            application/json:
+              type: object
+              properties:
+                error:
+                  type: object
+              required:
+                - error
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/publish/{version}:
+    post:
+      tags:
+        - Release
+      summary: Publish the active release. Will only succeed if the provided version number matches the version in the active release
+      parameters:
+        - name: version
+          description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary of the published release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '400':
+          description: Publishing error details
+          content:
+            application/json:
+              type: object
+              properties:
+                error:
+                  type: object
+              required:
+                - error
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /admin/index/{datacenter}:
+    post:
+      tags:
+        - Admin
+      parameters:
+        - name: datacenter
+          description: Datacenter code (ex song.collab) CURRENTLY ONLY ONE RDPC AND THE VALUE IS READ FROM CONFIG, THIS PARAMETER DOES NOTHING UNTIL THIS COMMENT IS UPDATED
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: study
+          description: Array of study IDs to index. If not provided, all studies will be indexed. ex. ?study=PACA-CA&study=LUCA-KR
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Submitted, will run in background
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /admin/promote/{stage}:
+    post:
+      tags:
+        - Admin
+      description: Promote the selected files to be AT LEAST the specified Embargo Stage. The Embargo Stage for the selected files will be re-calculated with this promotion stage being the minimum. On successful completion, the files will be re-indexed with their new embargo stage, but no changes will be made to the Public data release. Note that if a file has a promotion AND a deomotion applied, the demotion will take priority when they conflict.
+      parameters:
+        - name: stage
+          description: The embargo stage that the selected files should be promoted to
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/EmbargoStage'
+        - name: dryRun
+          description: Set to "true" to retrieve details of the Donors and Analyses affected by the provided filters. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for promotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated and re-indexed. NOTE that files promoted to PUBLIC are re-indexed as ASSOCIATE_ACCESS and re-index as QUEUED, not yet PUBLIC.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
+  /admin/demote/{stage}:
+    post:
+      tags:
+        - Admin
+      description: Demote the selected files to be AT MOST the specified Embargo Stage. The embargo stage for the selected files will be re-calculated with this demotion stage being the maximum. On successful completion, the files will be re-indexed with their new embargo stage, but no changes will be made to the Public data release. Note that if a file has a promotion AND a deomotion applied, the demotion will take priority when they conflict.
+      parameters:
+        - name: stage
+          description: The embargo stage that the selected files should be demoted to
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/EmbargoStage'
+        - name: dryRun
+          description: Set to "true" to retrieve details of the Donors and Analyses affected by the provided filters. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for demotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated and re-indexed. NOTE that publicly released files that have been demoted are not re-indexed.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
+
+  /debug/handleAnalysisEvent:
+    post:
+      tags:
+        - Debug
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisEvent'
+      responses:
+        '200':
+          description:
+          content:
+            application/json:
+              schema:
+                type: object
+  /debug/files:
+    delete:
+      tags:
+        - Debug
+      parameters:
+        - name: id
+          description: List of file Ids, csv (if not provided all will be deleted)
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+      summary: Deletes all files, filtered by the query parameters if provided
+      responses:
+        '400':
+          description: Invalid parameters or body request
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '201':
+          description: files deleted
+
 components:
   responses:
     ServiceUnavailableError:
@@ -297,6 +505,9 @@ components:
           type: string
         analysisId:
           type: string
+    EmbargoStage:
+      type: string
+      enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
     File:
       type: object
       properties:
@@ -314,16 +525,158 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Labels'
+    FileFilter:
+      type: object
+      description: Two sets of file property filters. If none are provided, all files will be found. If "include" values are provided, files will be filtered to match these values. If "exclude" values are provided, the files found will be filtered to not include matches to these values. It is valid to provide any number of these filters from none, to some, to all.
+      properties:
+        include:
+          $ref: '#/components/schemas/FileProperties'
+          description: Provided values will filter the files found to only include matches to these values
+        exclude:
+          $ref: '#/components/schemas/FileProperties'
+          description: Provided values will filter the files found to not include matches to these values
+    FileProperties:
+      type: object
+      properties:
+        analyses:
+          description: List of analysis Ids
+          type: array
+          items:
+            type: string
+        donors:
+          description: List of donor ids
+          type: array
+          items:
+            type: string
+        programs:
+          description: List of program short-names (ex. TEST-CA)
+          type: array
+          items:
+            type: string
+        fileIds:
+          description: List of file IDs (ex. FL123)
+          type: array
+          items:
+            type: string
+        objectIds:
+          description: List of objectIDs that are used as unique IDs for files in SONG and ES
+          type: array
+          items:
+            type: string
+    ReleaseCounts:
+      type: object
+      properties:
+        kept:
+          type: number
+        added:
+          type: number
+        removed:
+          type: number
+      required:
+        - kept
+        - added
+        - removed
+    ReleaseSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+        version:
+          type: string
+        label:
+          type: string
+        calculatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        files:
+          $ref: '#/components/ReleaseCounts'
+      required:
+        - id
+        - state
+        - version
+        - calculatedAt
+        - files
+    ReleaseDetails:
+      type: object
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+        version:
+          type: string
+        label:
+          type: string
+        snapshot:
+          type: string
+        calculatedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        totals:
+          type: object
+          properties:
+            files:
+              $ref: '#/components/ReleaseCounts'
+            donors:
+              $ref: '#/components/ReleaseCounts'
+          required:
+            - files
+            - donors
+        programs:
+          type: array
+          items:
+            type: object
+          properties:
+            program:
+              type: string
+            files:
+              $ref: '#/components/ReleaseCounts'
+            donors:
+              $ref: '#/components/ReleaseCounts'
+          required:
+            - program
+            - files
+            - donors
+      required:
+        - id
+        - state
+        - version
+        - calculatedAt
+        - totals
+        - programs
     Labels:
       type: object
-      description: 'arbitrary pair of a key and value(s) string'
+      description: Arbitrary pair of a key and value(s) string
       properties:
         key:
           type: string
           required: true
-          description: 'label key, cannot contain commas, note that this will be normalized to lower case'
+          description: Label key, cannot contain commas, note that this will be normalized to lower case
         value:
           type: array
-          description: label values array, can be empty if the label doesn't need values
+          description: Label values array, can be empty if the label doesn't need values
           items:
             type: string
+    SelectedFilesResponse:
+      type: object
+      description: A summary of the files selected by the query
+      properties:
+        total:
+          description: Total number of files selected
+          type: integer
+        ids:
+          description: The objectIds of the files selected
+          type: array
+          items:
+            type: string
+        message:
+          description: Text description of action taken
+          type: string

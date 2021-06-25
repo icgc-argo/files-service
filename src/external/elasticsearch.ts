@@ -17,17 +17,19 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { getAppConfig } from './config';
-import { FileCentricDocument } from './entity';
 import { Client } from '@elastic/elasticsearch';
-import esMapping from './resources/file_centric_example.json';
-import logger from './logger';
+
+import { getAppConfig } from '../config';
+import { FilePartialDocument } from '../external/analysisConverter';
+import esMapping from '../resources/file_centric_example.json';
+import logger from '../logger';
 
 let esClient: Client;
-let indexName: string = '';
 
-async function getClient() {
-  if (esClient) return esClient;
+export async function getClient() {
+  if (esClient) {
+    return esClient;
+  }
   const config = await getAppConfig();
   esClient = new Client({
     node: config.elasticProperties.node,
@@ -37,73 +39,35 @@ async function getClient() {
     },
   });
   await esClient.ping();
-  indexName = config.elasticProperties.indexName;
-  if (config.elasticProperties.createSampleIndex.toLowerCase() == 'true') {
-    await createSampleIndex(indexName, esClient);
-  } else {
-    await checkIndexExists(indexName, esClient);
-  }
   return esClient;
 }
 
-export async function index(docs: FileCentricDocument[]) {
-  const client = await getClient();
-  const body = docs.map(camelCaseKeysToUnderscore).flatMap(doc => [
-    { update: { _id: doc.object_id } },
-    {
-      doc_as_upsert: true,
-      doc,
-    },
-  ]);
+export async function createSnapshot(content: {
+  indices: string[];
+  label: string;
+}): Promise<string | void> {
+  const {
+    elasticProperties: { repository },
+  } = await getAppConfig();
 
-  try {
-    await client.bulk({
-      index: indexName,
-      body,
+  if (repository) {
+    const snapshot = `release_${content.label}_${Date.now()}`;
+    logger.info(`[Elasticsearch] Creating snapshot ${snapshot} for indices: ${content.indices}`);
+    await esClient.snapshot.create({
+      repository,
+      snapshot,
+      wait_for_completion: true,
+      body: {
+        indices: content.indices.join(','),
+        ignore_unavailable: true,
+        include_global_state: false,
+        metadata: {},
+      },
     });
-  } catch (e) {
-    logger.error(`failed bulk indexing request: ${JSON.stringify(e)}`, e);
-    throw e;
+    logger.info(`[Elasticsearch] Snapshot ${snapshot} created successfully.`);
+    return snapshot;
   }
-}
-
-export async function remove(docs: FileCentricDocument[]) {
-  const client = await getClient();
-  const body = docs.map(doc => ({ delete: { _id: doc.objectId } }));
-
-  try {
-    await client.bulk({
-      index: indexName,
-      body,
-    });
-  } catch (e) {
-    logger.error(`failed bulk delete request: ${JSON.stringify(e)}`, e);
-    throw e;
-  }
-}
-
-function camelCaseKeysToUnderscore(obj: any) {
-  if (typeof obj != 'object') return obj;
-
-  for (const oldName in obj) {
-    // Camel to underscore
-    const newName = oldName.replace(/([A-Z])/g, function($1) {
-      return '_' + $1.toLowerCase();
-    });
-
-    // Only process if names are different
-    if (newName != oldName) {
-      // Check for the old property name to avoid a ReferenceError in strict mode.
-      if (obj.hasOwnProperty(oldName)) {
-        obj[newName] = obj[oldName];
-        delete obj[oldName];
-      }
-    }
-    if (typeof obj[newName] == 'object') {
-      obj[newName] = camelCaseKeysToUnderscore(obj[newName]);
-    }
-  }
-  return obj;
+  return;
 }
 
 const checkIndexExists = async (index: string, esClient: Client) => {

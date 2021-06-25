@@ -16,50 +16,17 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-export interface DbFile {
-  fileId?: number;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: FileLabel[];
-}
 
-export type AnalysisUpdateEvent = {
-  songServerId: string;
-  analysis: { [k: string]: any };
+import { RequestHandler } from 'express';
+
+// wrapper to handle errors from async express route handlers
+const wrapAsync = (fn: RequestHandler): RequestHandler => {
+  return (req, res, next) => {
+    const routePromise = fn(req, res, next) as any;
+    if (routePromise.catch) {
+      routePromise.catch(next);
+    }
+  };
 };
 
-export type FileCentricDocument = { [k: string]: any } & {
-  fileId: string;
-  objectId: string;
-  studyId: string;
-  repositories: { [k: string]: string }[];
-  analysis: { [k: string]: any };
-};
-
-export interface File {
-  fileId?: string;
-  objectId: string;
-  repoId: string;
-  programId: string;
-  analysisId: string;
-  labels: FileLabel[];
-}
-
-export type FileLabel = {
-  key: string;
-  value: string[];
-};
-
-export type QueryFilters = {
-  analysisId?: string[];
-  programId?: string[];
-  objectId?: string[];
-};
-
-export enum Status {
-  OK = '😇',
-  UNKNOWN = '🤔',
-  ERROR = '😱',
-}
+export default wrapAsync;
