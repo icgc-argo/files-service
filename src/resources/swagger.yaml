@@ -257,7 +257,7 @@ paths:
     post:
       tags:
         - Release
-      summary: Build new public index for the active release. Requires the provided version number matches the version in the active release.
+      summary: Build new public index for the active release. Requires the provided version number to match the version in the active release.
       parameters:
         - name: version
           description: Version string from the active release to be built. If this does not match the active release, it will not build. This is a security measure against building a release that was not intended to be built.
