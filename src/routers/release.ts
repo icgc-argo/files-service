@@ -184,7 +184,7 @@ function summarizeRelease(release: Release): ReleaseSummary {
     id: release._id,
     state: release.state,
     version: release.version,
-    label: release.version,
+    label: release.label,
     calculatedAt: release.calculatedAt,
     publishedAt: release.publishedAt,
     files: {
