@@ -63,6 +63,13 @@ paths:
           schema:
             type: string
             format: csv
+        - name: donorId
+          description: List of file donor Ids, csv
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
       tags:
         - Files
       summary: Get all files, filtered by the query parameters if provided
