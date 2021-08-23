@@ -48,7 +48,7 @@ const LabelSchema = new mongoose.Schema(
   },
 );
 
-// DbFile has the types we get back out  of the DB (before casting strings to enums)
+// DbFile has the types we get back out of the DB (before casting strings to enums)
 interface DbFile {
   objectId: string;
   fileId: number;
@@ -162,6 +162,7 @@ export type QueryFilters = {
   analysisId?: string[];
   programId?: string[];
   objectId?: string[];
+  donorId?: string[];
 };
 
 /**
@@ -275,6 +276,11 @@ function buildQueryFilters(filters: QueryFilters) {
   if (filters.objectId && filters.objectId.length > 0) {
     queryFilters.objectId = {
       $in: filters.objectId,
+    };
+  }
+  if (filters.donorId && filters.donorId.length > 0) {
+    queryFilters.donorId = {
+      $in: filters.donorId,
     };
   }
   return queryFilters;
