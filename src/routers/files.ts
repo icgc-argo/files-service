@@ -19,7 +19,6 @@
 
 import { Router, Request, Response, RequestHandler, NextFunction } from 'express';
 
-import logger from '../logger';
 import { AppConfig } from '../config';
 import wrapAsync from '../utils/wrapAsync';
 import * as fileService from '../data/files';
@@ -46,6 +45,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
           analysisId: (req.query as any)?.analysisId?.split(','),
           objectId: (req.query as any)?.objectId?.split(','),
           programId: (req.query as any)?.programId?.split(','),
+          donorId: (req.query as any)?.donorId?.split(','),
         }),
       );
     }),

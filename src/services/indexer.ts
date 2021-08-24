@@ -22,11 +22,9 @@ import PromisePool from '@supercharge/promise-pool';
 import logger from '../logger';
 import { EmbargoStage, FileReleaseState } from '../data/files';
 import { getClient } from '../external/elasticsearch';
-import { getAppConfig } from '../config';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
-import { timeout } from 'promise-tools';
 
 type ReleaseOptions = {
   publicRelease?: boolean;
