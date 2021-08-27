@@ -17,7 +17,11 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import mongoose from 'mongoose';
+import mongoose, { PaginateModel } from 'mongoose';
+import { File } from 'winston/lib/winston/transports';
+import { FILE_STREAM_LIMIT } from '../../config';
+
+const mongoosePaginate = require('mongoose-paginate-v2');
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export enum EmbargoStage {
@@ -159,6 +163,8 @@ const FileSchema = new mongoose.Schema(
 );
 
 export type QueryFilters = {
+  page: number;
+  limit?: number;
   analysisId?: string[];
   programId?: string[];
   objectId?: string[];
@@ -188,33 +194,42 @@ FileSchema.plugin(AutoIncrement, {
   inc_field: 'fileId',
 });
 
+FileSchema.plugin(mongoosePaginate);
+
 export type FileMongooseDocument = mongoose.Document & DbFile;
 
 export async function getFiles(filters: FileFilter) {
-  return (await FileModel.find(
-    convertFiltersForMongoose(filters),
-  ).exec()) as FileMongooseDocument[];
+  return (await fileModel
+    .find(convertFiltersForMongoose(filters))
+    .exec()) as FileMongooseDocument[];
 }
+
 export async function getFilesQuery(filters: QueryFilters) {
-  return (await FileModel.find(buildQueryFilters(filters)).exec()) as FileMongooseDocument[];
+  const options = {
+    page: filters.page,
+    limit: filters.limit ? filters.limit : FILE_STREAM_LIMIT,
+    sort: { analysisId: 'asc' },
+  };
+
+  return (await fileModel.paginate(buildQueryFilters(filters), options)).docs;
 }
 
 export async function getFileById(id: number) {
-  return await FileModel.findOne({ fileId: id });
+  return await fileModel.findOne({ fileId: id });
 }
 
 export async function getFileByObjId(objId: string) {
-  return await FileModel.findOne({
+  return await fileModel.findOne({
     objectId: objId,
   });
 }
 
 export async function getFilesByState(filter: FileStateFilter) {
-  return (await FileModel.find(filter).exec()) as FileMongooseDocument[];
+  return (await fileModel.find(filter).exec()) as FileMongooseDocument[];
 }
 
 export async function create(file: FileInput) {
-  const newFile = new FileModel(file);
+  const newFile = new fileModel(file);
   return await newFile.save();
 }
 
@@ -228,7 +243,7 @@ export async function updateByObjectId(
   updates: mongoose.UpdateQuery<FileMongooseDocument>,
   options: any,
 ) {
-  return await FileModel.findOneAndUpdate({ objectId }, updates, {
+  return await fileModel.findOneAndUpdate({ objectId }, updates, {
     ...options,
     useFindAndModify: false,
   });
@@ -240,26 +255,31 @@ export async function updateBulk(
   options?: { returnDocuments: boolean },
 ) {
   const mongooseFilter = convertFiltersForMongoose(filter);
-  await FileModel.updateMany(mongooseFilter, updates);
+  await fileModel.updateMany(mongooseFilter, updates);
   if (options?.returnDocuments) {
-    return FileModel.find(mongooseFilter);
+    return fileModel.find(mongooseFilter);
   }
 }
 
 export async function deleteAll(ids: number[]) {
   if (!ids || ids.length == 0) {
-    await FileModel.deleteMany({});
+    await fileModel.deleteMany({});
     return;
   }
 
-  await FileModel.deleteMany({
+  await fileModel.deleteMany({
     fileId: {
       $in: ids,
     },
   });
 }
 
-const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema);
+interface FileModel<T extends FileMongooseDocument> extends PaginateModel<T> {}
+
+const fileModel: FileModel<FileMongooseDocument> = mongoose.model<FileMongooseDocument>(
+  'File',
+  FileSchema,
+) as FileModel<FileMongooseDocument>;
 
 function buildQueryFilters(filters: QueryFilters) {
   const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};

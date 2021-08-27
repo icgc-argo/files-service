@@ -42,6 +42,18 @@ paths:
   /files:
     get:
       parameters:
+        - name: page
+          description: the current page number, starting from page 1
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: limit
+          description: the number of files per page, default to 20
+          in: query
+          required: false
+          schema:
+            type: number
         - name: analysisId
           description: List of analysis ids, csv
           in: query
@@ -72,7 +84,7 @@ paths:
             format: csv
       tags:
         - Files
-      summary: Get all files, filtered by the query parameters if provided
+      summary: Get all files, sorted by analysisId asc, filtered by the query parameters if provided
       responses:
         '404':
           description: Requested resource not found
