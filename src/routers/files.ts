@@ -40,14 +40,18 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
-        await fileService.getFilesQuery({
-          page: (req.query as any).page,
-          limit: (req.query as any)?.limit,
-          analysisId: (req.query as any)?.analysisId?.split(','),
-          objectId: (req.query as any)?.objectId?.split(','),
-          programId: (req.query as any)?.programId?.split(','),
-          donorId: (req.query as any)?.donorId?.split(','),
-        }),
+        await fileService.getFilesQuery(
+          {
+            page: (req.query as any)?.page,
+            limit: (req.query as any)?.limit,
+          },
+          {
+            analysisId: (req.query as any)?.analysisId?.split(','),
+            objectId: (req.query as any)?.objectId?.split(','),
+            programId: (req.query as any)?.programId?.split(','),
+            donorId: (req.query as any)?.donorId?.split(','),
+          },
+        ),
       );
     }),
   );

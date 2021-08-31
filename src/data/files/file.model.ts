@@ -19,9 +19,14 @@
 
 import mongoose, { PaginateModel } from 'mongoose';
 import { File } from 'winston/lib/winston/transports';
-import { FILE_STREAM_LIMIT } from '../../config';
+import { FILE_PAGE_SIZE_LIMIT } from '../../config';
 
-const mongoosePaginate = require('mongoose-paginate-v2');
+// Main reason for using this pagination plugin
+// is that it provides flexibility on pagination options such as
+// select, sort, offset, page, limit  ect.. It's easy to code with and
+// the return value gives extra info such prevPage, nextPage, totalDocs.
+import mongoosePaginate from 'mongoose-paginate-v2';
+
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export enum EmbargoStage {
@@ -163,12 +168,15 @@ const FileSchema = new mongoose.Schema(
 );
 
 export type QueryFilters = {
-  page: number;
-  limit?: number;
   analysisId?: string[];
   programId?: string[];
   objectId?: string[];
   donorId?: string[];
+};
+
+export type PaginationFilter = {
+  page?: number;
+  limit?: number;
 };
 
 /**
@@ -199,37 +207,37 @@ FileSchema.plugin(mongoosePaginate);
 export type FileMongooseDocument = mongoose.Document & DbFile;
 
 export async function getFiles(filters: FileFilter) {
-  return (await fileModel
-    .find(convertFiltersForMongoose(filters))
-    .exec()) as FileMongooseDocument[];
+  return (await FileModel.find(
+    convertFiltersForMongoose(filters),
+  ).exec()) as FileMongooseDocument[];
 }
 
-export async function getFilesQuery(filters: QueryFilters) {
-  const options = {
-    page: filters.page,
-    limit: filters.limit ? filters.limit : FILE_STREAM_LIMIT,
+export async function getFilesQuery(paginationFilters: PaginationFilter, filters: QueryFilters) {
+  const paginateOptions = {
+    page: paginationFilters.page ? paginationFilters.page : 1,
+    limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
     sort: { analysisId: 'asc' },
   };
 
-  return (await fileModel.paginate(buildQueryFilters(filters), options)).docs;
+  return (await FileModel.paginate(buildQueryFilters(filters), paginateOptions)).docs;
 }
 
 export async function getFileById(id: number) {
-  return await fileModel.findOne({ fileId: id });
+  return await FileModel.findOne({ fileId: id });
 }
 
 export async function getFileByObjId(objId: string) {
-  return await fileModel.findOne({
+  return await FileModel.findOne({
     objectId: objId,
   });
 }
 
 export async function getFilesByState(filter: FileStateFilter) {
-  return (await fileModel.find(filter).exec()) as FileMongooseDocument[];
+  return (await FileModel.find(filter).exec()) as FileMongooseDocument[];
 }
 
 export async function create(file: FileInput) {
-  const newFile = new fileModel(file);
+  const newFile = new FileModel(file);
   return await newFile.save();
 }
 
@@ -243,7 +251,7 @@ export async function updateByObjectId(
   updates: mongoose.UpdateQuery<FileMongooseDocument>,
   options: any,
 ) {
-  return await fileModel.findOneAndUpdate({ objectId }, updates, {
+  return await FileModel.findOneAndUpdate({ objectId }, updates, {
     ...options,
     useFindAndModify: false,
   });
@@ -255,31 +263,28 @@ export async function updateBulk(
   options?: { returnDocuments: boolean },
 ) {
   const mongooseFilter = convertFiltersForMongoose(filter);
-  await fileModel.updateMany(mongooseFilter, updates);
+  await FileModel.updateMany(mongooseFilter, updates);
   if (options?.returnDocuments) {
-    return fileModel.find(mongooseFilter);
+    return FileModel.find(mongooseFilter);
   }
 }
 
 export async function deleteAll(ids: number[]) {
   if (!ids || ids.length == 0) {
-    await fileModel.deleteMany({});
+    await FileModel.deleteMany({});
     return;
   }
 
-  await fileModel.deleteMany({
+  await FileModel.deleteMany({
     fileId: {
       $in: ids,
     },
   });
 }
 
-interface FileModel<T extends FileMongooseDocument> extends PaginateModel<T> {}
-
-const fileModel: FileModel<FileMongooseDocument> = mongoose.model<FileMongooseDocument>(
-  'File',
-  FileSchema,
-) as FileModel<FileMongooseDocument>;
+const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<
+  FileMongooseDocument
+>;
 
 function buildQueryFilters(filters: QueryFilters) {
   const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};

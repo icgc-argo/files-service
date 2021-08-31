@@ -43,9 +43,9 @@ paths:
     get:
       parameters:
         - name: page
-          description: the current page number, starting from page 1
+          description: the current page number, default is page 1
           in: query
-          required: true
+          required: false
           schema:
             type: number
         - name: limit
