@@ -185,3 +185,8 @@ export const getAppConfig = async (envFile?: string): Promise<AppConfig> => {
   const secrets = await loadVaultSecrets();
   return buildAppConfig(secrets);
 };
+
+export const FILE_PAGE_SIZE_LIMIT =
+  !Number(process.env.FILE_PAGE_SIZE_LIMIT) || Number(process.env.FILE_PAGE_SIZE_LIMIT) <= 0
+    ? 20
+    : Number(process.env.FILE_PAGE_SIZE_LIMIT);

@@ -28,12 +28,16 @@ import {
   EmbargoStage,
   FileReleaseState,
   FileStateFilter,
+  PaginationFilter,
 } from './file.model';
 import * as fileModel from './file.model';
 import logger from '../../logger';
 
-export async function getFilesQuery(filter: QueryFilters): Promise<File[]> {
-  return (await fileModel.getFilesQuery(filter)).map(toPojo);
+export async function getFilesQuery(
+  paginationFilter: PaginationFilter,
+  queryFilter: QueryFilters,
+): Promise<File[]> {
+  return (await fileModel.getFilesQuery(paginationFilter, queryFilter)).map(toPojo);
 }
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);

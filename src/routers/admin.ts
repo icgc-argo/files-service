@@ -19,16 +19,12 @@
 
 import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
-
-import querystring from 'querystring';
-
 import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
-
 import { reindexDataCenter } from '../services/syncDataProcessor';
 import { recalculateFileState } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
