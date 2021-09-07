@@ -101,6 +101,16 @@ export interface File {
   labels: FileLabel[];
 }
 
+export interface FilesResponse {
+  files: File[];
+  totalFiles: number;
+  pageSize: number;
+  totalPages: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
+  currentPage?: number;
+}
+
 // FileInput matches the File object, but with optional fields where
 //  values may not want to be provided when doing an update or creating
 //  a new File and plannign to use the default values
@@ -212,14 +222,17 @@ export async function getFiles(filters: FileFilter) {
   ).exec()) as FileMongooseDocument[];
 }
 
-export async function getFilesQuery(paginationFilters: PaginationFilter, filters: QueryFilters) {
+export async function getFilesQuery(
+  paginationFilters: PaginationFilter,
+  filters: QueryFilters,
+): Promise<mongoose.PaginateResult<FileMongooseDocument>> {
   const paginateOptions = {
     page: paginationFilters.page ? paginationFilters.page : 1,
     limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
     sort: { analysisId: 'asc' },
   };
 
-  return (await FileModel.paginate(buildQueryFilters(filters), paginateOptions)).docs;
+  return await FileModel.paginate(buildQueryFilters(filters), paginateOptions);
 }
 
 export async function getFileById(id: number) {
