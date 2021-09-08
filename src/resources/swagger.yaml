@@ -530,7 +530,7 @@ components:
     FilesResponse:
       type: object
       properties:
-        info:
+        meta:
           type: object
           properties:
             totalFiles:
