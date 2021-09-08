@@ -103,7 +103,7 @@ export interface File {
 
 export interface FilesResponse {
   files: File[];
-  info: {
+  meta: {
     totalFiles: number;
     pageSize: number;
     totalPages: number;

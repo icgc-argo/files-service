@@ -41,7 +41,7 @@ export async function getFilesQuery(
   const response = await fileModel.getFilesQuery(paginationFilter, queryFilter);
   const files = response.docs.map(toPojo);
   return {
-    info: {
+    meta: {
       totalFiles: response.totalDocs,
       currentPage: response.page,
       pageSize: response.limit,
