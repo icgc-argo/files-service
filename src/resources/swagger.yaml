@@ -103,7 +103,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/File'
+                  $ref: '#/components/schemas/FilesResponse'
     post:
       tags:
         - Files
@@ -527,6 +527,28 @@ components:
     EmbargoStage:
       type: string
       enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
+    FilesResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            totalFiles:
+              type: number
+            currentPage:
+              type: number
+            pageSize:
+              type: number
+            totalPages:
+              type: number
+            hasPrevPage:
+              type: boolean
+            hasNextPage:
+              type: boolean
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/File'
     File:
       type: object
       properties:

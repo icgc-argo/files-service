@@ -29,6 +29,7 @@ import {
   FileReleaseState,
   FileStateFilter,
   PaginationFilter,
+  FilesResponse,
 } from './file.model';
 import * as fileModel from './file.model';
 import logger from '../../logger';
@@ -36,9 +37,22 @@ import logger from '../../logger';
 export async function getFilesQuery(
   paginationFilter: PaginationFilter,
   queryFilter: QueryFilters,
-): Promise<File[]> {
-  return (await fileModel.getFilesQuery(paginationFilter, queryFilter)).map(toPojo);
+): Promise<FilesResponse> {
+  const response = await fileModel.getFilesQuery(paginationFilter, queryFilter);
+  const files = response.docs.map(toPojo);
+  return {
+    meta: {
+      totalFiles: response.totalDocs,
+      currentPage: response.page,
+      pageSize: response.limit,
+      totalPages: response.totalPages,
+      hasPrevPage: response.hasPrevPage,
+      hasNextPage: response.hasNextPage,
+    },
+    files: files,
+  };
 }
+
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);
 }
