@@ -103,12 +103,14 @@ export interface File {
 
 export interface FilesResponse {
   files: File[];
-  totalFiles: number;
-  pageSize: number;
-  totalPages: number;
-  hasPrevPage: boolean;
-  hasNextPage: boolean;
-  currentPage?: number;
+  info: {
+    totalFiles: number;
+    pageSize: number;
+    totalPages: number;
+    hasPrevPage: boolean;
+    hasNextPage: boolean;
+    currentPage?: number;
+  };
 }
 
 // FileInput matches the File object, but with optional fields where
