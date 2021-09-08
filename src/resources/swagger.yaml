@@ -84,7 +84,7 @@ paths:
             format: csv
       tags:
         - Files
-      summary: Get all files, sorted by analysisId asc, filtered by the query parameters if provided
+      summary: Get all files, sorted by fileId asc, filtered by the query parameters if provided
       responses:
         '404':
           description: Requested resource not found
