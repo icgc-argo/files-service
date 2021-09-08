@@ -530,22 +530,25 @@ components:
     FilesResponse:
       type: object
       properties:
+        meta:
+          type: object
+          properties:
+            totalFiles:
+              type: number
+            currentPage:
+              type: number
+            pageSize:
+              type: number
+            totalPages:
+              type: number
+            hasPrevPage:
+              type: boolean
+            hasNextPage:
+              type: boolean
         files:
           type: array
           items:
             $ref: '#/components/schemas/File'
-        totalFiles:
-          type: number
-        currentPage:
-          type: number
-        pageSize:
-          type: number
-        totalPages:
-          type: number
-        hasPrevPage:
-          type: boolean
-        hasNextPage:
-          type: boolean
     File:
       type: object
       properties:

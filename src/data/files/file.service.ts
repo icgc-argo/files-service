@@ -41,13 +41,15 @@ export async function getFilesQuery(
   const response = await fileModel.getFilesQuery(paginationFilter, queryFilter);
   const files = response.docs.map(toPojo);
   return {
+    meta: {
+      totalFiles: response.totalDocs,
+      currentPage: response.page,
+      pageSize: response.limit,
+      totalPages: response.totalPages,
+      hasPrevPage: response.hasPrevPage,
+      hasNextPage: response.hasNextPage,
+    },
     files: files,
-    totalFiles: response.totalDocs,
-    currentPage: response.page,
-    pageSize: response.limit,
-    totalPages: response.totalPages,
-    hasPrevPage: response.hasPrevPage,
-    hasNextPage: response.hasNextPage,
   };
 }
 
