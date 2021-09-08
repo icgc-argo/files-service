@@ -231,7 +231,7 @@ export async function getFilesQuery(
   const paginateOptions = {
     page: paginationFilters.page ? paginationFilters.page : 1,
     limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
-    sort: { analysisId: 'asc' },
+    sort: { fileId: 'asc' },
   };
 
   return await FileModel.paginate(buildQueryFilters(filters), paginateOptions);
