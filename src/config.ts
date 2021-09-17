@@ -32,6 +32,9 @@ export interface AppConfig {
       analysisUpdates: KafkaConsumerConfigurations;
       reindexing: KafkaConsumerConfigurations;
     };
+    producers: {
+      publicRelease: KafkaProducerConfigurations;
+    };
   };
   mongoProperties: MongoProps;
   elasticProperties: {
@@ -73,6 +76,10 @@ export interface KafkaConsumerConfigurations {
   topic: string;
   group: string;
   dlq: string | undefined;
+}
+
+export interface KafkaProducerConfigurations {
+  topic: string;
 }
 
 export interface MongoProps {
@@ -131,6 +138,11 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
           topic: process.env.KAFKA_REINDEXING_TOPIC || 'files_reindexing',
           group: process.env.KAFKA_REINDEXING_GROUP || 'files-service-placeholder-reindexing',
           dlq: process.env.KAFKA_REINDEXING_DLQ,
+        },
+      },
+      producers: {
+        publicRelease: {
+          topic: process.env.KAFKA_PUBLIC_RELEASE_TOPIC || 'public_release',
         },
       },
     },
