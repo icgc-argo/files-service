@@ -142,7 +142,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       },
       producers: {
         publicRelease: {
-          topic: process.env.KAFKA_PUBLIC_RELEASE_TOPIC || 'public_release',
+          topic: process.env.KAFKA_PUBLIC_RELEASE_TOPIC || 'files_public_release',
         },
       },
     },

@@ -26,9 +26,9 @@ import { createSnapshot } from '../external/elasticsearch';
 import StringMap from '../utils/StringMap';
 import { getIndexer } from './indexer';
 import logger from '../logger';
-import { Program, PublicReleaseMessage } from './type';
 import { sendPublicReleaseMessage } from '../external/kafka';
 import _ from 'lodash';
+import { Program, PublicReleaseMessage } from 'kafkaMessages';
 
 function toFileId(file: File) {
   return file.objectId;
@@ -189,7 +189,7 @@ export async function publishActiveRelease(): Promise<Release> {
   logger.debug(`[Release.Publish] Release marked as published.`);
 
   const message = buildKafkaMessage(release, filesAdded, filesRemoved);
-  sendPublicReleaseMessage(message.toString());
+  sendPublicReleaseMessage(message);
 
   return release;
 }
@@ -199,26 +199,19 @@ const buildKafkaMessage = (
   filesAdded: File[],
   filesRemoved: File[],
 ): PublicReleaseMessage => {
-  const filesAddedByProgramId = _.groupBy(filesAdded, file => file.programId);
-  const filesRemovedByProgramId = _.groupBy(filesRemoved, file => file.programId);
-
-  // merge removed and added files by programId into filesAddedByProgramId:
-  Object.entries(filesRemovedByProgramId).forEach(([programId, files]) => {
-    const existing = filesAddedByProgramId[programId] ? filesAddedByProgramId[programId] : [];
-    filesAddedByProgramId[programId] = [...existing, ...files];
-  });
+  const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
 
   // get unique donor ids from filesAdded and filesRemoved:
   const programsUpdated: Program[] = [];
 
-  Object.entries(filesAddedByProgramId).forEach(([programId, files]) => {
-    const donorIds = new Set();
+  Object.entries(filesUpdated).forEach(([programId, files]) => {
+    const donorIds = new Set<string>();
     files.map(file => {
       donorIds.add(file.donorId);
     });
     const program: Program = {
       id: programId,
-      donorsUpdated: Array.from(donorIds) as string[],
+      donorsUpdated: Array.from(donorIds),
     };
     programsUpdated.push(program);
   });

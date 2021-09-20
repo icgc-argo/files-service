@@ -22,6 +22,7 @@ import { AppConfig } from '../config';
 import retry from 'async-retry';
 import analysisEventHandler from '../services/analysisEventHandler';
 import log from '../logger';
+import { PublicReleaseMessage } from 'kafkaMessages';
 
 export type AnalysisUpdateEvent = {
   songServerId: string;
@@ -95,7 +96,7 @@ export const setup = async (config: AppConfig) => {
   };
 };
 
-export const sendPublicReleaseMessage = async (messageJSON: string) => {
+export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage) => {
   const result = await publicReleaseProducer.send({
     topic: publicReleaseTopic,
     messages: [
