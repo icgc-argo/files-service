@@ -17,10 +17,11 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import logger from '../logger';
+import Logger from '../logger';
 import { File } from '../data/files';
 import { EmbargoStage, FileReleaseState } from '../data/files';
 import { FilePartialDocument } from '../external/analysisConverter';
+const logger = Logger('FileDocumentService');
 
 export type FileCentricDocument = FilePartialDocument & {
   embargoStage: EmbargoStage;

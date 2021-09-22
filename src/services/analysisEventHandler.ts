@@ -17,12 +17,12 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import logger from '../logger';
+import Logger from '../logger';
 import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external/analysisConverter';
 import { AnalysisUpdateEvent } from '../external/kafka';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
 import { getIndexer } from './indexer';
-
+const logger = Logger('AnalysisEventHandler');
 /**
  * Song Kafka Message Handler
  * @param analysisEvent
@@ -32,7 +32,7 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   const dataCenterId = analysisEvent.songServerId;
 
   logger.info(
-    `[analysisEventHandler] START - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
+    `START - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
   );
 
   const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
@@ -42,7 +42,7 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   const response = await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId, indexer);
   await indexer.release();
   logger.info(
-    `[analysisEventHandler] DONE - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
+    `DONE - processing song analysis event from data-center ${dataCenterId} for analysisId ${analysis.analysisId}}`,
   );
   return response;
 };

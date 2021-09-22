@@ -19,7 +19,7 @@
 
 import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
-import logger from '../logger';
+import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
@@ -28,6 +28,8 @@ import * as fileService from '../data/files';
 import { reindexDataCenter } from '../services/syncDataProcessor';
 import { recalculateFileState } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
+
+const logger = Logger('Admin.Router');
 
 function fileSummaryResponse(files: fileService.File[]) {
   const total = files.length;

@@ -21,10 +21,11 @@ import { Router, Request, Response, RequestHandler, NextFunction } from 'express
 
 import { AppConfig } from '../config';
 
-import logger from '../logger';
+import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import analysisEventHandler from '../services/analysisEventHandler';
 import * as fileService from '../data/files';
+const logger = Logger('Debug.Router');
 
 const createDebugRouter = (
   config: AppConfig,

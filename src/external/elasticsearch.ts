@@ -22,7 +22,8 @@ import { Client } from '@elastic/elasticsearch';
 import { getAppConfig } from '../config';
 import { FilePartialDocument } from '../external/analysisConverter';
 import esMapping from '../resources/file_centric_example.json';
-import logger from '../logger';
+import Logger from '../logger';
+const logger = Logger('Elasticsearch');
 
 let esClient: Client;
 
@@ -52,7 +53,7 @@ export async function createSnapshot(content: {
 
   if (repository) {
     const snapshot = `release_${content.label}_${Date.now()}`;
-    logger.info(`[Elasticsearch] Creating snapshot ${snapshot} for indices: ${content.indices}`);
+    logger.info(`Creating snapshot ${snapshot} for indices: ${content.indices}`);
     await esClient.snapshot.create({
       repository,
       snapshot,
@@ -64,7 +65,7 @@ export async function createSnapshot(content: {
         metadata: {},
       },
     });
-    logger.info(`[Elasticsearch] Snapshot ${snapshot} created successfully.`);
+    logger.info(`Snapshot ${snapshot} created successfully.`);
     return snapshot;
   }
   return;
@@ -77,11 +78,11 @@ const checkIndexExists = async (index: string, esClient: Client) => {
     });
     logger.info(`index ${index} exists`);
   } catch (e) {
-    if (e.name == 'ResponseError' && e.message == 'index_not_found_exception') {
-      logger.error(`index ${index} doesn't exist.`);
+    if ((<Error>e).name === 'ResponseError' && (<Error>e).message === 'index_not_found_exception') {
+      logger.error(`Index ${index} doesn't exist.`);
       throw e;
     } else {
-      logger.error(`failed to check index ${index} ${e}`);
+      logger.error(`Failed to check index ${index}`, e);
       throw e;
     }
   }
@@ -95,10 +96,13 @@ const createSampleIndex = async (index: string, esClient: Client) => {
     });
     logger.info(`index ${index} exists`);
   } catch (e) {
-    if (e.name == 'ResponseError' && e.message == 'resource_already_exists_exception') {
-      logger.info(`index ${index} already exist.`);
+    if (
+      (<Error>e).name === 'ResponseError' &&
+      (<Error>e).message === 'resource_already_exists_exception'
+    ) {
+      logger.info(`Index ${index} already exist.`);
     } else {
-      logger.error(`failed to check index ${index} ${e}`);
+      logger.error(`Failed to check index ${index} ${e}`);
       throw e;
     }
   }

@@ -19,12 +19,13 @@
 
 import PromisePool from '@supercharge/promise-pool';
 
-import logger from '../logger';
+import Logger from '../logger';
 import { EmbargoStage, FileReleaseState } from '../data/files';
 import { getClient } from '../external/elasticsearch';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
+const logger = Logger('Indexer');
 
 type ReleaseOptions = {
   publicRelease?: boolean;

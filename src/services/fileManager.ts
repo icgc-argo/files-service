@@ -7,7 +7,8 @@ import * as fileService from '../data/files';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
 import { getEmbargoStage } from './embargo';
 import { Indexer } from './indexer';
-import logger from '../logger';
+import Logger from '../logger';
+const logger = Logger('FileManager');
 
 export async function updateFileFromRdpcData(
   partialFile: FilePartialDocument,

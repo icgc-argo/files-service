@@ -21,7 +21,8 @@ import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 import { AppConfig } from '../config';
 import retry from 'async-retry';
 import analysisEventHandler from '../services/analysisEventHandler';
-import log from '../logger';
+import Logger from '../logger';
+const logger = Logger('Kafka');
 
 export type AnalysisUpdateEvent = {
   songServerId: string;
@@ -73,13 +74,13 @@ export const setup = async (config: AppConfig) => {
       autoCommitThreshold: 10,
       autoCommitInterval: 10000,
       eachMessage: async ({ message }) => {
-        log.info(`[Kafka] new message received offset : ${message.offset}`);
+        logger.info(`New message received offset : ${message.offset}`);
         await handleAnalysisUpdate(message, analysisDlq);
-        log.debug(`[Kafka] message handled ok`);
+        logger.debug(`Message handled ok`);
       },
     })
     .catch(e => {
-      log.error('[Kafka] Failed to run consumer ' + e.message, e);
+      logger.error('Failed to run consumer ' + e.message, e);
       throw e;
     });
 
@@ -98,7 +99,7 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
       },
     ],
   });
-  log.debug(`[Kafka] dlq ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
+  logger.debug(`DLQ ${dlqTopic} message sent, response: ${JSON.stringify(result)}`);
 };
 
 async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string | undefined) {
@@ -115,15 +116,15 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
       },
     );
   } catch (err) {
-    log.error(
-      `[Kafka] failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
+    logger.error(
+      `Failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
       err,
     );
     if (analysisDlq && analysisUpdatesDlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
         : { message: `invalid body, original offset: ${message.offset}` };
-      log.debug(`[Kafka] sending message to dlq...`);
+      logger.debug(`Sending message to dlq...`);
       await sendDlqMessage(analysisUpdatesDlqProducer, analysisDlq, msg);
     }
   }

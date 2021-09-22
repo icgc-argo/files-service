@@ -25,7 +25,7 @@ import Auth from '@overture-stack/ego-token-middleware';
 
 import { Errors } from './data/files';
 import { AppConfig } from './config';
-import logger from './logger';
+import Logger from './logger';
 
 import createAdminRouter from './routers/admin';
 import createFilesRouter from './routers/files';
@@ -71,11 +71,10 @@ const App = (config: AppConfig): express.Express => {
 
 // general catch all error handler
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): any => {
-  logger.error('[Global Error Handler] Received unhandled error: ', err);
+  const logger = Logger('GlobalErrorHandler');
+  logger.error('Received unhandled error: ', err);
   if (res.headersSent) {
-    logger.debug(
-      '[Global Error Handler] Skipping error processing, response headers already sent.',
-    );
+    logger.debug('Skipping error processing, response headers already sent.');
     return next(err);
   }
   let status: number;
@@ -112,6 +111,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 };
 
 const noOpReqHandler: RequestHandler = (req, res, next) => {
+  const logger = Logger('App');
   logger.warn(`Accepting request to ( ${req.url} ) endpoint without auth enabled.`);
   next();
 };

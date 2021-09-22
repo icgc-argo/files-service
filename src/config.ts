@@ -19,6 +19,8 @@
 
 import * as dotenv from 'dotenv';
 import * as vault from './external/vault';
+import Logger from './logger';
+const logger = Logger('Config');
 
 let config: AppConfig | undefined = undefined;
 export interface AppConfig {
@@ -87,17 +89,19 @@ export interface MongoProps {
 const loadVaultSecrets = async () => {
   const vaultEnabled = process.env.VAULT_ENABLED === 'true';
   let secrets: any = {};
+
   /** Vault */
   if (vaultEnabled) {
-    if (process.env.VAULT_ENABLED && process.env.VAULT_ENABLED == 'true') {
+    if (process.env.VAULT_ENABLED && process.env.VAULT_ENABLED === 'true') {
       if (!process.env.VAULT_SECRETS_PATH) {
+        logger.error('Path to secrets not specified but vault is enabled');
         throw new Error('Path to secrets not specified but vault is enabled');
       }
       try {
         secrets = await vault.loadSecret(process.env.VAULT_SECRETS_PATH);
       } catch (err) {
-        console.error(err);
-        throw new Error('failed to load secrets from vault.');
+        logger.error('Failed to load secrets from vault.');
+        throw new Error('Failed to load secrets from vault.');
       }
     }
   }
@@ -105,7 +109,7 @@ const loadVaultSecrets = async () => {
 };
 
 const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
-  console.log('building app context');
+  logger.debug('Building app config');
   const policy = process.env.EGO_POLICY || 'FILES-SVC';
   config = {
     serverPort: process.env.PORT || '3000',
