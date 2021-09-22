@@ -18,7 +18,6 @@
  */
 
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
-import bodyParser from 'body-parser';
 import path from 'path';
 import * as swaggerUi from 'swagger-ui-express';
 import yaml from 'yamljs';
@@ -44,7 +43,7 @@ const App = (config: AppConfig): express.Express => {
 
   const app = express();
   app.set('port', process.env.PORT || 3000);
-  app.use(bodyParser.json());
+  app.use(express.json());
 
   // Cool matrix background for homepage:
   // app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
