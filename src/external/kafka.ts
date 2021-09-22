@@ -23,6 +23,7 @@ import retry from 'async-retry';
 import analysisEventHandler from '../services/analysisEventHandler';
 import Logger from '../logger';
 const logger = Logger('Kafka');
+import { PublicReleaseMessage } from 'kafkaMessages';
 
 export type AnalysisUpdateEvent = {
   songServerId: string;
@@ -31,12 +32,18 @@ export type AnalysisUpdateEvent = {
 
 let analysisUpdatesConsumer: Consumer | undefined;
 let analysisUpdatesDlqProducer: Producer | undefined;
+let publicReleaseProducer: Producer;
+let publicReleaseTopic: string;
 
 export const setup = async (config: AppConfig) => {
   const kafka = new Kafka({
     clientId: config.kafkaProperties.kafkaClientId,
     brokers: config.kafkaProperties.kafkaBrokers,
   });
+
+  publicReleaseProducer = kafka.producer();
+  publicReleaseProducer.connect();
+  publicReleaseTopic = config.kafkaProperties.producers.publicRelease.topic;
 
   // analysis updates indexing subscription
   analysisUpdatesConsumer = kafka.consumer({
@@ -88,6 +95,18 @@ export const setup = async (config: AppConfig) => {
     analysisUpdatesConsumer,
     analysisUpdatesDlqProducer,
   };
+};
+
+export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage) => {
+  const result = await publicReleaseProducer.send({
+    topic: publicReleaseTopic,
+    messages: [
+      {
+        value: JSON.stringify(messageJSON),
+      },
+    ],
+  });
+  logger.debug(`Message sent to topic ${publicReleaseTopic}, response: ${JSON.stringify(result)}`);
 };
 
 const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON: string) => {

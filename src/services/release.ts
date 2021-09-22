@@ -25,8 +25,10 @@ import * as releaseService from '../data/releases';
 import { createSnapshot } from '../external/elasticsearch';
 import StringMap from '../utils/StringMap';
 import { getIndexer } from './indexer';
+import { sendPublicReleaseMessage } from '../external/kafka';
+import _ from 'lodash';
+import { Program, PublicReleaseMessage } from 'kafkaMessages';
 import Logger from '../logger';
-import { SSL_OP_EPHEMERAL_RSA } from 'constants';
 const logger = Logger('ReleaseManager');
 
 function toFileId(file: File) {
@@ -204,10 +206,46 @@ export async function publishActiveRelease(): Promise<void> {
   // 5. Update release state to published
   logger.info(`Finishing release publish!`);
   const { updated, message } = await releaseService.finishPublishingActiveRelease();
-  if (!updated) {
+  if (updated) {
+    // 5b. Send kafka message for public release
+    const kafkaMessage = buildKafkaMessage(release, filesAdded, filesRemoved);
+    sendPublicReleaseMessage(kafkaMessage);
+  } else {
     logger.error(`Unable to set release to published: ${message}`);
     releaseService.setActiveReleaseError(
       'Release expected to be set as published but was in the wrong state.',
     );
   }
+}
+
+function buildKafkaMessage(
+  release: Release,
+  filesAdded: File[],
+  filesRemoved: File[],
+): PublicReleaseMessage {
+  const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
+
+  // get unique donor ids from filesAdded and filesRemoved:
+  const programsUpdated: Program[] = [];
+
+  Object.entries(filesUpdated).forEach(([programId, files]) => {
+    const donorIds = new Set<string>();
+    files.map(file => {
+      donorIds.add(file.donorId);
+    });
+    const program: Program = {
+      id: programId,
+      donorsUpdated: Array.from(donorIds),
+    };
+    programsUpdated.push(program);
+  });
+
+  const message: PublicReleaseMessage = {
+    id: release._id,
+    publishedAt: <Date>release.publishedAt,
+    label: <string>release.label,
+    programs: programsUpdated,
+  };
+
+  return message;
 }
