@@ -19,14 +19,89 @@
 
 import { Release, ReleaseState, ReleaseMongooseDocument, ReleaseFilesInput } from './release.model';
 import * as releaseModel from './release.model';
-import logger from '../../logger';
+import Logger from '../../logger';
+const logger = Logger('Release.DataService');
+
+// Values are the list of states that the release can be in to allow transition to the property name
+const ALLOWED_STATE_TRANSITIONS: { [key in ReleaseState]: ReleaseState[] } = {
+  [ReleaseState.CREATED]: [],
+  [ReleaseState.CALCULATING]: [
+    ReleaseState.CREATED,
+    ReleaseState.CALCULATED,
+    ReleaseState.BUILT,
+    ReleaseState.ERROR_BUILD,
+    ReleaseState.ERROR_CALCULATE,
+    ReleaseState.ERROR_PUBLISH,
+  ],
+  [ReleaseState.CALCULATED]: [ReleaseState.CALCULATING],
+  [ReleaseState.ERROR_CALCULATE]: [ReleaseState.CALCULATING],
+  [ReleaseState.BUILDING]: [
+    ReleaseState.CALCULATED,
+    ReleaseState.BUILT,
+    ReleaseState.ERROR_BUILD,
+    ReleaseState.ERROR_PUBLISH,
+  ],
+  [ReleaseState.BUILT]: [ReleaseState.BUILDING],
+  [ReleaseState.ERROR_BUILD]: [ReleaseState.BUILDING],
+  [ReleaseState.PUBLISHING]: [ReleaseState.BUILT, ReleaseState.ERROR_PUBLISH],
+  [ReleaseState.PUBLISHED]: [ReleaseState.PUBLISHING],
+  [ReleaseState.ERROR_PUBLISH]: [ReleaseState.PUBLISHING],
+};
+
+function isAllowedStateTransition(release: Release, newState: ReleaseState): boolean {
+  return ALLOWED_STATE_TRANSITIONS[newState].includes(release.state);
+}
+interface ReleaseStateChangeResponse {
+  release: Release;
+  previousState: ReleaseState;
+  updated: boolean;
+  message: string;
+}
+
+async function getActiveReleaseOrThrow(error: string): Promise<Release> {
+  const activeRelease = await getActiveRelease();
+  if (!activeRelease) {
+    throw new Error(error);
+  }
+  return activeRelease;
+}
 
 export async function getReleases(): Promise<Release[]> {
   return (await releaseModel.getReleases()).map(toPojo);
 }
 
+export async function getReleaseById(_id: string): Promise<Release | undefined> {
+  try {
+    const release = await releaseModel.getRelease({ _id });
+    if (release) {
+      return toPojo(release);
+    }
+  } catch (e) {
+    logger.error(`Error fetching release by id: ${e}`);
+  }
+
+  return undefined;
+}
+
+/**
+ *
+ * @returns Active release if there is one, otherwise returns undefined
+ */
 export async function getActiveRelease(): Promise<Release | undefined> {
-  const release = await releaseModel.getRelease({ state: ReleaseState.ACTIVE });
+  const release = await releaseModel.getRelease({ state: { $ne: ReleaseState.PUBLISHED } });
+  if (release) {
+    return toPojo(release);
+  }
+
+  return undefined;
+}
+
+/**
+ * @returns {Release | undefined} Returns latest release, which is either the active release or the last published release. Returns undefined if no releases have ever been made.
+ */
+export async function getLatestRelease(): Promise<Release | undefined> {
+  const release = await releaseModel.getLatestRelease();
+
   if (release) {
     return toPojo(release);
   }
@@ -35,40 +110,285 @@ export async function getActiveRelease(): Promise<Release | undefined> {
 }
 
 export async function updateActiveReleaseFiles(files: ReleaseFilesInput): Promise<Release> {
-  const activeRelease = await getActiveRelease();
-  if (activeRelease) {
-    return toPojo(await releaseModel.updateRelease(activeRelease, { files }));
-  }
-  return toPojo(await releaseModel.create(files));
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
+  return toPojo(await releaseModel.updateRelease(activeRelease, { files }));
 }
 
 export async function updateActiveReleaseIndices(indices: string[]): Promise<Release> {
-  const activeRelease = await getActiveRelease();
-  if (!activeRelease) {
-    throw new Error('No active release.');
-  }
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
   return toPojo(await releaseModel.updateRelease(activeRelease, { indices }));
 }
 export async function updateActiveReleaseLabel(label: string): Promise<Release> {
-  const activeRelease = await getActiveRelease();
-  if (!activeRelease) {
-    throw new Error('No active release.');
-  }
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
   return toPojo(await releaseModel.updateRelease(activeRelease, { label }));
 }
 export async function updateActiveReleaseSnapshot(snapshot: string): Promise<Release> {
-  const activeRelease = await getActiveRelease();
-  if (!activeRelease) {
-    throw new Error('No active release.');
-  }
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
   return toPojo(await releaseModel.updateRelease(activeRelease, { snapshot }));
 }
 
-export async function publishActiveRelease(): Promise<Release> {
-  const activeRelease = await getActiveRelease();
+export async function beginCalculatingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  let activeRelease = await getActiveRelease();
   if (!activeRelease) {
-    throw new Error('No active release.');
+    // Create a new release if no active release is found
+    activeRelease = toPojo(await releaseModel.create());
   }
+
+  if (!activeRelease) {
+    logger.error(
+      'Unable to get or create an active release for calculating. Throwing error to break the process.',
+    );
+    throw new Error('Unexpected error reading or creating active release.');
+  }
+
+  const previousState = activeRelease.state;
+
+  if (isAllowedStateTransition(activeRelease, ReleaseState.CALCULATING)) {
+    logger.info(
+      `Transitioning active release from ${previousState} to ${ReleaseState.CALCULATING}. Clearing all existing release calculations and build data.`,
+    );
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.CALCULATING,
+        files: null,
+        builtAt: null,
+        calculatedAt: null,
+        label: null,
+        indices: null,
+        snapshot: null,
+        error: null,
+      }),
+    );
+    return {
+      release,
+      previousState,
+      updated: true,
+      message:
+        previousState === ReleaseState.CREATED
+          ? 'Calculating new release...'
+          : 'Updating release calculation...',
+    };
+  } else {
+    // Not allowed to make this state transition
+    logger.warn(
+      `Cannot transition active release from ${previousState} to ${ReleaseState.CALCULATING}. No action taken.`,
+    );
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message:
+        previousState === ReleaseState.CALCULATING
+          ? 'Already calculating release...'
+          : `Cannot begin calculating release that is in '${previousState}' state.`,
+    };
+  }
+}
+
+export async function finishCalculatingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+  if (isAllowedStateTransition(activeRelease, ReleaseState.CALCULATED)) {
+    logger.info(
+      `Transitioning active release from ${previousState} to ${ReleaseState.CALCULATED}.`,
+    );
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.CALCULATED,
+        calculatedAt: new Date(),
+      }),
+    );
+    return {
+      release,
+      previousState,
+      updated: true,
+      message: 'Active release finished calculating.',
+    };
+  } else {
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message: `Unable to finish calculating from '${previousState}' state.`,
+    };
+  }
+}
+
+export async function beginBuildingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  let activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+
+  if (isAllowedStateTransition(activeRelease, ReleaseState.BUILDING)) {
+    logger.info(
+      `Transitioning active release from ${previousState} to ${ReleaseState.BUILDING}. Clearing all existing release build data.`,
+    );
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.BUILDING,
+        builtAt: null,
+        label: null,
+        indices: null,
+        snapshot: null,
+        error: null,
+      }),
+    );
+
+    return {
+      release,
+      previousState,
+      updated: true,
+      message: 'Building release...',
+    };
+  } else {
+    // Not allowed to make this state transition
+    logger.warn(
+      `Cannot transition active release from ${previousState} to ${ReleaseState.BUILDING}. No action taken.`,
+    );
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message:
+        previousState === ReleaseState.BUILDING
+          ? 'Already building release...'
+          : `Cannot begin building release that is in '${previousState}' state.`,
+    };
+  }
+}
+
+export async function finishBuildingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+  if (isAllowedStateTransition(activeRelease, ReleaseState.BUILT)) {
+    logger.info(`Transitioning active release from ${previousState} to ${ReleaseState.BUILT}.`);
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.BUILT,
+        builtAt: new Date(),
+      }),
+    );
+    return {
+      release,
+      previousState,
+      updated: true,
+      message: 'Active release finished building.',
+    };
+  } else {
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message: `Unable to finish building from '${previousState}' state.`,
+    };
+  }
+}
+
+export async function beginPublishingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  let activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+
+  if (isAllowedStateTransition(activeRelease, ReleaseState.PUBLISHING)) {
+    logger.info(
+      `Transitioning active release from ${previousState} to ${ReleaseState.PUBLISHING}.`,
+    );
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.PUBLISHING,
+        error: null,
+      }),
+    );
+
+    return {
+      release,
+      previousState,
+      updated: true,
+      message: 'Publishing release...',
+    };
+  } else {
+    // Not allowed to make this state transition
+    logger.warn(
+      `Cannot transition active release from ${previousState} to ${ReleaseState.PUBLISHING}. No action taken.`,
+    );
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message:
+        previousState === ReleaseState.PUBLISHING
+          ? 'Already publishing release...'
+          : `Cannot begin publishing release that is in '${previousState}' state.`,
+    };
+  }
+}
+
+export async function finishPublishingActiveRelease(): Promise<ReleaseStateChangeResponse> {
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+  if (isAllowedStateTransition(activeRelease, ReleaseState.PUBLISHED)) {
+    logger.info(`Transitioning active release from ${previousState} to ${ReleaseState.PUBLISHED}.`);
+    const release = toPojo(
+      await releaseModel.updateRelease(activeRelease, {
+        state: ReleaseState.PUBLISHED,
+        publishedAt: new Date(),
+      }),
+    );
+    return {
+      release,
+      previousState,
+      updated: true,
+      message: 'Active release finished publishing.',
+    };
+  } else {
+    return {
+      release: activeRelease,
+      previousState,
+      updated: false,
+      message: `Unable to finish publishing from '${previousState}' state.`,
+    };
+  }
+}
+
+/**
+ * Utility method for setActiveReleaseError
+ * @param previousState
+ * @returns
+ */
+function getErrorState(previousState: ReleaseState): ReleaseState | undefined {
+  switch (previousState) {
+    case ReleaseState.CALCULATING:
+      return ReleaseState.ERROR_CALCULATE;
+    case ReleaseState.BUILDING:
+      return ReleaseState.ERROR_BUILD;
+    case ReleaseState.PUBLISHING:
+      return ReleaseState.ERROR_PUBLISH;
+    default:
+      // No logic for handling an error from a static state.
+      return undefined;
+  }
+}
+export async function setActiveReleaseError(error: string) {
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
+
+  const previousState = activeRelease.state;
+  const nextState = getErrorState(previousState);
+  if (!nextState) {
+    throw new Error(
+      `Unable to set active release error state from '${previousState}'. Error message provided: ${error}`,
+    );
+  }
+
+  const release = toPojo(
+    await releaseModel.updateRelease(activeRelease, { state: nextState, error }),
+  );
+}
+
+export async function publishActiveRelease(): Promise<Release> {
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
 
   return toPojo(
     await releaseModel.updateRelease(activeRelease, {
@@ -88,6 +408,7 @@ function toPojo(releaseDoc: ReleaseMongooseDocument): Release {
     version: releaseDoc.version,
     state: releaseDoc.state as ReleaseState,
     calculatedAt: releaseDoc.calculatedAt,
+    builtAt: releaseDoc.builtAt,
     publishedAt: releaseDoc.publishedAt,
     indices: releaseDoc.indices,
     snapshot: releaseDoc.snapshot,

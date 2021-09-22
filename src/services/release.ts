@@ -25,16 +25,19 @@ import * as releaseService from '../data/releases';
 import { createSnapshot } from '../external/elasticsearch';
 import StringMap from '../utils/StringMap';
 import { getIndexer } from './indexer';
-import getRollcall, { Index } from '../external/rollcall';
-import logger from '../logger';
+import Logger from '../logger';
+import { SSL_OP_EPHEMERAL_RSA } from 'constants';
+const logger = Logger('ReleaseManager');
 
 function toFileId(file: File) {
   return file.objectId;
 }
 
-export async function calculateRelease(): Promise<Release> {
+export async function calculateRelease(): Promise<void> {
   // Get files that are currently public, and those queued for public release
   // Add these to the active release. Release service handles creating new release if active release not available.
+
+  logger.info(`Beginning release calculation...`);
 
   const publicFiles = await fileService.getFilesByState({
     releaseState: FileReleaseState.PUBLIC,
@@ -45,13 +48,20 @@ export async function calculateRelease(): Promise<Release> {
   const kept = publicFiles.map(toFileId);
   const added = queuedFiles.map(toFileId);
 
-  const release = releaseService.updateActiveReleaseFiles({
+  await releaseService.updateActiveReleaseFiles({
     kept,
     added,
     removed: [], // TODO: Implement removed files after we build a "withdraw" mechanism for files.
   });
 
-  return release;
+  logger.info(`Finishing release calculation!`);
+  const { updated, message } = await releaseService.finishCalculatingActiveRelease();
+  if (!updated) {
+    logger.error(`Unable to set release to Calculated: ${message}`);
+    releaseService.setActiveReleaseError(
+      'Release expected to be set as calculated but was in the wrong state.',
+    );
+  }
 }
 
 /**
@@ -67,7 +77,9 @@ export async function calculateRelease(): Promise<Release> {
  *
  * @param label
  */
-export async function buildActiveRelease(label: string): Promise<Release> {
+export async function buildActiveRelease(label: string): Promise<void> {
+  logger.info(`Beginning release building...`);
+
   let release = await releaseService.getActiveRelease();
   if (!release) {
     throw new Error('No Active release available.');
@@ -119,12 +131,19 @@ export async function buildActiveRelease(label: string): Promise<Release> {
   await indexer.removeFilesFromPublic(filesRemoved);
 
   // 4. Make snapshot!
-  const snapshot = await createSnapshot({ indices: release.indices, label: release.label });
+  const snapshot = await createSnapshot({ indices: publicIndices, label });
   if (snapshot) {
     release = await releaseService.updateActiveReleaseSnapshot(snapshot);
   }
 
-  return release;
+  logger.info(`Finishing release build!`);
+  const { updated, message } = await releaseService.finishBuildingActiveRelease();
+  if (!updated) {
+    logger.error(`Unable to set release to Built: ${message}`);
+    releaseService.setActiveReleaseError(
+      'Release expected to be set as BUILT but was in the wrong state.',
+    );
+  }
 }
 
 /**
@@ -136,7 +155,9 @@ export async function buildActiveRelease(label: string): Promise<Release> {
  *   This will modify the files in the database by:
  *     - Update the embargo_stage and release_state of any files that have been moved to public/restricted
  */
-export async function publishActiveRelease(): Promise<Release> {
+export async function publishActiveRelease(): Promise<void> {
+  logger.info(`Beginning release publishing...`);
+
   let release = await releaseService.getActiveRelease();
   if (!release) {
     throw new Error('No Active release available.');
@@ -152,7 +173,7 @@ export async function publishActiveRelease(): Promise<Release> {
 
   // 1. Added files - Remove from restricted index
   await indexer.removeFilesFromRestricted(filesAdded);
-  logger.debug(`[Release.Publish] ${filesAdded.length} Files removed from restricted index`);
+  logger.debug(`${filesAdded.length} Files removed from restricted index`);
 
   // TODO: Getting the add to public working before circling back to removing and updating out of date files.
   // 2. Removed files
@@ -161,7 +182,7 @@ export async function publishActiveRelease(): Promise<Release> {
 
   // 3. Release all indices (public and restricted)
   await indexer.release({ publicRelease: true, indices: release.indices });
-  logger.debug(`[Release.Publish] Release Indices have been aliased.`);
+  logger.debug(`Release Indices have been aliased.`);
 
   // 4. Update DB with published changes
   await PromisePool.withConcurrency(20)
@@ -175,16 +196,18 @@ export async function publishActiveRelease(): Promise<Release> {
         releaseState: FileReleaseState.PUBLIC,
       });
     });
-  logger.debug(`[Release.Publish] File records in DB updated with new published states.`);
+  logger.debug(`File records in DB updated with new published states.`);
   // TODO: when implementing the filesRemoved logic, check if the release_state needs to be updated in DB or
   //  if that change is handled when the embargoStage calculation is redone when the file was modified to no
   //  longer be public. I.E. We may need to update the DB with releaseState that is not PUBLIC
 
-  // 5. Update the release to track the changed status
-  // 5a. release.state should now be PUBLISHED
-  // 5b. record publishedAt date
-  release = await releaseService.publishActiveRelease();
-  logger.debug(`[Release.Publish] Release marked as published.`);
-
-  return release;
+  // 5. Update release state to published
+  logger.info(`Finishing release publish!`);
+  const { updated, message } = await releaseService.finishPublishingActiveRelease();
+  if (!updated) {
+    logger.error(`Unable to set release to published: ${message}`);
+    releaseService.setActiveReleaseError(
+      'Release expected to be set as published but was in the wrong state.',
+    );
+  }
 }

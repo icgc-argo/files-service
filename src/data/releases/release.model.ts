@@ -22,61 +22,83 @@ import { createHash } from 'crypto';
 import { FilterQuery } from 'mongodb';
 import mongoose from 'mongoose';
 
+/**
+ * `CREATED` -> `CALCULATING` -> `CALCULATED` -> `BUILDING` -> `BUILT` -> `PUBLISHING` -> `PUBLISHED`
+ */
 export enum ReleaseState {
-  ACTIVE = 'ACTIVE',
-  LOCKED = 'LOCKED',
+  CREATED = 'CREATED',
+
+  CALCULATING = 'CALCULATING',
+  CALCULATED = 'CALCULATED',
+  ERROR_CALCULATE = 'ERROR_CALCULATE',
+
+  BUILDING = 'BUILDING',
+  BUILT = 'BUILT',
+  ERROR_BUILD = 'ERROR_BUILD',
+
+  PUBLISHING = 'PUBLISHING',
   PUBLISHED = 'PUBLISHED',
+  ERROR_PUBLISH = 'ERROR_PUBLISH',
 }
 
 export interface Release {
   _id: string;
-  version: string;
+  version?: string;
   state: ReleaseState;
+  error?: string;
 
-  calculatedAt: Date;
   filesKept: string[];
   filesAdded: string[];
   filesRemoved: string[];
 
-  publishedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
+  publishedAt?: Date;
   indices: string[];
-  label: string;
-  snapshot: string;
+  label?: string;
+  snapshot?: string;
 }
 
 interface DbRelease {
-  version: string;
+  version?: string;
   state: string;
+  error?: string;
 
-  calculatedAt: Date;
   filesKept: string[];
   filesAdded: string[];
   filesRemoved: string[];
 
-  publishedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
+  publishedAt?: Date;
   indices: string[];
-  label: string;
-  snapshot: string;
+  label?: string;
+  snapshot?: string;
 }
 
 const ReleaseSchema = new mongoose.Schema(
   {
-    version: { type: String, required: true },
+    version: { type: String, required: false },
     state: {
       type: String,
       required: true,
       enum: Object.values(ReleaseState),
-      default: ReleaseState.ACTIVE,
+      default: ReleaseState.CREATED,
+    },
+    error: {
+      type: String,
+      required: false,
     },
 
-    calculatedAt: { type: Date, required: true },
     filesKept: { type: [String], required: true },
     filesAdded: { type: [String], required: true },
     filesRemoved: { type: [String], required: true },
 
+    calculatedAt: { type: Date, required: false },
+    builtAt: { type: Date, required: false },
     publishedAt: { type: Date, required: false },
     label: { type: String, required: false, unique: true, trim: true, sparse: true },
-    indices: { type: [String], required: false },
+    indices: { type: [String], required: true, default: [] },
     snapshot: { type: String, required: false },
   },
   { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
@@ -92,31 +114,38 @@ export type ReleaseFilesInput = {
   removed: string[];
 };
 
+/**
+ * null values are used to clear previously set values
+ */
 export type ReleaseUpdates = {
-  files?: ReleaseFilesInput;
-  label?: string;
-  indices?: string[];
-  publishedAt?: Date;
+  files?: ReleaseFilesInput | null;
+  label?: string | null;
+  indices?: string[] | null;
+  calculatedAt?: Date | null;
+  builtAt?: Date | null;
+  publishedAt?: Date | null;
   state?: ReleaseState;
-  snapshot?: string;
+  error?: string | null;
+  snapshot?: string | null;
 };
 
-export async function create(files: ReleaseFilesInput): Promise<ReleaseMongooseDocument> {
-  const version = calculateVersion(files);
+export async function create(): Promise<ReleaseMongooseDocument> {
   const release = new ReleaseModel({
-    filesKept: files.kept,
-    filesAdded: files.added,
-    filesRemoved: files.removed,
-    version,
-    calculatedAt: new Date(),
+    filesKept: [],
+    filesAdded: [],
+    filesRemoved: [],
   });
   return await release.save();
 }
 
 export async function getRelease(
   filter: FilterQuery<ReleaseMongooseDocument>,
-): Promise<ReleaseMongooseDocument> {
-  return (await ReleaseModel.findOne(filter)) as ReleaseMongooseDocument;
+): Promise<ReleaseMongooseDocument | undefined> {
+  return await ReleaseModel.findOne(filter);
+}
+
+export async function getLatestRelease(): Promise<ReleaseMongooseDocument | undefined> {
+  return await ReleaseModel.findOne({}, {}, { sort: { createdAt: -1 } });
 }
 
 export async function getReleases(): Promise<ReleaseMongooseDocument[]> {
@@ -127,29 +156,85 @@ export async function updateRelease(
   release: Release,
   updates: ReleaseUpdates,
 ): Promise<ReleaseMongooseDocument> {
+  // TODO: Clean up this massive unmaintainable section of copy-pasta
+
   const updatedRelease: Release = {
     ...release,
   };
+
+  // State (no null case)
+  if (updates.state) {
+    updatedRelease.state = updates.state;
+  }
+
+  // Files
   if (updates.files) {
     updatedRelease.filesKept = updates.files.kept;
     updatedRelease.filesAdded = updates.files.added;
     updatedRelease.filesRemoved = updates.files.removed;
     updatedRelease.version = calculateVersion(updates.files);
   }
+  if (updates.files === null) {
+    updatedRelease.filesKept = [];
+    updatedRelease.filesAdded = [];
+    updatedRelease.filesRemoved = [];
+    updatedRelease.version = undefined;
+  }
+
+  // Label
   if (updates.label) {
     updatedRelease.label = updates.label;
   }
+  if (updates.label === null) {
+    updatedRelease.label = undefined;
+  }
+
+  // Snapshot
   if (updates.snapshot) {
     updatedRelease.snapshot = updates.snapshot;
   }
+  if (updates.snapshot === null) {
+    updatedRelease.snapshot = undefined;
+  }
+
+  // Indices (reset to [])
   if (updates.indices) {
     updatedRelease.indices = updates.indices;
   }
-  if (updates.state) {
-    updatedRelease.state = updates.state;
+  if (updates.indices === null) {
+    updatedRelease.indices = [];
   }
+
+  // Calculated At
+  if (updates.calculatedAt) {
+    updatedRelease.calculatedAt = updates.calculatedAt;
+  }
+  if (updates.calculatedAt === null) {
+    updatedRelease.calculatedAt = undefined;
+  }
+
+  // Built At
+  if (updates.builtAt) {
+    updatedRelease.builtAt = updates.builtAt;
+  }
+  if (updates.builtAt === null) {
+    updatedRelease.builtAt = undefined;
+  }
+
+  // Published At
   if (updates.publishedAt) {
     updatedRelease.publishedAt = updates.publishedAt;
+  }
+  if (updates.publishedAt === null) {
+    updatedRelease.publishedAt = undefined;
+  }
+
+  // Error
+  if (updates.error) {
+    updatedRelease.error = updates.error;
+  }
+  if (updates.error === null) {
+    updatedRelease.error = undefined;
   }
   return (await ReleaseModel.findOneAndUpdate({ _id: release._id }, updatedRelease, {
     new: true,

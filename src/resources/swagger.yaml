@@ -238,6 +238,32 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '500':
           $ref: '#/components/responses/ServerError'
+  /release/{id}:
+    get:
+      tags:
+        - Release
+      summary: Get release by ID
+      parameters:
+        - name: id
+          description: ID of release to retrieve
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Details of the release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: 'No Release found with the provided ID'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /release/active:
     get:
       tags:
@@ -246,6 +272,23 @@ paths:
       responses:
         '200':
           description: Details of the active release
+          content:
+            application/json:
+              $ref: '#/components/schemas/ReleaseSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /release/latest:
+    get:
+      tags:
+        - Release
+      summary: Get details of the latest release, without calculating. This will be either the active release or the last published release. No data is returned if no release has ever been calculated.
+      responses:
+        '200':
+          description: Details of the latest release.
           content:
             application/json:
               $ref: '#/components/schemas/ReleaseSummary'
@@ -635,7 +678,7 @@ components:
           type: string
           format: date-time
         files:
-          $ref: '#/components/ReleaseCounts'
+          $ref: '#/components/schemas/ReleaseCounts'
       required:
         - id
         - state
@@ -665,9 +708,9 @@ components:
           type: object
           properties:
             files:
-              $ref: '#/components/ReleaseCounts'
+              $ref: '#/components/schemas/ReleaseCounts'
             donors:
-              $ref: '#/components/ReleaseCounts'
+              $ref: '#/components/schemas/ReleaseCounts'
           required:
             - files
             - donors
@@ -679,9 +722,9 @@ components:
             program:
               type: string
             files:
-              $ref: '#/components/ReleaseCounts'
+              $ref: '#/components/schemas/ReleaseCounts'
             donors:
-              $ref: '#/components/ReleaseCounts'
+              $ref: '#/components/schemas/ReleaseCounts'
           required:
             - program
             - files
