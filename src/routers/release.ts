@@ -19,7 +19,6 @@
 import { Router, RequestHandler } from 'express';
 
 import { AppConfig } from '../config';
-import logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import StringMap from '../utils/StringMap';
 import { Release } from '../data/releases';

@@ -20,7 +20,6 @@
 import { differenceInMonths } from 'date-fns';
 import logger from '../logger';
 import { EmbargoStage, File, FileReleaseState } from '../data/files';
-import { first } from 'lodash';
 
 const stageOrder = {
   [EmbargoStage.PROGRAM_ONLY]: 0,
