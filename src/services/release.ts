@@ -71,7 +71,7 @@ export async function calculateRelease(): Promise<void> {
  * This does:
  *  - Create the new public indices, adding and removing the files as required
  *  - TODO: Update from song (and clincial eventually) all files kept and added in the release
- *  - TODO: Snapshot the new indices in ES
+ *  - Snapshot the new indices in ES
  * This does not:
  *  - Alias the new indices (no change to the live platform data)
  *  - Update the embargoStage or releaseState of any files
@@ -160,7 +160,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
 export async function publishActiveRelease(): Promise<void> {
   logger.info(`Beginning release publishing...`);
 
-  let release = await releaseService.getActiveRelease();
+  const release = await releaseService.getActiveRelease();
   if (!release) {
     throw new Error('No Active release available.');
   }

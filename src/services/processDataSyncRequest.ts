@@ -24,7 +24,7 @@ import { getStudies, getAnalysesBatchesStream } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
 import { getIndexer } from './indexer';
-const logger = Logger('DataSyncProcessor');
+const logger = Logger('Process.DataSync');
 
 export async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
   try {

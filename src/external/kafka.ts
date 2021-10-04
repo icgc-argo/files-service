@@ -20,7 +20,7 @@
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 import { AppConfig } from '../config';
 import retry from 'async-retry';
-import analysisEventHandler from '../services/analysisEventHandler';
+import analysisEventProcessor from '../services/processAnalysisEvent';
 import Logger from '../logger';
 const logger = Logger('Kafka');
 import { PublicReleaseMessage } from 'kafkaMessages';
@@ -127,7 +127,7 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq: string |
       async (bail: Function) => {
         // todo validate message body
         const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
-        await analysisEventHandler(analysisEvent);
+        await analysisEventProcessor(analysisEvent);
       },
       {
         retries: 3,

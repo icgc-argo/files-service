@@ -22,7 +22,7 @@ import { convertAnalysesToFileDocuments, FilePartialDocument } from '../external
 import { AnalysisUpdateEvent } from '../external/kafka';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
 import { getIndexer } from './indexer';
-const logger = Logger('AnalysisEventHandler');
+const logger = Logger('Process.AnalysisEvent');
 /**
  * Song Kafka Message Handler
  * @param analysisEvent
@@ -36,7 +36,6 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   );
 
   const partialDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
-  logger.debug('converted to files');
 
   const indexer = await getIndexer();
   const response = await saveAndIndexFilesFromRdpcData(partialDocuments, dataCenterId, indexer);

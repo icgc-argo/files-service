@@ -25,7 +25,7 @@ import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
-import { reindexDataCenter } from '../services/syncDataProcessor';
+import { reindexDataCenter } from '../services/processDataSyncRequest';
 import { recalculateFileState } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
 
@@ -120,8 +120,6 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         } catch (e) {
           return res.status(500).send(`Unexpected error updating files: ${e}`);
         }
-
-        return res.status(200).json(filter);
       } catch (error) {
         // Catch Param Validation Errors
         return res.status(400).send(error.toString());
