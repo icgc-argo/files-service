@@ -148,16 +148,21 @@ export async function beginCalculatingActiveRelease(): Promise<ReleaseStateChang
       `Transitioning active release from ${previousState} to ${ReleaseState.CALCULATING}. Clearing all existing release calculations and build data.`,
     );
     const release = toPojo(
-      await releaseModel.updateRelease(activeRelease, {
-        state: ReleaseState.CALCULATING,
-        files: null,
-        builtAt: null,
-        calculatedAt: null,
-        label: null,
-        indices: null,
-        snapshot: null,
-        error: null,
-      }),
+      await releaseModel.updateRelease(
+        activeRelease,
+        {
+          state: ReleaseState.CALCULATING,
+        },
+        {
+          files: true,
+          builtAt: true,
+          calculatedAt: true,
+          label: true,
+          indices: true,
+          snapshot: true,
+          error: true,
+        },
+      ),
     );
     return {
       release,
@@ -216,7 +221,7 @@ export async function finishCalculatingActiveRelease(): Promise<ReleaseStateChan
 }
 
 export async function beginBuildingActiveRelease(): Promise<ReleaseStateChangeResponse> {
-  let activeRelease = await getActiveReleaseOrThrow('No active release.');
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
 
   const previousState = activeRelease.state;
 
@@ -225,14 +230,19 @@ export async function beginBuildingActiveRelease(): Promise<ReleaseStateChangeRe
       `Transitioning active release from ${previousState} to ${ReleaseState.BUILDING}. Clearing all existing release build data.`,
     );
     const release = toPojo(
-      await releaseModel.updateRelease(activeRelease, {
-        state: ReleaseState.BUILDING,
-        builtAt: null,
-        label: null,
-        indices: null,
-        snapshot: null,
-        error: null,
-      }),
+      await releaseModel.updateRelease(
+        activeRelease,
+        {
+          state: ReleaseState.BUILDING,
+        },
+        {
+          builtAt: true,
+          label: true,
+          indices: true,
+          snapshot: true,
+          error: true,
+        },
+      ),
     );
 
     return {
@@ -287,7 +297,7 @@ export async function finishBuildingActiveRelease(): Promise<ReleaseStateChangeR
 }
 
 export async function beginPublishingActiveRelease(): Promise<ReleaseStateChangeResponse> {
-  let activeRelease = await getActiveReleaseOrThrow('No active release.');
+  const activeRelease = await getActiveReleaseOrThrow('No active release.');
 
   const previousState = activeRelease.state;
 
@@ -296,10 +306,15 @@ export async function beginPublishingActiveRelease(): Promise<ReleaseStateChange
       `Transitioning active release from ${previousState} to ${ReleaseState.PUBLISHING}.`,
     );
     const release = toPojo(
-      await releaseModel.updateRelease(activeRelease, {
-        state: ReleaseState.PUBLISHING,
-        error: null,
-      }),
+      await releaseModel.updateRelease(
+        activeRelease,
+        {
+          state: ReleaseState.PUBLISHING,
+        },
+        {
+          error: true,
+        },
+      ),
     );
 
     return {
