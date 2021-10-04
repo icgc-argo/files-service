@@ -17,18 +17,24 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 import PromisePool from '@supercharge/promise-pool';
+import _ from 'lodash';
 
 import { File, FileReleaseState, EmbargoStage } from '../data/files';
 import * as fileService from '../data/files';
 import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
+
 import { createSnapshot } from '../external/elasticsearch';
-import StringMap from '../utils/StringMap';
-import { getIndexer } from './indexer';
 import { sendPublicReleaseMessage } from '../external/kafka';
-import _ from 'lodash';
+
+import StringMap from '../utils/StringMap';
 import { Program, PublicReleaseMessage } from 'kafkaMessages';
+
+import { getIndexer } from './indexer';
+import * as fileManager from './fileManager';
+
 import Logger from '../logger';
+import { buildDocument, FileCentricDocument } from './fileCentricDocument';
 const logger = Logger('ReleaseManager');
 
 function toFileId(file: File) {
@@ -123,20 +129,44 @@ export async function buildActiveRelease(label: string): Promise<void> {
   await indexer.deleteIndices(release.indices);
   release = await releaseService.updateActiveReleaseIndices([]);
 
-  // 2.b Clone new public indices from the current public indices.
+  // 2.b Make new empty public indices from the current public indices.
   const publicIndices = await indexer.preparePublicIndices(Array.from(programIds));
   release = await releaseService.updateActiveReleaseIndices(publicIndices);
 
-  // 3. Perform reindex of required documents from source indices to new published indices.
+  // 3. Add files all required files to public indices.
 
-  await indexer.copyFilesToPublic(filesAdded);
-  await indexer.removeFilesFromPublic(filesRemoved);
+  // 3.a Get RDPC data for all included files
+  const rdpcFilesToAdd = await fileManager.getRdpcDataForFiles(filesAdded.concat(filesKept));
+
+  // Convert to FileCentricDocs
+  // Limit for concurrency here is DB connections. Can go higher than 1 RDPC at a time but there aren't that many RDPCs to need to push this value
+  const fileCentricDocsToAdd: FileCentricDocument[] = [];
+  PromisePool.withConcurrency(1)
+    .for(rdpcFilesToAdd) // For each rdpc in the files to add
+    .process(data => {
+      const rdpcFiles = data.files;
+      PromisePool.withConcurrency(10)
+        .for(rdpcFiles) // For each file doc retrieved from that rdpc
+        .process(async rdpcFile => {
+          const dbFile = await fileManager.updateFileFromRdpcData(rdpcFile, data.dataCenterId);
+          const fileCentricDoc = await buildDocument({ dbFile, rdpcFile });
+
+          // Force the embarge and release state to be public. This will stay as associate/queued in the DB until published.
+          fileCentricDoc.embargoStage = EmbargoStage.PUBLIC;
+          fileCentricDoc.releaseState = FileReleaseState.PUBLIC;
+          fileCentricDocsToAdd.push(fileCentricDoc);
+        });
+    });
+
+  await indexer.indexPublicFileDocs(fileCentricDocsToAdd);
 
   // 4. Make snapshot!
   const snapshot = await createSnapshot({ indices: publicIndices, label });
   if (snapshot) {
     release = await releaseService.updateActiveReleaseSnapshot(snapshot);
   }
+
+  // NOTE: Public indices are not released! that is for the public stage.
 
   logger.info(`Finishing release build!`);
   const { updated, message } = await releaseService.finishBuildingActiveRelease();

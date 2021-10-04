@@ -23,10 +23,15 @@ import Batch from 'stream-json/utils/Batch';
 import urljoin from 'url-join';
 import streamArray from 'stream-json/streamers/StreamArray';
 
-import Logger from '../logger';
 import { getAppConfig } from '../config';
 
+import Logger from '../logger';
 const logger = Logger('Song');
+
+type SongAnalysis = { [k: string]: any } & {
+  analysisId: 'string';
+  analysisState: 'string';
+};
 
 export const getStudies = async (url: string) => {
   const studiesUrl = urljoin(url, '/studies/all');
@@ -37,7 +42,12 @@ export const getStudies = async (url: string) => {
   return studies;
 };
 
-export const getAnalysesBatchesStream = async (url: string, studyId: string): Promise<Batch> => {
+/**
+ * Fetch potentially very large responses from Song then return them in a batched stream.
+ * @param analysesUrl
+ * @returns
+ */
+const fetchAnalysesInBatches = async (analysesUrl: string): Promise<Batch> => {
   const controller = new abortController();
   const timeoutPeriod = (await getAppConfig()).datacenter.fetchTimeout;
   const batchSize = (await getAppConfig()).datacenter.batchSize;
@@ -46,7 +56,6 @@ export const getAnalysesBatchesStream = async (url: string, studyId: string): Pr
     controller.abort();
   }, timeoutPeriod);
   try {
-    const analysesUrl = urljoin(url, '/studies', studyId, '/analysis?analysisStates=PUBLISHED');
     logger.info(`Fetching analyses from ${analysesUrl}`);
     const res = await fetch(analysesUrl, {
       signal: controller.signal,
@@ -59,5 +68,40 @@ export const getAnalysesBatchesStream = async (url: string, studyId: string): Pr
     throw error;
   } finally {
     clearTimeout(timeout);
+  }
+};
+
+/**
+ * Return all analyses for a study pre-filtered to only include PUBLISHED analyses
+ * @param url
+ * @param studyId
+ * @returns
+ */
+export const getAnalysesByStudy = async (url: string, studyId: string): Promise<Batch> => {
+  const analysesUrl = urljoin(url, '/studies', studyId, '/analysis?analysisStates=PUBLISHED');
+  return fetchAnalysesInBatches(analysesUrl);
+};
+
+export const getAnalysesById = async (
+  url: string,
+  studyId: string,
+  analysisId: string,
+): Promise<SongAnalysis | undefined> => {
+  const analysesUrl = urljoin(
+    url,
+    '/studies',
+    studyId,
+    '/analysis',
+    analysisId,
+    '?analysisStates=PUBLISHED,UNPUBLISHED,SUPPRESSED',
+  );
+  try {
+    const res = await fetch(analysesUrl);
+    if (res.status === 200) {
+      return (await res.json()) as SongAnalysis;
+    }
+  } catch (e) {
+    logger.error(`Error fetching analysis by id: ${e}`);
+    return;
   }
 };

@@ -32,18 +32,28 @@ type ReleaseOptions = {
   indices?: string[];
 };
 
+/**
+ * Indexer has separate methods for interacting with restricted and public indices in an attempt to prevent
+ * manipulation of public indices when it is not intended. There are no actions that should be affecting both
+ * restricted and public indices at the same time so this separation has proved useful when writing out processes.
+ *
+ * Note that the indexer tracks the next index to create
+ */
 export interface Indexer {
-  indexFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
-  removeFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
-
-  updateFile: (file: File) => Promise<void>;
+  indexRestrictedFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
+  removeRestrictedFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
+  updateRestrictedFile: (file: File) => Promise<void>;
+  removeFilesFromPublic: (files: File[]) => Promise<void>;
+  removeFilesFromRestricted: (files: File[]) => Promise<void>;
 
   preparePublicIndices: (programs: string[]) => Promise<string[]>;
-  copyFilesToPublic: (files: File[]) => Promise<void>;
-  removeFilesFromPublic: (files: File[]) => Promise<void>;
+  indexPublicFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
+  deleteIndices: (indices: string[]) => Promise<void>;
+
   release: (options?: ReleaseOptions) => Promise<void>;
 }
-export const getIndexer = async () => {
+
+export const getIndexer = async (): Promise<Indexer> => {
   const rollcall = await getRollcall();
   const client = await getClient();
 
@@ -216,7 +226,7 @@ export const getIndexer = async () => {
    * Also update these values in the document meta data object.
    * @param file
    */
-  async function updateFile(file: File): Promise<void> {
+  async function updateRestrictedFile(file: File): Promise<void> {
     // Don't update a file if it is PUBLIC already
     if (file.releaseState === FileReleaseState.PUBLIC) {
       return;
@@ -246,10 +256,11 @@ export const getIndexer = async () => {
   }
 
   /**
-   * For indexing updates as they come in from
+   * Update restricted file centric index documents
+   * No change for files with Public release
    * @param docs
    */
-  async function indexFileDocs(docs: FileCentricDocument[]): Promise<void> {
+  async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are not PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
       docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
@@ -283,7 +294,11 @@ export const getIndexer = async () => {
       });
   }
 
-  async function removeFileDocs(docs: FileCentricDocument[]): Promise<void> {
+  /**
+   * Remove a file from a restricted file centric index
+   * @param docs
+   */
+  async function removeRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only removing files that are not public
     const sortedFiles = sortFileDocsIntoPrograms(
       docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
@@ -313,12 +328,56 @@ export const getIndexer = async () => {
     await PromisePool.withConcurrency(5)
       .for(programs)
       .process(async program => {
-        const index = await getNextIndex(program, { isPublic: true, clone: true });
+        const index = await getNextIndex(program, { isPublic: true, clone: false });
         publicIndices.push(index);
       });
     return publicIndices;
   }
 
+  /**
+   * Update restricted file centric index documents
+   * No change for files with Public release
+   * @param docs
+   */
+  async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
+    // Only indexing docs that are not PUBLIC
+    const sortedFiles = sortFileDocsIntoPrograms(
+      docs.filter(doc => doc.releaseState === FileReleaseState.PUBLIC),
+    );
+
+    await PromisePool.withConcurrency(20)
+      .for(sortedFiles)
+      .process(async ({ program, files }) => {
+        const index = await getNextIndex(program, {
+          isPublic: true,
+          clone: true,
+        });
+        const camelcased = files.map(camelCaseKeysToUnderscore);
+        const body = camelcased.flatMap(file => [
+          { update: { _id: file.object_id } },
+          {
+            doc_as_upsert: true,
+            doc: file,
+          },
+        ]);
+
+        try {
+          await client.bulk({
+            index,
+            body,
+          });
+        } catch (e) {
+          logger.error(`Failed bulk indexing request: ${JSON.stringify(e)}`, e);
+          throw e;
+        }
+      });
+  }
+
+  /**
+   * @deprecated - Building file documents directly from song instead of relying on their data in ES restricted indices
+   * Copy file data currently in a restricted index into a public index.
+   * @param files
+   */
   async function copyFilesToPublic(files: File[]): Promise<void> {
     const sortedFiles = sortFilesIntoPrograms(files);
 
@@ -374,6 +433,10 @@ export const getIndexer = async () => {
       });
   }
 
+  /**
+   * Note: No longer used in release process. Keeping this for use in emergency updates to public indices requiring removing files from an index.
+   * @param files
+   */
   async function removeFilesFromPublic(files: File[]): Promise<void> {
     const sortedFiles = sortFilesIntoPrograms(files);
 
@@ -457,15 +520,15 @@ export const getIndexer = async () => {
 
   return {
     // By FileDocument
-    indexFileDocs,
-    removeFileDocs,
+    indexRestrictedFileDocs,
+    removeRestrictedFileDocs,
 
-    updateFile,
+    updateRestrictedFile,
 
     // Public Index Management
-    deleteIndices,
     preparePublicIndices,
-    copyFilesToPublic,
+    indexPublicFileDocs,
+    deleteIndices,
     removeFilesFromPublic,
     removeFilesFromRestricted,
     release,

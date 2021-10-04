@@ -104,7 +104,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             .process(async file => {
               logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
               const recalculatedFile = await recalculateFileState(file);
-              await indexer.updateFile(recalculatedFile);
+              await indexer.updateRestrictedFile(recalculatedFile);
               return file;
             });
 
@@ -171,7 +171,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             .process(async file => {
               logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
               const recalculatedFile = await recalculateFileState(file);
-              await indexer.updateFile(recalculatedFile);
+              await indexer.updateRestrictedFile(recalculatedFile);
               return file;
             });
 
@@ -187,8 +187,6 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         } catch (e) {
           return res.status(500).send(`Unexpected error updating files: ${e}`);
         }
-
-        return res.status(200).json(filter);
       } catch (error) {
         // Catch Param Validation Errors
         return res.status(400).send(error.toString());

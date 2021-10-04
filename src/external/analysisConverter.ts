@@ -40,7 +40,7 @@ import { getAppConfig } from '../config';
 import Logger from '../logger';
 const logger = Logger('AnalysisConverter');
 
-export type FilePartialDocument = { [k: string]: any } & {
+export type RdpcFileDocument = { [k: string]: any } & {
   objectId: string;
   studyId: string;
   repositories: { [k: string]: string }[];
@@ -56,7 +56,7 @@ export type FilePartialDocument = { [k: string]: any } & {
 export async function convertAnalysesToFileDocuments(
   analyses: any[],
   repoCode: string,
-): Promise<FilePartialDocument[]> {
+): Promise<RdpcFileDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
@@ -77,12 +77,12 @@ export async function convertAnalysesToFileDocuments(
   }
 
   const response: {
-    [k: string]: FilePartialDocument[];
+    [k: string]: RdpcFileDocument[];
   } = await result.json();
   logger.debug(`Conversion response received with ${Object.keys(response).length} files`);
 
   // Convert the Analysis response (StringMap of FileCentricDocuments)
-  let files: FilePartialDocument[] = [];
+  let files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response
   Object.keys(response).forEach((a: string) => {

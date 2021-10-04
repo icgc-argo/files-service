@@ -20,7 +20,7 @@
 import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
-import { getStudies, getAnalysesBatchesStream } from '../external/song';
+import { getStudies, getAnalysesByStudy } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
 import { getIndexer } from './indexer';
@@ -68,7 +68,7 @@ export async function reindexDataCenter(dataCenterId: string, studyFilter: strin
 }
 
 async function generateStudyAnalyses(url: string, studyId: string) {
-  const pipeline = await getAnalysesBatchesStream(url, studyId);
+  const pipeline = await getAnalysesByStudy(url, studyId);
   // read one batch entry at a time
   return streamToAsyncGenerator<any>(pipeline, 1);
 }
