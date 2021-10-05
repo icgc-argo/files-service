@@ -34,24 +34,16 @@ import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
 
 import Logger from '../logger';
-import { buildDocument, FileCentricDocument } from './fileCentricDocument';
+import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('ReleaseManager');
 
 function toFileId(file: File) {
   return file.objectId;
 }
 
-function activeReleaseErrorCatch(_e: unknown) {
-  if (typeof _e === 'object') {
-    const e = _e as Error;
-    releaseService.setActiveReleaseError(e.message);
-  } else if (typeof _e === 'string') {
-    releaseService.setActiveReleaseError(_e);
-  } else {
-    releaseService.setActiveReleaseError(
-      'An undescribed error occurred. Please check logs for details.',
-    );
-  }
+function activeReleaseErrorCatch(e: unknown) {
+  logger.error(e as string);
+  releaseService.setActiveReleaseError(e as string);
 }
 
 export async function calculateRelease(): Promise<void> {
@@ -66,13 +58,18 @@ export async function calculateRelease(): Promise<void> {
     const queuedFiles = await fileService.getFilesByState({
       releaseState: FileReleaseState.QUEUED,
     });
-    const kept = publicFiles.map(toFileId);
-    const added = queuedFiles.map(toFileId);
+    const kept = publicFiles.filter(file => file.status === ANALYSIS_STATE.PUBLISHED).map(toFileId);
+    const added = queuedFiles
+      .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
+      .map(toFileId);
+    const removed = publicFiles
+      .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
+      .map(toFileId);
 
     await releaseService.updateActiveReleaseFiles({
       kept,
       added,
-      removed: [], // TODO: Implement removed files after we build a "withdraw" mechanism for files.
+      removed,
     });
 
     logger.info(`Finishing release calculation!`);
@@ -107,7 +104,12 @@ export async function buildActiveRelease(label: string): Promise<void> {
       throw new Error('No Active release available.');
     }
 
-    release = await releaseService.updateActiveReleaseLabel(label);
+    try {
+      release = await releaseService.updateActiveReleaseLabel(label);
+    } catch (e) {
+      logger.debug(JSON.stringify(e));
+      throw new Error(`Release with the label '${label}' already exists`);
+    }
 
     // 1. Sort files into programs, published and restricted
 

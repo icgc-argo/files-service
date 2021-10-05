@@ -158,9 +158,9 @@ export async function beginCalculatingActiveRelease(): Promise<ReleaseStateChang
           builtAt: true,
           calculatedAt: true,
           label: true,
-          indices: true,
           snapshot: true,
           error: true,
+          // not clearing indices so we can maintain a reference and remove them during build process
         },
       ),
     );
@@ -238,9 +238,9 @@ export async function beginBuildingActiveRelease(): Promise<ReleaseStateChangeRe
         {
           builtAt: true,
           label: true,
-          indices: true,
           snapshot: true,
           error: true,
+          // not clearing indices so we can maintain a reference and remove them during build process
         },
       ),
     );
@@ -422,6 +422,7 @@ function toPojo(releaseDoc: ReleaseMongooseDocument): Release {
     label: releaseDoc.label,
     version: releaseDoc.version,
     state: releaseDoc.state as ReleaseState,
+    error: releaseDoc.error,
     calculatedAt: releaseDoc.calculatedAt,
     builtAt: releaseDoc.builtAt,
     publishedAt: releaseDoc.publishedAt,

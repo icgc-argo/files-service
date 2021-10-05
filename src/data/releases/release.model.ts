@@ -250,8 +250,11 @@ function calculateVersion(files: ReleaseFilesInput): string {
   const sortedAdded = files.added.sort();
   const sortedRemoved = files.removed.sort();
   const versionInput = sortedKept
+    .concat('kept')
     .concat(sortedAdded)
+    .concat('added')
     .concat(sortedRemoved)
+    .concat('removed')
     .join('');
   return createHash('md5')
     .update(versionInput)

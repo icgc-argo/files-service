@@ -43,6 +43,8 @@ import { getDataCenter } from '../external/dataCenterRegistry';
 import { getAnalysesById } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import PromisePool from '@supercharge/promise-pool/dist';
+import { STATES } from 'mongoose';
+import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('FileManager');
 
 export async function updateFileFromRdpcData(
@@ -107,10 +109,10 @@ export async function saveAndIndexFilesFromRdpcData(
 
   // Documents to add and remove from index
   const addDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-    doc => doc.analysis?.analysisState === 'PUBLISHED',
+    doc => doc.analysis?.analysisState === ANALYSIS_STATE.PUBLISHED,
   );
   const removeDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-    doc => doc.analysis?.analysisState !== 'PUBLISHED',
+    doc => doc.analysis?.analysisState !== ANALYSIS_STATE.PUBLISHED,
   );
 
   logger.debug(`START - Indexing/Removing files`);
