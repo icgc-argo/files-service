@@ -138,7 +138,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
   // 3.a Get RDPC data for all included files
   const rdpcFilesToAdd = await fileManager.getRdpcDataForFiles(filesAdded.concat(filesKept));
 
-  // Convert to FileCentricDocs
+  // 3.b Convert to FileCentricDocs
   // Limit for concurrency here is DB connections. Can go higher than 1 RDPC at a time but there aren't that many RDPCs to need to push this value
   const fileCentricDocsToAdd: FileCentricDocument[] = [];
   PromisePool.withConcurrency(1)
@@ -158,6 +158,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
         });
     });
 
+  // 3.c add the updated files to public indices
   await indexer.indexPublicFileDocs(fileCentricDocsToAdd);
 
   // 4. Make snapshot!
@@ -207,10 +208,27 @@ export async function publishActiveRelease(): Promise<void> {
   await indexer.removeFilesFromRestricted(filesAdded);
   logger.debug(`${filesAdded.length} Files removed from restricted index`);
 
-  // TODO: Getting the add to public working before circling back to removing and updating out of date files.
   // 2. Removed files
   //  2a. Fetch file data from RDPC
+  const rdpcFilesMovingToRestricted = await fileManager.getRdpcDataForFiles(filesRemoved);
+
+  // Limit for concurrency here is DB connections. Can go higher than 1 RDPC at a time but there aren't that many RDPCs to need to push this value
+  const fileCentricDocsMovingToRestricted: FileCentricDocument[] = [];
+  PromisePool.withConcurrency(1)
+    .for(rdpcFilesMovingToRestricted) // For each rdpc in the files to add
+    .process(data => {
+      const rdpcFiles = data.files;
+      PromisePool.withConcurrency(10)
+        .for(rdpcFiles) // For each file doc retrieved from that rdpc
+        .process(async rdpcFile => {
+          const dbFile = await fileManager.updateFileFromRdpcData(rdpcFile, data.dataCenterId);
+          const fileCentricDoc = await buildDocument({ dbFile, rdpcFile });
+          fileCentricDocsMovingToRestricted.push(fileCentricDoc);
+        });
+    });
+
   //  2b. Add file data to restricted index
+  indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
 
   // 3. Release all indices (public and restricted)
   await indexer.release({ publicRelease: true, indices: release.indices });
