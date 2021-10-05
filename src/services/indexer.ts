@@ -342,7 +342,10 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are not PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.releaseState === FileReleaseState.PUBLIC),
+      docs.filter(
+        doc =>
+          doc.releaseState === FileReleaseState.PUBLIC && doc.embargoStage === EmbargoStage.PUBLIC,
+      ),
     );
 
     await PromisePool.withConcurrency(20)

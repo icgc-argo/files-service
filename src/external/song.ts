@@ -86,7 +86,7 @@ export const getAnalysesById = async (
   url: string,
   studyId: string,
   analysisId: string,
-): Promise<SongAnalysis | undefined> => {
+): Promise<SongAnalysis> => {
   const analysesUrl = urljoin(
     url,
     '/studies',
@@ -99,9 +99,14 @@ export const getAnalysesById = async (
     const res = await fetch(analysesUrl);
     if (res.status === 200) {
       return (await res.json()) as SongAnalysis;
+    } else {
+      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${url}`);
+      throw new Error(
+        `Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`,
+      );
     }
   } catch (e) {
-    logger.error(`Error fetching analysis by id: ${e}`);
-    return;
+    logger.error(`Error fetching analysis ${analysisId} for ${studyId} from ${analysesUrl}: ${e}`);
+    throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
   }
 };

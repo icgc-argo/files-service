@@ -42,6 +42,7 @@ import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getAnalysesById } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
+import PromisePool from '@supercharge/promise-pool/dist';
 const logger = Logger('FileManager');
 
 export async function updateFileFromRdpcData(
@@ -164,9 +165,9 @@ type RdpcSortedFiles = {
 }[];
 /**
  * Given a list of files, fetch the updated file data for them from song
- * This is important to updating Public indices during the release process
+ * This is the data fetching step for updating db files from data center
  *
- * Note that the files returned may not be PUBLISHED anymore
+ * Note that the files returned may not be PUBLISHED, they could be in UNPUBLISHED or SUPPRESSED state
  * @param files
  * @returns
  */
@@ -194,22 +195,57 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
       const analyses = _.uniq(dcProgramFiles.map(file => file.analysisId));
 
       logger.debug(
-        `Fetching analyses by ID -- DC: ${dataCenterId} -- program: ${programId} -- analysisIds: ${analyses}`,
+        `Fetching analyses by ID -- DC: ${dataCenterId} -- program: ${programId} -- analysis count: ${analyses.length}`,
       );
 
       // Fetch data for each anaylsis ID
-      for (const analysisId in analyses) {
-        const analysis = await getAnalysesById(dcUrl, programId, analysisId);
-        if (analysis !== undefined) {
-          retrievedAnalyses.concat(analysis);
-        }
-      }
+      await PromisePool.withConcurrency(10)
+        .for(analyses)
+        .process(async analysisId => {
+          const analysis = await getAnalysesById(dcUrl, programId, analysisId);
+          retrievedAnalyses.push(analysis);
+        });
     }
-
     // convert analyses documents to rdpcFileDocs
     const rdpcFiles = await convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
-    output.push({ dataCenterId, files: rdpcFiles });
+
+    // Filter files to only include the ones requested for updates:
+    const dcFileIds = dcFiles.map(file => file.objectId);
+    const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
+    logger.debug(`Successfully retrieved ${filteredFiles.length} files from ${dataCenterId}}`);
+    output.push({ dataCenterId, files: filteredFiles });
   }
+
+  return output;
+}
+
+/**
+ * Given a list of files from the DB, fetch the latest data from their data center
+ * The DB will be updated with changes retrieved, and then documents will be prepared for indexing
+ *
+ * Note that the updates will include UNPUBLISHED and SUPPRESSED files, so they need to be filtered by state before indexing.
+ * @param files
+ * @returns
+ */
+export async function fetchFileUpdatesFromDataCenter(
+  files: File[],
+): Promise<FileCentricDocument[]> {
+  const rdpcFilesToAdd = await getRdpcDataForFiles(files);
+
+  const output: FileCentricDocument[] = [];
+
+  await PromisePool.withConcurrency(1)
+    .for(rdpcFilesToAdd) // For each rdpc in the files to add
+    .process(async data => {
+      const rdpcFiles = data.files;
+      await PromisePool.withConcurrency(10)
+        .for(rdpcFiles) // For each file doc retrieved from that rdpc
+        .process(async rdpcFile => {
+          const dbFile = await updateFileFromRdpcData(rdpcFile, data.dataCenterId);
+          const fileCentricDoc = await buildDocument({ dbFile, rdpcFile });
+          output.push(fileCentricDoc);
+        });
+    });
 
   return output;
 }
