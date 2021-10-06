@@ -22,61 +22,83 @@ import { createHash } from 'crypto';
 import { FilterQuery } from 'mongodb';
 import mongoose from 'mongoose';
 
+/**
+ * `CREATED` -> `CALCULATING` -> `CALCULATED` -> `BUILDING` -> `BUILT` -> `PUBLISHING` -> `PUBLISHED`
+ */
 export enum ReleaseState {
-  ACTIVE = 'ACTIVE',
-  LOCKED = 'LOCKED',
+  CREATED = 'CREATED',
+
+  CALCULATING = 'CALCULATING',
+  CALCULATED = 'CALCULATED',
+  ERROR_CALCULATE = 'ERROR_CALCULATE',
+
+  BUILDING = 'BUILDING',
+  BUILT = 'BUILT',
+  ERROR_BUILD = 'ERROR_BUILD',
+
+  PUBLISHING = 'PUBLISHING',
   PUBLISHED = 'PUBLISHED',
+  ERROR_PUBLISH = 'ERROR_PUBLISH',
 }
 
 export interface Release {
   _id: string;
-  version: string;
+  version?: string;
   state: ReleaseState;
+  error?: string;
 
-  calculatedAt: Date;
   filesKept: string[];
   filesAdded: string[];
   filesRemoved: string[];
 
-  publishedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
+  publishedAt?: Date;
   indices: string[];
-  label: string;
-  snapshot: string;
+  label?: string;
+  snapshot?: string;
 }
 
 interface DbRelease {
-  version: string;
+  version?: string;
   state: string;
+  error?: string;
 
-  calculatedAt: Date;
   filesKept: string[];
   filesAdded: string[];
   filesRemoved: string[];
 
-  publishedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
+  publishedAt?: Date;
   indices: string[];
-  label: string;
-  snapshot: string;
+  label?: string;
+  snapshot?: string;
 }
 
 const ReleaseSchema = new mongoose.Schema(
   {
-    version: { type: String, required: true },
+    version: { type: String, required: false },
     state: {
       type: String,
       required: true,
       enum: Object.values(ReleaseState),
-      default: ReleaseState.ACTIVE,
+      default: ReleaseState.CREATED,
+    },
+    error: {
+      type: String,
+      required: false,
     },
 
-    calculatedAt: { type: Date, required: true },
     filesKept: { type: [String], required: true },
     filesAdded: { type: [String], required: true },
     filesRemoved: { type: [String], required: true },
 
+    calculatedAt: { type: Date, required: false },
+    builtAt: { type: Date, required: false },
     publishedAt: { type: Date, required: false },
     label: { type: String, required: false, unique: true, trim: true, sparse: true },
-    indices: { type: [String], required: false },
+    indices: { type: [String], required: true, default: [] },
     snapshot: { type: String, required: false },
   },
   { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
@@ -92,44 +114,76 @@ export type ReleaseFilesInput = {
   removed: string[];
 };
 
+/**
+ * null values are used to clear previously set values
+ */
 export type ReleaseUpdates = {
   files?: ReleaseFilesInput;
   label?: string;
   indices?: string[];
+  calculatedAt?: Date;
+  builtAt?: Date;
   publishedAt?: Date;
   state?: ReleaseState;
+  error?: string;
   snapshot?: string;
 };
 
-export async function create(files: ReleaseFilesInput): Promise<ReleaseMongooseDocument> {
-  const version = calculateVersion(files);
+export type ReleaseResets = {
+  files?: boolean;
+  label?: boolean;
+  indices?: boolean;
+  calculatedAt?: boolean;
+  builtAt?: boolean;
+  publishedAt?: boolean;
+  error?: boolean;
+  snapshot?: boolean;
+};
+
+export async function create(): Promise<ReleaseMongooseDocument> {
   const release = new ReleaseModel({
-    filesKept: files.kept,
-    filesAdded: files.added,
-    filesRemoved: files.removed,
-    version,
-    calculatedAt: new Date(),
+    filesKept: [],
+    filesAdded: [],
+    filesRemoved: [],
   });
   return await release.save();
 }
 
 export async function getRelease(
   filter: FilterQuery<ReleaseMongooseDocument>,
-): Promise<ReleaseMongooseDocument> {
-  return (await ReleaseModel.findOne(filter)) as ReleaseMongooseDocument;
+): Promise<ReleaseMongooseDocument | undefined> {
+  return await ReleaseModel.findOne(filter);
+}
+
+export async function getLatestRelease(): Promise<ReleaseMongooseDocument | undefined> {
+  return await ReleaseModel.findOne({}, {}, { sort: { createdAt: -1 } });
 }
 
 export async function getReleases(): Promise<ReleaseMongooseDocument[]> {
   return (await ReleaseModel.find({}).exec()) as ReleaseMongooseDocument[];
 }
 
+/**
+ *
+ * @param release release document to update, only the release._id is used here
+ * @param updates values to set. omitted properties will be ignored
+ * @param resets values to clear. any property set to true will be removed from the document or reset to an empty array
+ * @returns
+ */
 export async function updateRelease(
   release: Release,
   updates: ReleaseUpdates,
+  resets: ReleaseResets = {},
 ): Promise<ReleaseMongooseDocument> {
   const updatedRelease: Release = {
     ...release,
   };
+
+  if (updates.state) {
+    updatedRelease.state = updates.state;
+  }
+
+  // Update values provided
   if (updates.files) {
     updatedRelease.filesKept = updates.files.kept;
     updatedRelease.filesAdded = updates.files.added;
@@ -145,11 +199,46 @@ export async function updateRelease(
   if (updates.indices) {
     updatedRelease.indices = updates.indices;
   }
-  if (updates.state) {
-    updatedRelease.state = updates.state;
+  if (updates.calculatedAt) {
+    updatedRelease.calculatedAt = updates.calculatedAt;
+  }
+  if (updates.builtAt) {
+    updatedRelease.builtAt = updates.builtAt;
   }
   if (updates.publishedAt) {
     updatedRelease.publishedAt = updates.publishedAt;
+  }
+  if (updates.error) {
+    updatedRelease.error = updates.error;
+  }
+
+  // Handle Resets
+  if (resets.files) {
+    updatedRelease.filesKept = [];
+    updatedRelease.filesAdded = [];
+    updatedRelease.filesRemoved = [];
+    updatedRelease.version = undefined;
+  }
+  if (resets.label) {
+    updatedRelease.label = undefined;
+  }
+  if (resets.snapshot) {
+    updatedRelease.snapshot = undefined;
+  }
+  if (resets.indices) {
+    updatedRelease.indices = [];
+  }
+  if (resets.calculatedAt) {
+    updatedRelease.calculatedAt = undefined;
+  }
+  if (resets.builtAt) {
+    updatedRelease.builtAt = undefined;
+  }
+  if (resets.publishedAt) {
+    updatedRelease.publishedAt = undefined;
+  }
+  if (resets.error) {
+    updatedRelease.error = undefined;
   }
   return (await ReleaseModel.findOneAndUpdate({ _id: release._id }, updatedRelease, {
     new: true,
@@ -161,8 +250,11 @@ function calculateVersion(files: ReleaseFilesInput): string {
   const sortedAdded = files.added.sort();
   const sortedRemoved = files.removed.sort();
   const versionInput = sortedKept
+    .concat('kept')
     .concat(sortedAdded)
+    .concat('added')
     .concat(sortedRemoved)
+    .concat('removed')
     .join('');
   return createHash('md5')
     .update(versionInput)

@@ -18,7 +18,6 @@
  */
 
 import express, { NextFunction, Request, Response, RequestHandler } from 'express';
-import bodyParser from 'body-parser';
 import path from 'path';
 import * as swaggerUi from 'swagger-ui-express';
 import yaml from 'yamljs';
@@ -26,7 +25,7 @@ import Auth from '@overture-stack/ego-token-middleware';
 
 import { Errors } from './data/files';
 import { AppConfig } from './config';
-import logger from './logger';
+import Logger from './logger';
 
 import createAdminRouter from './routers/admin';
 import createFilesRouter from './routers/files';
@@ -44,7 +43,7 @@ const App = (config: AppConfig): express.Express => {
 
   const app = express();
   app.set('port', process.env.PORT || 3000);
-  app.use(bodyParser.json());
+  app.use(express.json());
 
   // Cool matrix background for homepage:
   // app.get('/', (req, res) => res.status(200).sendFile(__dirname + '/resources/index.html'));
@@ -72,9 +71,10 @@ const App = (config: AppConfig): express.Express => {
 
 // general catch all error handler
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): any => {
-  logger.error('error handler received error: ', err);
+  const logger = Logger('GlobalErrorHandler');
+  logger.error('Received unhandled error: ', err);
   if (res.headersSent) {
-    logger.debug('error handler skipped');
+    logger.debug('Skipping error processing, response headers already sent.');
     return next(err);
   }
   let status: number;
@@ -111,7 +111,8 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
 };
 
 const noOpReqHandler: RequestHandler = (req, res, next) => {
-  logger.warn(`Calling protected ( ${req.url} ) endpoint without auth enabled.`);
+  const logger = Logger('App');
+  logger.warn(`Accepting request to ( ${req.url} ) endpoint without auth enabled.`);
   next();
 };
 

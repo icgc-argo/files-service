@@ -37,7 +37,15 @@ const options: LoggerOptions = {
 const logger = createLogger(options);
 
 if (process.env.NODE_ENV !== 'production') {
-  logger.debug('Logging initialized at debug level.');
+  logger.debug('[Logger] Logging initialized at debug level.');
 }
 
-export default logger;
+export default (service: string) => {
+  const buildServiceMessage = (message: string) => `[${service}] ${message}`;
+  return {
+    debug: (message: string, ...meta: any[]) => logger.debug(buildServiceMessage(message), ...meta),
+    info: (message: string, ...meta: any[]) => logger.info(buildServiceMessage(message), ...meta),
+    warn: (message: string, ...meta: any[]) => logger.warn(buildServiceMessage(message), ...meta),
+    error: (message: string, ...meta: any[]) => logger.error(buildServiceMessage(message), ...meta),
+  };
+};

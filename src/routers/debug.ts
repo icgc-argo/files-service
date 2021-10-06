@@ -21,10 +21,11 @@ import { Router, Request, Response, RequestHandler, NextFunction } from 'express
 
 import { AppConfig } from '../config';
 
-import logger from '../logger';
+import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import analysisEventHandler from '../services/analysisEventHandler';
+import analysisEventProcessor from '../services/processAnalysisEvent';
 import * as fileService from '../data/files';
+const logger = Logger('Debug.Router');
 
 const createDebugRouter = (
   config: AppConfig,
@@ -59,7 +60,7 @@ const createDebugRouter = (
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const analysisEvent = req.body;
-      const result = await analysisEventHandler(analysisEvent);
+      const result = await analysisEventProcessor(analysisEvent);
       return res.status(201).send(result);
     }),
   );

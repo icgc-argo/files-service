@@ -17,43 +17,70 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 import PromisePool from '@supercharge/promise-pool';
+import _ from 'lodash';
 
 import { File, FileReleaseState, EmbargoStage } from '../data/files';
 import * as fileService from '../data/files';
 import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
+
 import { createSnapshot } from '../external/elasticsearch';
-import StringMap from '../utils/StringMap';
-import { getIndexer } from './indexer';
-import logger from '../logger';
 import { sendPublicReleaseMessage } from '../external/kafka';
-import _ from 'lodash';
+
+import StringMap from '../utils/StringMap';
 import { Program, PublicReleaseMessage } from 'kafkaMessages';
+
+import { getIndexer } from './indexer';
+import * as fileManager from './fileManager';
+
+import Logger from '../logger';
+import { ANALYSIS_STATE } from '../utils/constants';
+const logger = Logger('ReleaseManager');
 
 function toFileId(file: File) {
   return file.objectId;
 }
 
-export async function calculateRelease(): Promise<Release> {
+function activeReleaseErrorCatch(e: unknown) {
+  logger.error(e as string);
+  releaseService.setActiveReleaseError(e as string);
+}
+
+export async function calculateRelease(): Promise<void> {
   // Get files that are currently public, and those queued for public release
   // Add these to the active release. Release service handles creating new release if active release not available.
+  try {
+    logger.info(`Beginning release calculation...`);
 
-  const publicFiles = await fileService.getFilesByState({
-    releaseState: FileReleaseState.PUBLIC,
-  });
-  const queuedFiles = await fileService.getFilesByState({
-    releaseState: FileReleaseState.QUEUED,
-  });
-  const kept = publicFiles.map(toFileId);
-  const added = queuedFiles.map(toFileId);
+    const publicFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.PUBLIC,
+    });
+    const queuedFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.QUEUED,
+    });
+    const kept = publicFiles.filter(file => file.status === ANALYSIS_STATE.PUBLISHED).map(toFileId);
+    const added = queuedFiles
+      .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
+      .map(toFileId);
+    const removed = publicFiles
+      .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
+      .map(toFileId);
 
-  const release = releaseService.updateActiveReleaseFiles({
-    kept,
-    added,
-    removed: [], // TODO: Implement removed files after we build a "withdraw" mechanism for files.
-  });
+    await releaseService.updateActiveReleaseFiles({
+      kept,
+      added,
+      removed,
+    });
 
-  return release;
+    logger.info(`Finishing release calculation!`);
+    const { updated, message } = await releaseService.finishCalculatingActiveRelease();
+    if (!updated) {
+      logger.error(`Unable to set release to Calculated: ${message}`);
+      throw new Error('Release expected to be set as calculated but was in the wrong state.');
+    }
+  } catch (e) {
+    activeReleaseErrorCatch(e);
+  }
 }
 
 /**
@@ -61,7 +88,7 @@ export async function calculateRelease(): Promise<Release> {
  * This does:
  *  - Create the new public indices, adding and removing the files as required
  *  - TODO: Update from song (and clincial eventually) all files kept and added in the release
- *  - TODO: Snapshot the new indices in ES
+ *  - Snapshot the new indices in ES
  * This does not:
  *  - Alias the new indices (no change to the live platform data)
  *  - Update the embargoStage or releaseState of any files
@@ -69,64 +96,112 @@ export async function calculateRelease(): Promise<Release> {
  *
  * @param label
  */
-export async function buildActiveRelease(label: string): Promise<Release> {
-  let release = await releaseService.getActiveRelease();
-  if (!release) {
-    throw new Error('No Active release available.');
-  }
-
-  release = await releaseService.updateActiveReleaseLabel(label);
-
-  // 1. Sort files into programs, published and restricted
-
-  const programs: StringMap<{ kept: File[]; added: File[] }> = {};
-  const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
-  const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
-  const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
-
-  const programIds = new Set<string>();
-  filesKept.forEach(file => programIds.add(file.programId));
-  filesAdded.forEach(file => programIds.add(file.programId));
-  filesRemoved.forEach(file => programIds.add(file.programId));
-
-  filesKept.forEach(file => {
-    const program = file.programId;
-    if (!programs[program]) {
-      programs[program] = { kept: [], added: [] };
+export async function buildActiveRelease(label: string): Promise<void> {
+  try {
+    logger.info(`Beginning release building...`);
+    let release = await releaseService.getActiveRelease();
+    if (!release) {
+      throw new Error('No Active release available.');
     }
-    programs[program].kept.push(file);
-  });
-  filesAdded.forEach(file => {
-    const program = file.programId;
-    if (!programs[program]) {
-      programs[program] = { kept: [], added: [] };
+
+    try {
+      release = await releaseService.updateActiveReleaseLabel(label);
+    } catch (e) {
+      logger.debug(JSON.stringify(e));
+      throw new Error(`Release with the label '${label}' already exists`);
     }
-    programs[program].added.push(file);
-  });
 
-  // 2. Create public indices for each program (no clone!)
-  const indexer = await getIndexer();
+    // 1. Sort files into programs, published and restricted
 
-  // 2.a If the release already has public indices, remove those so we can build from the existing indices.
-  await indexer.deleteIndices(release.indices);
-  release = await releaseService.updateActiveReleaseIndices([]);
+    const programs: StringMap<{ kept: File[]; added: File[] }> = {};
+    const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
+    const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
+    const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
-  // 2.b Clone new public indices from the current public indices.
-  const publicIndices = await indexer.preparePublicIndices(Array.from(programIds));
-  release = await releaseService.updateActiveReleaseIndices(publicIndices);
+    const programIds = new Set<string>();
+    filesKept.forEach(file => programIds.add(file.programId));
+    filesAdded.forEach(file => programIds.add(file.programId));
+    filesRemoved.forEach(file => programIds.add(file.programId));
 
-  // 3. Perform reindex of required documents from source indices to new published indices.
+    filesKept.forEach(file => {
+      const program = file.programId;
+      if (!programs[program]) {
+        programs[program] = { kept: [], added: [] };
+      }
+      programs[program].kept.push(file);
+    });
+    filesAdded.forEach(file => {
+      const program = file.programId;
+      if (!programs[program]) {
+        programs[program] = { kept: [], added: [] };
+      }
+      programs[program].added.push(file);
+    });
 
-  await indexer.copyFilesToPublic(filesAdded);
-  await indexer.removeFilesFromPublic(filesRemoved);
+    // 2. Create public indices for each program (no clone!)
+    const indexer = await getIndexer();
 
-  // 4. Make snapshot!
-  const snapshot = await createSnapshot({ indices: release.indices, label: release.label });
-  if (snapshot) {
-    release = await releaseService.updateActiveReleaseSnapshot(snapshot);
+    // 2.a If the release already has public indices, remove those so we can build from the existing indices.
+    await indexer.deleteIndices(release.indices);
+    release = await releaseService.updateActiveReleaseIndices([]);
+
+    // 2.b Make new empty public indices from the current public indices.
+    const publicIndices = await indexer.preparePublicIndices(Array.from(programIds));
+    release = await releaseService.updateActiveReleaseIndices(publicIndices);
+
+    // 3. Add files all required files to public indices.
+
+    // 3a. Get file centric docs for our files and update the DB with any changes from DC
+    const expectedPublicFiles = filesAdded.concat(filesKept);
+    const fileCentricDocs = await fileManager.fetchFileUpdatesFromDataCenter(expectedPublicFiles);
+
+    // 3b. Check if any of the files expected in our public release have been unpublished.
+    const publishedFileCentricDocs = fileCentricDocs.filter(
+      doc => doc.analysis.analysisState === 'PUBLISHED',
+    );
+
+    if (publishedFileCentricDocs.length < expectedPublicFiles.length) {
+      const expectedFileIds = expectedPublicFiles.map(file => file.objectId);
+      const missingFileIds = publishedFileCentricDocs.filter(
+        file => !expectedFileIds.includes(file.objectId),
+      );
+      logger.error(
+        `Some of the expected files to publish were discovered as no longer PUBLIC in the DataCenter: ${missingFileIds}`,
+      );
+      throw new Error(
+        `Some files expected in the release are no longer PUBLISHED in their data center. \
+        Re-run the Calculate step to update the release plan. \
+        The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
+      );
+    }
+
+    // 3c. Prepare the file centric docs for public index.
+    // Set the EmbargoStage and Release state of our ES documents to PUBLIC. These will be updated in the DB during the Publish stage.
+    fileCentricDocs.forEach(doc => {
+      doc.embargoStage = EmbargoStage.PUBLIC;
+      doc.releaseState = FileReleaseState.PUBLIC;
+    });
+
+    // 3.d add the updated files to public indices
+    await indexer.indexPublicFileDocs(fileCentricDocs);
+
+    // 4. Make snapshot!
+    const snapshot = await createSnapshot({ indices: publicIndices, label });
+    if (snapshot) {
+      release = await releaseService.updateActiveReleaseSnapshot(snapshot);
+    }
+
+    // NOTE: Public indices are not released! that is for the public stage.
+
+    logger.info(`Finishing release build!`);
+    const { updated, message } = await releaseService.finishBuildingActiveRelease();
+    if (!updated) {
+      logger.error(`Unable to set release to Built: ${message}`);
+      throw new Error('Release expected to be set as BUILT but was in the wrong state.');
+    }
+  } catch (e) {
+    activeReleaseErrorCatch(e);
   }
-
-  return release;
 }
 
 /**
@@ -138,67 +213,78 @@ export async function buildActiveRelease(label: string): Promise<Release> {
  *   This will modify the files in the database by:
  *     - Update the embargo_stage and release_state of any files that have been moved to public/restricted
  */
-export async function publishActiveRelease(): Promise<Release> {
-  let release = await releaseService.getActiveRelease();
-  if (!release) {
-    throw new Error('No Active release available.');
-  }
-  if (!(release.indices.length > 0)) {
-    throw new Error('Active release has no public indices. Nothing to publish.');
-  }
+export async function publishActiveRelease(): Promise<void> {
+  try {
+    logger.info(`Beginning release publishing...`);
 
-  const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
-  const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
+    const release = await releaseService.getActiveRelease();
+    if (!release) {
+      throw new Error('No Active release available.');
+    }
+    if (!(release.indices.length > 0)) {
+      throw new Error('Active release has no public indices. Nothing to publish.');
+    }
 
-  const indexer = await getIndexer();
+    const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
+    const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
-  // 1. Added files - Remove from restricted index
-  await indexer.removeFilesFromRestricted(filesAdded);
-  logger.debug(`[Release.Publish] ${filesAdded.length} Files removed from restricted index`);
+    const indexer = await getIndexer();
 
-  // TODO: Getting the add to public working before circling back to removing and updating out of date files.
-  // 2. Removed files
-  //  2a. Fetch file data from RDPC
-  //  2b. Add file data to restricted index
+    // 1. Added files - Remove from restricted index
+    await indexer.removeFilesFromRestricted(filesAdded);
+    logger.debug(`${filesAdded.length} Files removed from restricted index`);
 
-  // 3. Release all indices (public and restricted)
-  await indexer.release({ publicRelease: true, indices: release.indices });
-  logger.debug(`[Release.Publish] Release Indices have been aliased.`);
+    // 2. Removed files
+    // 2a. Get updated file data from Data Centers
+    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(filesRemoved);
 
-  // 4. Update DB with published changes
-  await PromisePool.withConcurrency(20)
-    .for(release.filesAdded)
-    .handleError((error, file) => {
-      logger.error(`Failed to update release status in DB for ${file}`);
-    })
-    .process(async file => {
-      await fileService.updateFileReleaseProperties(file, {
-        embargoStage: EmbargoStage.PUBLIC,
-        releaseState: FileReleaseState.PUBLIC,
+    // 2b. Filter out files being removed because they are not PUBLISHED in data center
+    const fileCentricDocsMovingToRestricted = fileCentricDocsToRemove.filter(
+      doc => doc.analysis.analysisState === 'PUBLISHED',
+    );
+
+    //  2c. Add file data to restricted index
+    indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
+
+    // 3. Release all indices (public and restricted)
+    await indexer.release({ publicRelease: true, indices: release.indices });
+    logger.debug(`Release Indices have been aliased.`);
+
+    // 4. Update DB with published changes
+    await PromisePool.withConcurrency(20)
+      .for(release.filesAdded)
+      .handleError((error, file) => {
+        logger.error(`Failed to update release status in DB for ${file}`);
+      })
+      .process(async file => {
+        await fileService.updateFileReleaseProperties(file, {
+          embargoStage: EmbargoStage.PUBLIC,
+          releaseState: FileReleaseState.PUBLIC,
+        });
       });
-    });
-  logger.debug(`[Release.Publish] File records in DB updated with new published states.`);
-  // TODO: when implementing the filesRemoved logic, check if the release_state needs to be updated in DB or
-  //  if that change is handled when the embargoStage calculation is redone when the file was modified to no
-  //  longer be public. I.E. We may need to update the DB with releaseState that is not PUBLIC
+    logger.debug(`File records in DB updated with new published states.`);
 
-  // 5. Update the release to track the changed status
-  // 5a. release.state should now be PUBLISHED
-  // 5b. record publishedAt date
-  release = await releaseService.publishActiveRelease();
-  logger.debug(`[Release.Publish] Release marked as published.`);
-
-  const message = buildKafkaMessage(release, filesAdded, filesRemoved);
-  sendPublicReleaseMessage(message);
-
-  return release;
+    // 5. Update release state to published
+    logger.info(`Finishing release publish!`);
+    const { updated, message } = await releaseService.finishPublishingActiveRelease();
+    if (updated) {
+      // 5b. Send kafka message for public release
+      const kafkaMessage = buildKafkaMessage(release, filesAdded, filesRemoved);
+      sendPublicReleaseMessage(kafkaMessage);
+    } else {
+      logger.error(`Unable to set release to published: ${message}`);
+      throw new Error('Release expected to be set as published but was in the wrong state.');
+    }
+  } catch (e) {
+    activeReleaseErrorCatch(e);
+  }
 }
 
-const buildKafkaMessage = (
+function buildKafkaMessage(
   release: Release,
   filesAdded: File[],
   filesRemoved: File[],
-): PublicReleaseMessage => {
+): PublicReleaseMessage {
   const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
 
   // get unique donor ids from filesAdded and filesRemoved:
@@ -218,10 +304,10 @@ const buildKafkaMessage = (
 
   const message: PublicReleaseMessage = {
     id: release._id,
-    publishedAt: release.publishedAt,
-    label: release.label,
+    publishedAt: <Date>release.publishedAt,
+    label: <string>release.label,
     programs: programsUpdated,
   };
 
   return message;
-};
+}

@@ -20,10 +20,11 @@
 import fetch from 'node-fetch';
 import urljoin from 'url-join';
 
-import logger from '../logger';
+import Logger from '../logger';
 import { getAppConfig } from '../config';
 import { getClient } from './elasticsearch';
 import fileCentricConfig from '../file-centric-index-mapping.json';
+const logger = Logger('Rollcall');
 
 export function getIndexFromIndexName(indexName: string): Index {
   const parts = indexName.split('_');
@@ -147,10 +148,10 @@ export default async (): Promise<RollCallClient> => {
       // Set the mapping and update settings
       await configureIndex(newIndex);
 
-      logger.info(`[Rollcall] New index: ${newIndex.indexName}`);
+      logger.info(`New index: ${newIndex.indexName}`);
       return newIndex;
     } catch (err) {
-      logger.error('[Rollcall] Failed to get new index from rollcall: ' + err);
+      logger.error('Failed to get new index from rollcall: ' + err);
       throw err;
     }
   };
