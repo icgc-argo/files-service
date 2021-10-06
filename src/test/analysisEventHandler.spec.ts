@@ -279,6 +279,9 @@ const convertedAnalysisResponse = {
 
 const analysisEvent: AnalysisUpdateEvent = {
   songServerId: 'song.collabz',
+  action: 'PUBLISH',
+  state: 'PUBLISHED',
+  studyId: 'TEST-CA',
   analysis: {
     analysisId: '11d1cf85-4d3d-4aea-91cf-854d3deaea1d',
     studyId: 'TEST-CA',
