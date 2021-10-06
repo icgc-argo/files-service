@@ -19,7 +19,7 @@
 
 import App from './app';
 import mongoose from 'mongoose';
-import logger from './logger';
+import Logger from './logger';
 import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
@@ -27,6 +27,9 @@ import { Consumer, Producer } from 'kafkajs';
 import * as kafka from './external/kafka';
 import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
+
+const serverLog = Logger('Server');
+const mongoLog = Logger('Mongo');
 
 let server: Server;
 let kafkaConnections: Promise<{
@@ -55,9 +58,9 @@ let kafkaConnections: Promise<{
   try {
     connection = await database.connect();
     const migrated = await up(connection.db);
-    migrated.forEach((fileName: string) => console.log('Migrated:', fileName));
+    migrated.forEach((fileName: string) => mongoLog.info('Migrated:', fileName));
   } catch (err) {
-    console.error('failed to do migration', err);
+    mongoLog.error('failed to do migration', err);
     process.exit(-10);
   }
 
@@ -68,9 +71,11 @@ let kafkaConnections: Promise<{
    */
   const app = App(appConfig);
   server = app.listen(app.get('port'), () => {
-    logger.info(`App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`);
-    logger.info(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
-    logger.info('Press CTRL-C to stop');
+    serverLog.info(
+      `App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`,
+    );
+    serverLog.info(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
+    serverLog.info('Press CTRL-C to stop');
   });
 
   if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
@@ -89,8 +94,9 @@ const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 errorTypes.map(type => {
   process.on(type as any, async (e: Error) => {
     try {
-      console.log(`process.on ${type}`);
-      console.error(e);
+      mongoLog.info(`process.on ${type}`);
+      mongoLog.error(e.message);
+      console.log(e); // Get full error output
       await mongoose.disconnect();
       if (kafkaConnections) {
         const kc = await kafkaConnections;

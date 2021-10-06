@@ -17,27 +17,29 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 import { Router, RequestHandler } from 'express';
+import { omit } from 'lodash';
 
 import { AppConfig } from '../config';
+import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
 import StringMap from '../utils/StringMap';
 import { Release } from '../data/releases';
-import * as releaseService from '../data/releases';
+import * as releaseDataService from '../data/releases';
 import { File } from '../data/files';
 import * as fileService from '../data/files';
 import { calculateRelease, buildActiveRelease, publishActiveRelease } from '../services/release';
-
+const logger = Logger('Release.Router');
 /**
  * Check for an existing ACTIVE release, and confirm that the provided version string matches.
  * @param version
  * @returns data object with result of validation check
  */
-async function validateActiveAuthVersion(
+async function validateActiveReleaseVersion(
   version: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const release = await releaseService.getActiveRelease();
+  const release = await releaseDataService.getActiveRelease();
   if (!release) {
-    return { success: false, error: `No Active Release. Calculate the release and try again.` };
+    return { success: false, error: `No Active Release. Calculate a new release and try again.` };
   }
   if (version !== release.version) {
     return {
@@ -70,8 +72,8 @@ const createReleaseRouter = (
     '/',
     authFilters.read,
     wrapAsync(async (req, res) => {
-      const releases = await releaseService.getReleases();
-      const output = releases.map(summarizeRelease);
+      const releases = await releaseDataService.getReleases();
+      const output = releases.map(getShortReleaseResponse);
       return res.status(200).json(output);
     }),
   );
@@ -84,14 +86,31 @@ const createReleaseRouter = (
     '/active',
     authFilters.read,
     wrapAsync(async (req, res) => {
-      const release = await releaseService.getActiveRelease();
-      const output = release ? await getReleaseDetails(release) : {};
+      const release = await releaseDataService.getActiveRelease();
+      const output = release ? await getReleaseResponse(release) : {};
+      return res.status(200).json(output);
+    }),
+  );
+
+  /**
+   * Get Latest Release
+   * Shows without calculation the latest release. This will be either the active release or the last published release.
+   * Returns empty object if there has never been a release created.
+   */
+  router.get(
+    '/latest',
+    authFilters.read,
+    wrapAsync(async (req, res) => {
+      const release = await releaseDataService.getLatestRelease();
+      const output = release ? await getReleaseResponse(release) : {};
       return res.status(200).json(output);
     }),
   );
 
   /**
    * Calculate Release
+   * Attempt to initiate calculation then return confirmation of state change.
+   * Calculation needs to:
    * Find the files that are queued for release and record their IDs
    * Provide a report with a summary of what is in the release and what will be added
    */
@@ -99,15 +118,35 @@ const createReleaseRouter = (
     '/calculate',
     authFilters.write,
     wrapAsync(async (req, res) => {
-      const release = await calculateRelease();
-      const output = await getReleaseDetails(release);
-      return res.status(200).json(output);
+      logger.info(`Attempting to begin calculating release...`);
+      const {
+        release,
+        previousState,
+        message,
+        updated,
+      } = await releaseDataService.beginCalculatingActiveRelease();
+      if (updated) {
+        logger.info(`Release set to calculating...`);
+        const releaseSummary = getShortReleaseResponse(release);
+        res.status(200).json({ message, previousState, release: releaseSummary });
+
+        // The work to be done:
+        calculateRelease();
+      } else {
+        logger.warn(`Unable to calculate release: ${message}`);
+        res.status(400).json({ error: message });
+      }
     }),
   );
 
   /**
    * Build Release
-   * Create new public release indices for each program. Does not attach to alias, that is done by Publish.
+   * Attempt to initiate build process then return confirmation of state change
+   * Build process will:
+   * Create new public release indices for each program.
+   * TODO: update files that are already public
+   * Save snapshot of release.
+   * Does not attach new indices to file centric alias, that is done by Publish.
    */
   router.post(
     '/build/:version/:label',
@@ -120,19 +159,35 @@ const createReleaseRouter = (
       if (!label) {
         return res.status(400).json({ error: `Missing path parameter: label` });
       }
-      const validationResult = await validateActiveAuthVersion(version);
+      const validationResult = await validateActiveReleaseVersion(version);
       if (!validationResult.success) {
         return res.status(400).json({ error: validationResult.error });
       }
 
-      const builtRelease = await buildActiveRelease(label);
+      logger.info(`Attempting to begin building release...`);
+      const {
+        release,
+        previousState,
+        message,
+        updated,
+      } = await releaseDataService.beginBuildingActiveRelease();
+      if (updated) {
+        logger.info(`Release set to building...`);
+        const releaseSummary = await getShortReleaseResponse(release);
+        res.status(200).json({ message, previousState, release: releaseSummary });
 
-      return res.status(200).json(builtRelease);
+        // The work to be done:
+        buildActiveRelease(label);
+      } else {
+        logger.warn(`Unable to build release: ${message}`);
+        res.status(400).json({ error: message });
+      }
     }),
   );
 
   /**
    * Publish Release
+   * For files added to public, remove from restricted indices
    * Attach built public indices to the file centric alias
    */
   router.post(
@@ -143,16 +198,55 @@ const createReleaseRouter = (
       if (!version) {
         return res.status(400).json({ error: `Missing path parameter: version` });
       }
-      const validationResult = await validateActiveAuthVersion(version);
+      const validationResult = await validateActiveReleaseVersion(version);
       if (!validationResult.success) {
         return res.status(400).json({ error: validationResult.error });
       }
 
-      const publishedRelease = await publishActiveRelease();
+      logger.info(`Attempting to begin publishing release...`);
+      const {
+        release,
+        previousState,
+        message,
+        updated,
+      } = await releaseDataService.beginPublishingActiveRelease();
+      if (updated) {
+        logger.info(`Release set to publishing...`);
+        const releaseSummary = await getShortReleaseResponse(release);
+        res.status(200).json({ message, previousState, release: releaseSummary });
 
-      return res.status(200).json(publishedRelease);
+        // The work to be done:
+        publishActiveRelease();
+      } else {
+        logger.warn(`Unable to publish release: ${message}`);
+        res.status(400).json({ error: message });
+      }
     }),
   );
+
+  /**
+   * Get Releases
+   * Provides list of releases stored in DB, includes:
+   *  - their status
+   *  - creation and publish date
+   *  - release count summary (files, analyses, donors per program)
+   *
+   * NOTE: Must be added to the router LAST so that all the other paths don't get swallowed by the :id parameter.
+   */
+  router.get(
+    '/:id',
+    authFilters.read,
+    wrapAsync(async (req, res) => {
+      const { id } = req.params;
+      const release = await releaseDataService.getReleaseById(id);
+      if (!release) {
+        return res.status(404).send();
+      }
+      const output = await getReleaseResponse(release);
+      return res.status(200).json(output);
+    }),
+  );
+
   return router;
 };
 
@@ -167,24 +261,35 @@ type ReleaseCounts = {
   removed: number;
 };
 
-// Release Summary is the short version,
-//  it shows limited details of a release. Lists of files are reduced to number of files.
-type ReleaseSummary = {
+/**
+ * ShortReleaseSummary is a concise recap of a release, used in the GET / (list of releases) endpoint
+ * it shows limited details of a release. Lists of files are reduced to number of files.
+ */
+type ShortReleaseSummary = {
   id: string;
   state: string;
-  version: string;
+  error?: string;
+  version?: string;
   label?: string;
-  calculatedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
   publishedAt?: Date;
   files: ReleaseCounts;
 };
-function summarizeRelease(release: Release): ReleaseSummary {
+function getShortReleaseResponse(release: Release): ShortReleaseSummary {
+  /**
+   * TODO: simplify this with omit - dont want to change too much at once, but we can do this
+   *
+   * return {...omit(release, ['_id', 'filesKept', 'filesAdded', 'filesRemoved']), id: release._id, files: {file stuff}}
+   */
   return {
     id: release._id,
     state: release.state,
+    error: release.error,
     version: release.version,
     label: release.label,
     calculatedAt: release.calculatedAt,
+    builtAt: release.builtAt,
     publishedAt: release.publishedAt,
     files: {
       kept: release.filesKept.length,
@@ -196,20 +301,22 @@ function summarizeRelease(release: Release): ReleaseSummary {
 
 /**
  * Release Details
- * Shows the expanded release counts by program and donor
+ * Shows the expanded release counts by program and donor.
+ * Used for all responses that return a single release.
  */
 interface ProgramDetails {
   program: string;
   files: ReleaseCounts;
   donors: ReleaseCounts;
 }
-type ReleaseDetails = {
+type ReleaseSummary = {
   id: string;
   state: string;
-  version: string;
+  version?: string;
   label?: string;
   snapshot?: string;
-  calculatedAt: Date;
+  calculatedAt?: Date;
+  builtAt?: Date;
   publishedAt?: Date;
   programs: ProgramDetails[];
   totals: { files: ReleaseCounts; donors: ReleaseCounts };
@@ -264,10 +371,7 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
   }
   return output;
 }
-
-async function getReleaseDetails(release: Release): Promise<ReleaseDetails> {
-  const { state, version, label, snapshot, calculatedAt, publishedAt } = release;
-
+async function getReleaseResponse(release: Release): Promise<ReleaseSummary> {
   // We need to get the donor and program details of our files
   const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
   const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
@@ -286,22 +390,11 @@ async function getReleaseDetails(release: Release): Promise<ReleaseDetails> {
     },
   };
   const programs = summarizePrograms(filesKept, filesAdded, filesRemoved);
-  const details: ReleaseDetails = {
+  const details: ReleaseSummary = {
     id: release._id,
-    state,
-    version,
-    calculatedAt,
+    ...omit(release, ['_id', 'filesKept', 'filesAdded', 'filesRemoved']),
     totals,
     programs,
   };
-  if (label) {
-    details.label = label;
-  }
-  if (snapshot) {
-    details.snapshot = snapshot;
-  }
-  if (publishedAt) {
-    details.publishedAt = publishedAt;
-  }
   return details;
 }

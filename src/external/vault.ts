@@ -19,7 +19,8 @@
 
 import vault from 'node-vault';
 import { promises } from 'fs';
-import logger from '../logger';
+import Logger from '../logger';
+const logger = Logger('Vault');
 
 let vaultClient: vault.client;
 
@@ -59,7 +60,7 @@ async function login() {
   });
 
   const clientToken = response.auth.client_token as string;
-  console.log(`login successful, token length: ${clientToken.length}`);
+  console.log(`Login successful, token length: ${clientToken.length}`);
 }
 
 export async function loadSecret(key: string) {
@@ -68,6 +69,6 @@ export async function loadSecret(key: string) {
   }
 
   const result = await vaultClient.read(key);
-  console.log(`loaded Secret ${key}`);
+  console.log(`Loaded Secret ${key}`);
   return result.data;
 }

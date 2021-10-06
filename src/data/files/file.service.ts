@@ -32,7 +32,8 @@ import {
   FilesResponse,
 } from './file.model';
 import * as fileModel from './file.model';
-import logger from '../../logger';
+import Logger from '../../logger';
+const logger = Logger('File.DataService');
 
 export async function getFilesQuery(
   paginationFilter: PaginationFilter,

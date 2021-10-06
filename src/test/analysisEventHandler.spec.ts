@@ -21,7 +21,6 @@ import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
 import { AnalysisUpdateEvent } from '../external/kafka';
-import analysisEventHandler from '../services/analysisEventHandler';
 import nock from 'nock';
 import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';

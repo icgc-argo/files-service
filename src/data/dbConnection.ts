@@ -19,8 +19,9 @@
 
 import { AppConfig, getAppConfig } from '../config';
 import mongoose from 'mongoose';
-import logger from '../logger';
+import Logger from '../logger';
 import Status from '../types/Status';
+const logger = Logger('DBConnection');
 
 export const connectDb = async (appConfig: AppConfig) => {
   /** Mongoose setup */

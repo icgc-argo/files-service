@@ -37,9 +37,10 @@
 
 import fetch from 'node-fetch';
 import { getAppConfig } from '../config';
-import logger from '../logger';
+import Logger from '../logger';
+const logger = Logger('AnalysisConverter');
 
-export type FilePartialDocument = { [k: string]: any } & {
+export type RdpcFileDocument = { [k: string]: any } & {
   objectId: string;
   studyId: string;
   repositories: { [k: string]: string }[];
@@ -55,15 +56,15 @@ export type FilePartialDocument = { [k: string]: any } & {
 export async function convertAnalysesToFileDocuments(
   analyses: any[],
   repoCode: string,
-): Promise<FilePartialDocument[]> {
+): Promise<RdpcFileDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
   if (!url) {
-    throw new Error('[AnalysisConverter] URL is not provided in configuration');
+    throw new Error('URL is not provided in configuration');
   }
 
-  logger.debug(`[AnalysisConverter] Requesting analyses-to-file conversion from: ${url}`);
+  logger.debug(`Requesting analyses-to-file conversion from: ${url}`);
   const result = await fetch(url, {
     body: JSON.stringify({ analyses, repoCode }),
     method: 'POST',
@@ -71,19 +72,17 @@ export async function convertAnalysesToFileDocuments(
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {
-    logger.error(`[AnalysisConverter] Error response from converter: ${await result.text()}`);
-    throw new Error(`[AnalysisConverter] Failed to convert files, got response ${result.status}`);
+    logger.error(`Error response from converter: ${await result.text()}`);
+    throw new Error(`Failed to convert files, got response ${result.status}`);
   }
 
   const response: {
-    [k: string]: FilePartialDocument[];
+    [k: string]: RdpcFileDocument[];
   } = await result.json();
-  logger.debug(
-    `[AnalysisConverter] Conversion response received with ${Object.keys(response).length} files`,
-  );
+  logger.debug(`Conversion response received with ${Object.keys(response).length} files`);
 
   // Convert the Analysis response (StringMap of FileCentricDocuments)
-  let files: FilePartialDocument[] = [];
+  let files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response
   Object.keys(response).forEach((a: string) => {

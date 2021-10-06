@@ -37,6 +37,11 @@ export interface DataCenter {
   type: string;
 }
 
+/**
+ * TODO: This needs to call out to data center registry. Currently hardcoded response.
+ * @param dataCenterId
+ * @returns
+ */
 export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> => {
   const url = (await getAppConfig()).datacenter.url;
 
