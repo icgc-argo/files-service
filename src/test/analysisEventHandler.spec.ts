@@ -278,6 +278,7 @@ const convertedAnalysisResponse = {
 };
 
 const analysisEvent: AnalysisUpdateEvent = {
+  analysisId: '11d1cf85-4d3d-4aea-91cf-854d3deaea1d',
   songServerId: 'song.collabz',
   action: 'PUBLISH',
   state: 'PUBLISHED',
