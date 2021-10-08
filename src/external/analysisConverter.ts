@@ -35,10 +35,16 @@
  *
  */
 
+import PromisePool from '@supercharge/promise-pool';
 import fetch from 'node-fetch';
+
+import { SongAnalysis } from './song';
+
 import { getAppConfig } from '../config';
 import Logger from '../logger';
 const logger = Logger('AnalysisConverter');
+
+const CONVERTER_CONCURRENT_REQUESTS = 5;
 
 export type RdpcFileDocument = { [k: string]: any } & {
   objectId: string;
@@ -54,40 +60,56 @@ export type RdpcFileDocument = { [k: string]: any } & {
  * @returns
  */
 export async function convertAnalysesToFileDocuments(
-  analyses: any[],
+  analyses: SongAnalysis[],
+  repoCode: string,
+): Promise<RdpcFileDocument[]> {
+  const output: RdpcFileDocument[] = [];
+
+  // Can't send hundreds of analyses in a single request, so this is simplified to 1 at a time to gaurantee success.
+  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+    .for(analyses)
+    .process(async analysis => {
+      const files = await convertAnalysisFileDocuments(analysis, repoCode);
+      output.push(...files);
+    });
+  return output;
+}
+
+export async function convertAnalysisFileDocuments(
+  analysis: SongAnalysis,
   repoCode: string,
 ): Promise<RdpcFileDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
-  if (!url) {
-    throw new Error('URL is not provided in configuration');
-  }
 
-  logger.debug(`Requesting analyses-to-file conversion from: ${url}`);
+  logger.debug(`Requesting analysis-to-file conversion for ${analysis.analysisId}`);
+
   const result = await fetch(url, {
-    body: JSON.stringify({ analyses, repoCode }),
+    body: JSON.stringify({ analyses: [analysis], repoCode }),
     method: 'POST',
     timeout: timeout,
     headers: { 'Content-Type': 'application/json' },
   });
   if (result.status != 201) {
     logger.error(`Error response from converter: ${await result.text()}`);
-    throw new Error(`Failed to convert files, got response ${result.status}`);
+    throw new Error(
+      `Failed to convert analysis ${analysis.analysisId} to files, got response ${result.status}`,
+    );
   }
 
   const response: {
     [k: string]: RdpcFileDocument[];
   } = await result.json();
-  logger.debug(`Conversion response received with ${Object.keys(response).length} files`);
-
   // Convert the Analysis response (StringMap of FileCentricDocuments)
-  let files: RdpcFileDocument[] = [];
+  const files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response
   Object.keys(response).forEach((a: string) => {
-    files = files.concat(response[a]);
+    files.push(...response[a]);
   });
+
+  logger.debug(`Retrieved ${files.length} files for ${analysis.analysisId}`);
 
   return files;
 }

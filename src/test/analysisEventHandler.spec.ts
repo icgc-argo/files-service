@@ -17,7 +17,6 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
 import { AnalysisUpdateEvent } from '../external/kafka';

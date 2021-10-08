@@ -32,7 +32,10 @@
 import _ from 'lodash';
 
 import { File, FileInput, EmbargoStage, FileReleaseState } from '../data/files';
-import { convertAnalysesToFileDocuments, RdpcFileDocument } from '../external/analysisConverter';
+import * as maestro from '../external/analysisConverter';
+import { RdpcFileDocument } from '../external/analysisConverter';
+import * as song from '../external/song';
+import { SongAnalysis } from '../external/song';
 
 import * as fileService from '../data/files';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
@@ -40,10 +43,7 @@ import { getEmbargoStage } from './embargo';
 import { Indexer } from './indexer';
 import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
-import { getAnalysesById } from '../external/song';
-import { streamToAsyncGenerator } from '../utils/streamToAsync';
-import PromisePool from '@supercharge/promise-pool';
-import { STATES } from 'mongoose';
+import PromisePool from '@supercharge/promise-pool/dist';
 import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('FileManager');
 
@@ -184,7 +184,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
   // For each data center, group into programs
   for (const dataCenterId in dataCenters) {
     // Collect analyses payloads from this data center
-    const retrievedAnalyses: any[] = [];
+    const retrievedAnalyses: SongAnalysis[] = [];
 
     const dcFiles = dataCenters[dataCenterId];
     const dcData = await getDataCenter(dataCenterId);
@@ -204,17 +204,17 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
       await PromisePool.withConcurrency(10)
         .for(analyses)
         .process(async analysisId => {
-          const analysis = await getAnalysesById(dcUrl, programId, analysisId);
+          const analysis = await song.getAnalysesById(dcUrl, programId, analysisId);
           retrievedAnalyses.push(analysis);
         });
     }
     // convert analyses documents to rdpcFileDocs
-    const rdpcFiles = await convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
+    const rdpcFiles = await maestro.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
     // Filter files to only include the ones requested for updates:
     const dcFileIds = dcFiles.map(file => file.objectId);
     const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
-    logger.debug(`Successfully retrieved ${filteredFiles.length} files from ${dataCenterId}}`);
+    logger.debug(`Successfully retrieved ${filteredFiles.length} files from ${dataCenterId}`);
     output.push({ dataCenterId, files: filteredFiles });
   }
 

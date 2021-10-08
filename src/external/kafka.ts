@@ -18,8 +18,9 @@
  */
 
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { AppConfig } from '../config';
 import retry from 'async-retry';
+import { AppConfig } from '../config';
+import { SongAnalysis } from './song';
 import analysisEventProcessor from '../services/processAnalysisEvent';
 import { PublicReleaseMessage } from 'kafkaMessages';
 import { ANALYSIS_STATE } from '../utils/constants';
@@ -32,7 +33,7 @@ export type AnalysisUpdateEvent = {
   state: string; // PUBLISHED, UNPUBLISHED, SUPPRESSED -> maybe more in the future so leaving this as string
   action: string; // PUBLISH, UNPUBLISH, SUPPRESS, CREATE -> future might add UPDATED
   songServerId: string;
-  analysis: { [k: string]: any; analysisId: string };
+  analysis: SongAnalysis;
 };
 
 let analysisUpdatesConsumer: Consumer | undefined;
