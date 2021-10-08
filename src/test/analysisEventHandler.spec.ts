@@ -17,7 +17,6 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { expect } from 'chai';
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
 import { AnalysisUpdateEvent } from '../external/kafka';
@@ -278,7 +277,11 @@ const convertedAnalysisResponse = {
 };
 
 const analysisEvent: AnalysisUpdateEvent = {
+  analysisId: '11d1cf85-4d3d-4aea-91cf-854d3deaea1d',
   songServerId: 'song.collabz',
+  action: 'PUBLISH',
+  state: 'PUBLISHED',
+  studyId: 'TEST-CA',
   analysis: {
     analysisId: '11d1cf85-4d3d-4aea-91cf-854d3deaea1d',
     studyId: 'TEST-CA',

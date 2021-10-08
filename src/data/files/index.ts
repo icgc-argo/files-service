@@ -18,6 +18,7 @@ export {
   deleteAll,
   getFilesQuery,
   getFiles,
+  getFilesFromAnalysisId,
   getFilesFromObjectIds,
   getFileById,
   getFileByObjId,
