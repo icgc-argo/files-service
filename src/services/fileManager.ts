@@ -42,7 +42,7 @@ import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getAnalysesById } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
-import PromisePool from '@supercharge/promise-pool/dist';
+import PromisePool from '@supercharge/promise-pool';
 import { STATES } from 'mongoose';
 import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('FileManager');
