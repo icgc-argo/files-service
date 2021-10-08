@@ -155,23 +155,39 @@ export async function buildActiveRelease(label: string): Promise<void> {
     const expectedPublicFiles = filesAdded.concat(filesKept);
     const fileCentricDocs = await fileManager.fetchFileUpdatesFromDataCenter(expectedPublicFiles);
 
+    if (fileCentricDocs.length < expectedPublicFiles.length) {
+      const retrievedFileIds = fileCentricDocs.map(file => file.objectId);
+      const missingFileIds = expectedPublicFiles
+        .filter(file => !retrievedFileIds.includes(file.objectId))
+        .map(file => file.objectId);
+      logger.error(
+        `Some of the expected files to publish were discovered as no longer PUBLIC in the DataCenter: ${missingFileIds}`,
+      );
+      throw new Error(
+        `Some files expected in the release were not retrieved when fetching data to buld the Public Index. \
+Try re-running the Calculate step to update the release plan and seeing if the counts change. \
+The objectIDs of the files not retrieved are: ${missingFileIds}`,
+      );
+    }
+
     // 3b. Check if any of the files expected in our public release have been unpublished.
     const publishedFileCentricDocs = fileCentricDocs.filter(
       doc => doc.analysis.analysisState === 'PUBLISHED',
     );
 
     if (publishedFileCentricDocs.length < expectedPublicFiles.length) {
-      const expectedFileIds = expectedPublicFiles.map(file => file.objectId);
-      const missingFileIds = publishedFileCentricDocs.filter(
-        file => !expectedFileIds.includes(file.objectId),
-      );
+      const publishedFileIds = publishedFileCentricDocs.map(file => file.objectId);
+
+      const missingFileIds = expectedPublicFiles
+        .filter(file => !publishedFileIds.includes(file.objectId))
+        .map(file => file.objectId);
       logger.error(
         `Some of the expected files to publish were discovered as no longer PUBLIC in the DataCenter: ${missingFileIds}`,
       );
       throw new Error(
-        `Some files expected in the release are no longer PUBLISHED in their data center. \
-        Re-run the Calculate step to update the release plan. \
-        The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
+        `Some files expected in the release were are no longer PUBLISHED in song. \
+Re-run Calculate step to update the release plan based on this data. \
+The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
       );
     }
 

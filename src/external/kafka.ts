@@ -18,16 +18,17 @@
  */
 
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { AppConfig } from '../config';
 import retry from 'async-retry';
+import { AppConfig } from '../config';
+import { SongAnalysis } from './song';
 import analysisEventProcessor from '../services/processAnalysisEvent';
+import { PublicReleaseMessage } from 'kafkaMessages';
 import Logger from '../logger';
 const logger = Logger('Kafka');
-import { PublicReleaseMessage } from 'kafkaMessages';
 
 export type AnalysisUpdateEvent = {
   songServerId: string;
-  analysis: { [k: string]: any };
+  analysis: SongAnalysis;
 };
 
 let analysisUpdatesConsumer: Consumer | undefined;
