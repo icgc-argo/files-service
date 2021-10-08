@@ -37,7 +37,7 @@ import Logger from '../logger';
 import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('ReleaseManager');
 
-function toFileId(file: File) {
+function toObjectId(file: File) {
   return file.objectId;
 }
 
@@ -58,13 +58,22 @@ export async function calculateRelease(): Promise<void> {
     const queuedFiles = await fileService.getFilesByState({
       releaseState: FileReleaseState.QUEUED,
     });
-    const kept = publicFiles.filter(file => file.status === ANALYSIS_STATE.PUBLISHED).map(toFileId);
+
     const added = queuedFiles
       .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
-      .map(toFileId);
-    const removed = publicFiles
+      .map(toObjectId);
+
+    // Find removed files - unpublished in song or demoted in file manager.
+    const unpublished = publicFiles
       .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
-      .map(toFileId);
+      .map(toObjectId);
+    const demoted = publicFiles
+      .filter(file => file.adminDemote && file.adminDemote !== EmbargoStage.PUBLIC)
+      .map(toObjectId);
+    const removed = unpublished.concat(demoted);
+
+    // Keep all those that are not removed
+    const kept = publicFiles.filter(file => !removed.includes(file.objectId)).map(toObjectId);
 
     await releaseService.updateActiveReleaseFiles({
       kept,
@@ -251,7 +260,10 @@ export async function publishActiveRelease(): Promise<void> {
     logger.debug(`${filesAdded.length} Files removed from restricted index`);
 
     // 2. Removed files
-    // 2a. Get updated file data from Data Centers
+    // Need to get the latest data on all of the removed files so they can be inserted into restricted indices
+    // so first data is fetched from RDPCs, then those files that are not PUBLISHED are filtered out since they shouldn't be indexed
+
+    // 2a. Get updated file data from Data Centers and update DB to match
     const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(filesRemoved);
 
     // 2b. Filter out files being removed because they are not PUBLISHED in data center

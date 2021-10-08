@@ -225,6 +225,8 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
  * Given a list of files from the DB, fetch the latest data from their data center
  * The DB will be updated with changes retrieved, and then documents will be prepared for indexing
  *
+ * This will recalculate their embargo stage and release status and set this in the DB
+ *
  * Note that the updates will include UNPUBLISHED and SUPPRESSED files, so they need to be filtered by state before indexing.
  * @param files
  * @returns
