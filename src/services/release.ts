@@ -161,7 +161,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
         .filter(file => !retrievedFileIds.includes(file.objectId))
         .map(file => file.objectId);
       logger.error(
-        `Some of the expected files to publish were discovered as no longer PUBLIC in the DataCenter: ${missingFileIds}`,
+        `Some of the expected files to publish were discovered as no longer PUBLISHED in the DataCenter: ${missingFileIds}`,
       );
       throw new Error(
         `Some files expected in the release were not retrieved when fetching data to buld the Public Index. \
