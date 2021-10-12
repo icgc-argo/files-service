@@ -37,7 +37,7 @@ import Logger from '../logger';
 import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('ReleaseManager');
 
-function toFileId(file: File) {
+function toObjectId(file: File) {
   return file.objectId;
 }
 
@@ -58,13 +58,22 @@ export async function calculateRelease(): Promise<void> {
     const queuedFiles = await fileService.getFilesByState({
       releaseState: FileReleaseState.QUEUED,
     });
-    const kept = publicFiles.filter(file => file.status === ANALYSIS_STATE.PUBLISHED).map(toFileId);
+
     const added = queuedFiles
       .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
-      .map(toFileId);
-    const removed = publicFiles
+      .map(toObjectId);
+
+    // Find removed files - unpublished in song or demoted in file manager.
+    const unpublished = publicFiles
       .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
-      .map(toFileId);
+      .map(toObjectId);
+    const demoted = publicFiles
+      .filter(file => file.adminDemote && file.adminDemote !== EmbargoStage.PUBLIC)
+      .map(toObjectId);
+    const removed = unpublished.concat(demoted);
+
+    // Keep all those that are not removed
+    const kept = publicFiles.filter(file => !removed.includes(file.objectId)).map(toObjectId);
 
     await releaseService.updateActiveReleaseFiles({
       kept,
@@ -155,23 +164,39 @@ export async function buildActiveRelease(label: string): Promise<void> {
     const expectedPublicFiles = filesAdded.concat(filesKept);
     const fileCentricDocs = await fileManager.fetchFileUpdatesFromDataCenter(expectedPublicFiles);
 
+    if (fileCentricDocs.length < expectedPublicFiles.length) {
+      const retrievedFileIds = fileCentricDocs.map(file => file.objectId);
+      const missingFileIds = expectedPublicFiles
+        .filter(file => !retrievedFileIds.includes(file.objectId))
+        .map(file => file.objectId);
+      logger.error(
+        `Some of the expected files to publish were discovered as no longer PUBLISHED in the DataCenter: ${missingFileIds}`,
+      );
+      throw new Error(
+        `Some files expected in the release were not retrieved when fetching data to buld the Public Index. \
+Try re-running the Calculate step to update the release plan and seeing if the counts change. \
+The objectIDs of the files not retrieved are: ${missingFileIds}`,
+      );
+    }
+
     // 3b. Check if any of the files expected in our public release have been unpublished.
     const publishedFileCentricDocs = fileCentricDocs.filter(
       doc => doc.analysis.analysisState === 'PUBLISHED',
     );
 
     if (publishedFileCentricDocs.length < expectedPublicFiles.length) {
-      const expectedFileIds = expectedPublicFiles.map(file => file.objectId);
-      const missingFileIds = publishedFileCentricDocs.filter(
-        file => !expectedFileIds.includes(file.objectId),
-      );
+      const publishedFileIds = publishedFileCentricDocs.map(file => file.objectId);
+
+      const missingFileIds = expectedPublicFiles
+        .filter(file => !publishedFileIds.includes(file.objectId))
+        .map(file => file.objectId);
       logger.error(
         `Some of the expected files to publish were discovered as no longer PUBLIC in the DataCenter: ${missingFileIds}`,
       );
       throw new Error(
-        `Some files expected in the release are no longer PUBLISHED in their data center. \
-        Re-run the Calculate step to update the release plan. \
-        The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
+        `Some files expected in the release were are no longer PUBLISHED in song. \
+Re-run Calculate step to update the release plan based on this data. \
+The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
       );
     }
 
@@ -235,7 +260,10 @@ export async function publishActiveRelease(): Promise<void> {
     logger.debug(`${filesAdded.length} Files removed from restricted index`);
 
     // 2. Removed files
-    // 2a. Get updated file data from Data Centers
+    // Need to get the latest data on all of the removed files so they can be inserted into restricted indices
+    // so first data is fetched from RDPCs, then those files that are not PUBLISHED are filtered out since they shouldn't be indexed
+
+    // 2a. Get updated file data from Data Centers and update DB to match
     const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(filesRemoved);
 
     // 2b. Filter out files being removed because they are not PUBLISHED in data center

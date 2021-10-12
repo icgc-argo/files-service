@@ -28,10 +28,7 @@ import { getAppConfig } from '../config';
 import Logger from '../logger';
 const logger = Logger('Song');
 
-type SongAnalysis = { [k: string]: any } & {
-  analysisId: 'string';
-  analysisState: 'string';
-};
+export type SongAnalysis = { [k: string]: any; analysisId: string; analysisState: string };
 
 export const getStudies = async (url: string) => {
   const studiesUrl = urljoin(url, '/studies/all');

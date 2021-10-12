@@ -57,6 +57,10 @@ export async function getFilesQuery(
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);
 }
+export async function getFilesFromAnalysisId(analysisId: string): Promise<File[]> {
+  const results = await fileModel.getFiles({ include: { analyses: [analysisId] } });
+  return results.map(toPojo);
+}
 export async function getFilesFromObjectIds(objectIds: string[]): Promise<File[]> {
   const results = objectIds.length ? await fileModel.getFiles({ include: { objectIds } }) : [];
   return results.map(toPojo);
