@@ -80,26 +80,25 @@ const getEmbargoStageForPublishDate = (firstPublishedAt?: Date): EmbargoStage =>
  * @param dbFile
  */
 export const getEmbargoStage = (dbFile: File): EmbargoStage => {
-  logger.debug(`${dbFile.fileId}: Recalculating embargo stage`);
-
-  // a releaseState of PUBLIC means this is already public, return EmbargoStage of PUBLIC
-  if (dbFile.releaseState === FileReleaseState.PUBLIC) {
-    logger.debug(`${dbFile.fileId}: File is already public.`);
-    return EmbargoStage.PUBLIC;
-  }
+  logger.debug('getEmbargoStage()', dbFile.fileId, 'Recalculating embargo stage');
+  let calculatedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
 
   // if adminHold is true then no change from the dbFile
   if (dbFile.adminHold) {
     logger.debug(
-      `${dbFile.fileId}: File has admin hold. Returning current stage: ${dbFile.embargoStage}`,
+      'getEmbargoStage()',
+      dbFile.fileId,
+      'File has admin hold. Returning current stage',
+      dbFile.embargoStage,
     );
     return dbFile.embargoStage;
   }
 
   // get the expected embarge stage from the publish date
-  let calculatedStage = getEmbargoStageForPublishDate(dbFile.firstPublished);
   logger.debug(
-    `${dbFile.fileId}: Based on a published date of ${dbFile.firstPublished} the calculated embargo stage is: ${calculatedStage}`,
+    'getEmbargoStage()',
+    dbFile.fileId,
+    `Based on a published date of ${dbFile.firstPublished} the calculated embargo stage is: ${calculatedStage}`,
   );
 
   // modify this with any promote, limit, and hold rules on the file
@@ -110,7 +109,9 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
         ? dbFile.adminPromote
         : calculatedStage;
     logger.debug(
-      `${dbFile.fileId}: File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
+      'getEmbargoStage()',
+      dbFile.fileId,
+      `File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
     );
   }
   if (dbFile.adminDemote) {
@@ -121,9 +122,11 @@ export const getEmbargoStage = (dbFile: File): EmbargoStage => {
         ? dbFile.adminDemote
         : calculatedStage;
     logger.debug(
-      `${dbFile.fileId}: File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
+      'getEmbargoStage()',
+      dbFile.fileId,
+      `File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
     );
   }
-  logger.debug(`${dbFile.fileId}: Returning embargo stage: ${calculatedStage}`);
+  logger.debug('getEmbargoStage()', dbFile.fileId, `Returning embargo stage: ${calculatedStage}`);
   return calculatedStage;
 };

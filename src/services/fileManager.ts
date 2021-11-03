@@ -134,13 +134,21 @@ export async function saveAndIndexFilesFromRdpcData(
 
 export async function recalculateFileState(file: File) {
   // If the file is not already released, lets update its embargo stage
-  const updates: any = {};
+  const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   const embargoStage = getEmbargoStage(file);
   if (file.releaseState === FileReleaseState.PUBLIC) {
     if (embargoStage !== EmbargoStage.PUBLIC) {
       // A currently public file has been calculated as needing to be restricted
       // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
-      updates.embargoStage = embargoStage;
+      logger.debug(
+        'recalculateFileState()',
+        file.fileId,
+        'PUBLIC file embargo calculated to be',
+        embargoStage,
+        'Setting release state to',
+        FileReleaseState.QUEUE_TO_RESTRICTED,
+      );
+      updates.releaseState = FileReleaseState.QUEUE_TO_RESTRICTED;
     }
   } else {
     // If this file is ready for PUBLIC access:
@@ -148,7 +156,7 @@ export async function recalculateFileState(file: File) {
     //  - set the release state to queued
     if (embargoStage === EmbargoStage.PUBLIC) {
       updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-      updates.releaseState = FileReleaseState.QUEUED;
+      updates.releaseState = FileReleaseState.QUEUE_TO_PUBLIC;
     } else {
       updates.embargoStage = embargoStage;
       updates.releaseState = FileReleaseState.RESTRICTED;
