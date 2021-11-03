@@ -43,7 +43,7 @@ if (process.env.NODE_ENV !== 'production') {
 export default (service: string) => {
   const buildServiceMessage = (...messages: (string | object)[]) => {
     const strings: string[] = messages.map(m => (typeof m === 'object' ? JSON.stringify(m) : m));
-    return `[${service}] ${strings.join(' ; ')}`;
+    return `[${service}] ${strings.join(' - ')}`;
   };
   return {
     debug: (...messages: (string | object)[]) => logger.debug(buildServiceMessage(...messages)),

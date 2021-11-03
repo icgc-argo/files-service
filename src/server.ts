@@ -72,10 +72,15 @@ let kafkaConnections: Promise<{
   const app = App(appConfig);
   server = app.listen(app.get('port'), () => {
     serverLog.info(
-      `App is running at http://localhost:${app.get('port')} in ${app.get('env')} mode`,
+      `Server started in ${app.get('env')} mode`,
+      `Listening to port ${app.get('port')}`,
     );
-    serverLog.info(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
-    serverLog.info('Press CTRL-C to stop');
+    if (!appConfig.auth.enabled) {
+      serverLog.warn(`Application running with AUTH DISABLED!`);
+    }
+    // serverLog.warn
+    serverLog.debug(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
+    serverLog.debug('Press CTRL-C to stop');
   });
 
   if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
