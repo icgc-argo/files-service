@@ -41,11 +41,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export default (service: string) => {
-  const buildServiceMessage = (message: string) => `[${service}] ${message}`;
+  const buildServiceMessage = (...messages: (string | object)[]) => {
+    const strings: string[] = messages.map(m => (typeof m === 'object' ? JSON.stringify(m) : m));
+    return `[${service}] ${strings.join(' - ')}`;
+  };
   return {
-    debug: (message: string, ...meta: any[]) => logger.debug(buildServiceMessage(message), ...meta),
-    info: (message: string, ...meta: any[]) => logger.info(buildServiceMessage(message), ...meta),
-    warn: (message: string, ...meta: any[]) => logger.warn(buildServiceMessage(message), ...meta),
-    error: (message: string, ...meta: any[]) => logger.error(buildServiceMessage(message), ...meta),
+    debug: (...messages: (string | object)[]) => logger.debug(buildServiceMessage(...messages)),
+    info: (...messages: (string | object)[]) => logger.info(buildServiceMessage(...messages)),
+    warn: (...messages: (string | object)[]) => logger.warn(buildServiceMessage(...messages)),
+    error: (...messages: (string | object)[]) => logger.error(buildServiceMessage(...messages)),
   };
 };

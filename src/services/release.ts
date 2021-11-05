@@ -55,21 +55,22 @@ export async function calculateRelease(): Promise<void> {
     const publicFiles = await fileService.getFilesByState({
       releaseState: FileReleaseState.PUBLIC,
     });
-    const queuedFiles = await fileService.getFilesByState({
-      releaseState: FileReleaseState.QUEUED,
+    const queuedToPublicFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.QUEUE_TO_PUBLIC,
+    });
+    const queuedToRestrictedFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.QUEUE_TO_RESTRICTED,
     });
 
-    const added = queuedFiles
+    const added = queuedToPublicFiles
       .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
       .map(toObjectId);
 
-    // Find removed files - unpublished in song or demoted in file manager.
+    // Find removed files - combined those queued to restricted and those no longer published in song
     const unpublished = publicFiles
       .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
       .map(toObjectId);
-    const demoted = publicFiles
-      .filter(file => file.adminDemote && file.adminDemote !== EmbargoStage.PUBLIC)
-      .map(toObjectId);
+    const demoted = queuedToRestrictedFiles.map(toObjectId);
     const removed = unpublished.concat(demoted);
 
     // Keep all those that are not removed
@@ -84,7 +85,7 @@ export async function calculateRelease(): Promise<void> {
     logger.info(`Finishing release calculation!`);
     const { updated, message } = await releaseService.finishCalculatingActiveRelease();
     if (!updated) {
-      logger.error(`Unable to set release to Calculated: ${message}`);
+      logger.error(`Unable to set release to Calculated`, message);
       throw new Error('Release expected to be set as calculated but was in the wrong state.');
     }
   } catch (e) {
@@ -272,7 +273,7 @@ export async function publishActiveRelease(): Promise<void> {
     );
 
     //  2c. Add file data to restricted index
-    indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
+    await indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
 
     // 3. Release all indices (public and restricted)
     await indexer.release({ publicRelease: true, indices: release.indices });
@@ -300,7 +301,7 @@ export async function publishActiveRelease(): Promise<void> {
       const kafkaMessage = buildKafkaMessage(release, filesAdded, filesRemoved);
       sendPublicReleaseMessage(kafkaMessage);
     } else {
-      logger.error(`Unable to set release to published: ${message}`);
+      logger.error(`Unable to set release to published`, message);
       throw new Error('Release expected to be set as published but was in the wrong state.');
     }
   } catch (e) {

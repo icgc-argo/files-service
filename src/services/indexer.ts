@@ -191,26 +191,14 @@ export const getIndexer = async (): Promise<Indexer> => {
     }
 
     // TODO: config for max simultaneous release?
-    // release indices tracked in nextIndices
+    // release indices tracked in nextIndices and requested in options.additionalIndices
     await PromisePool.withConcurrency(5)
-      .for(toRelease)
+      .for(toRelease.concat(additionalIndices.map(getIndexFromIndexName)))
       .handleError((error, index) => {
         logger.error(`Failed to release index: ${index.indexName}`);
       })
       .process(async index => {
         logger.info(`[Indexer] Releasing index to file alias: ${index.indexName}`);
-        await rollcall.release(index);
-      });
-
-    // release indices requested in options.additionalIndices
-    await PromisePool.withConcurrency(5)
-      .for(additionalIndices)
-      .handleError((error, indexName) => {
-        logger.error(`Failed to release index: ${indexName}`);
-      })
-      .process(async indexName => {
-        logger.debug(`[Indexer] Releasing index to file alias: ${indexName}`);
-        const index = getIndexFromIndexName(indexName);
         await rollcall.release(index);
       });
 

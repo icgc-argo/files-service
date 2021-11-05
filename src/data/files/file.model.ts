@@ -38,8 +38,9 @@ export enum EmbargoStage {
 
 export enum FileReleaseState {
   RESTRICTED = 'RESTRICTED',
-  QUEUED = 'QUEUED',
+  QUEUE_TO_PUBLIC = 'QUEUED',
   PUBLIC = 'PUBLIC',
+  QUEUE_TO_RESTRICTED = 'QUEUED_TO_RESTRICT',
 }
 
 export type FileLabel = {
