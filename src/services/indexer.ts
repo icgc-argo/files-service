@@ -250,7 +250,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are not Restricted
+    // Only indexing docs that are restricted
     const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     await PromisePool.withConcurrency(20)

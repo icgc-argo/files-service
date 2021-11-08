@@ -264,8 +264,18 @@ export async function publishActiveRelease(): Promise<void> {
     // Need to get the latest data on all of the removed files so they can be inserted into restricted indices
     // so first data is fetched from RDPCs, then those files that are not PUBLISHED are filtered out since they shouldn't be indexed
 
+    // 2a. update the embargo and release props of the files to remove:
+    const updatedFilesRemoved = filesRemoved.map(file => {
+      const output = _.clone(file);
+      output.embargoStage = getEmbargoStage(output);
+      output.releaseState = FileReleaseState.RESTRICTED;
+      return output;
+    });
+
     // 2a. Get updated file data from Data Centers and update DB to match
-    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(filesRemoved);
+    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(
+      updatedFilesRemoved,
+    );
 
     // 2b. Filter out files being removed because they are not PUBLISHED in data center
     const fileCentricDocsMovingToRestricted = fileCentricDocsToRemove.filter(
@@ -277,10 +287,10 @@ export async function publishActiveRelease(): Promise<void> {
 
     // 3. Release all indices (public and restricted)
     await indexer.release({ publicRelease: true, indices: release.indices });
-    logger.debug(`Release Indices have been aliased.`);
+    logger.debug(`Release Indices have been aliased! The new release data should be now be live!`);
 
-    // 4. Update DB Release State of with published changes
-    // 4.a. Newly released Files
+    // 4. Update DB Release State for files updated in the release
+    // 4a. DB Updates for added files
     await PromisePool.withConcurrency(20)
       .for(release.filesAdded)
       .handleError((error, file) => {
@@ -294,17 +304,16 @@ export async function publishActiveRelease(): Promise<void> {
       });
     logger.debug(`File records in DB updated with new published states.`);
 
-    // 4.b. Files demoted to restricted or Unpublished
+    // 4b. DB Updates for removed files
     await PromisePool.withConcurrency(20)
-      .for(release.filesRemoved)
+      .for(updatedFilesRemoved)
       .handleError((error, file) => {
         logger.error(`Failed to update release status in DB for ${file}`);
       })
       .process(async file => {
-        const dbFile = await fileService.getFileByObjId(file);
-        await fileService.updateFileReleaseProperties(file, {
-          embargoStage: getEmbargoStage(dbFile),
-          releaseState: FileReleaseState.RESTRICTED,
+        await fileService.updateFileReleaseProperties(file.objectId, {
+          embargoStage: file.embargoStage,
+          releaseState: file.releaseState,
         });
       });
     logger.debug(`File records in DB updated with new published states.`);
@@ -314,7 +323,7 @@ export async function publishActiveRelease(): Promise<void> {
     const { updated, message } = await releaseService.finishPublishingActiveRelease();
     if (updated) {
       // 5b. Send kafka message for public release
-      const kafkaMessage = buildKafkaMessage(release, filesAdded, filesRemoved);
+      const kafkaMessage = buildKafkaMessage(release, filesAdded, updatedFilesRemoved);
       sendPublicReleaseMessage(kafkaMessage);
     } else {
       logger.error(`Unable to set release to published`, message);
