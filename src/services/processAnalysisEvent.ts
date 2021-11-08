@@ -21,6 +21,7 @@ import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { AnalysisUpdateEvent } from '../external/kafka';
 import { saveAndIndexFilesFromRdpcData } from './fileManager';
+import { isRestricted } from './utils/fileUtils';
 import { getIndexer } from './indexer';
 import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
@@ -56,9 +57,12 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
     });
 
   // Remove these files from the restricted indices
-  const indexer = await getIndexer();
-  await indexer.removeFilesFromRestricted(files);
-  await indexer.release();
+  const restrictedFiles = files.filter(isRestricted);
+  if (restrictedFiles.length) {
+    const indexer = await getIndexer();
+    await indexer.removeFilesFromRestricted(files);
+    await indexer.release();
+  }
 }
 
 /**
@@ -80,7 +84,7 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
   }
 
   logger.info(
-    `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}}`,
+    `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
   );
 };
 export default analysisEventHandler;

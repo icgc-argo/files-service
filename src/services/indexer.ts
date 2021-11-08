@@ -25,6 +25,7 @@ import { getClient } from '../external/elasticsearch';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
+import { isPublic, isRestricted } from './utils/fileUtils';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
@@ -216,7 +217,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    */
   async function updateRestrictedFile(file: File): Promise<void> {
     // Don't update a file if it is PUBLIC already
-    if (file.releaseState === FileReleaseState.PUBLIC) {
+    if (isPublic(file)) {
       return;
     }
 
@@ -249,10 +250,8 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are not PUBLIC
-    const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
-    );
+    // Only indexing docs that are not Restricted
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     await PromisePool.withConcurrency(20)
       .for(sortedFiles)
@@ -288,9 +287,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    */
   async function removeRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only removing files that are not public
-    const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
-    );
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     // TODO: configure concurrency for ES requests.
     await PromisePool.withConcurrency(5)
@@ -328,12 +325,9 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are not PUBLIC
+    // Only indexing docs that are PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(
-        doc =>
-          doc.releaseState === FileReleaseState.PUBLIC && doc.embargoStage === EmbargoStage.PUBLIC,
-      ),
+      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC),
     );
 
     await PromisePool.withConcurrency(20)

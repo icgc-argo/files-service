@@ -45,6 +45,7 @@ import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import PromisePool from '@supercharge/promise-pool/dist';
 import { ANALYSIS_STATE } from '../utils/constants';
+import { isPublic } from './utils/fileUtils';
 const logger = Logger('FileManager');
 
 export async function updateFileFromRdpcData(
@@ -136,14 +137,14 @@ export async function recalculateFileState(file: File) {
   // If the file is not already released, lets update its embargo stage
   const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   const embargoStage = getEmbargoStage(file);
-  if (file.releaseState === FileReleaseState.PUBLIC) {
+  if (isPublic(file)) {
     if (embargoStage !== EmbargoStage.PUBLIC) {
       // A currently public file has been calculated as needing to be restricted
       // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
       logger.debug(
         'recalculateFileState()',
         file.fileId,
-        'PUBLIC file embargo calculated to be',
+        `${file.releaseState} file embargo calculated to be`,
         embargoStage,
         'Setting release state to',
         FileReleaseState.QUEUE_TO_RESTRICTED,
