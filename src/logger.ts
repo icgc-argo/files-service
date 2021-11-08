@@ -49,6 +49,7 @@ export default (service: string) => {
     debug: (...messages: (string | object)[]) => logger.debug(buildServiceMessage(...messages)),
     info: (...messages: (string | object)[]) => logger.info(buildServiceMessage(...messages)),
     warn: (...messages: (string | object)[]) => logger.warn(buildServiceMessage(...messages)),
-    error: (...messages: (string | object)[]) => logger.error(buildServiceMessage(...messages)),
+    error: (message: string | object, ...meta: any[]) =>
+      logger.error(buildServiceMessage(message), ...meta),
   };
 };
