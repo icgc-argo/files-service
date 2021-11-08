@@ -137,34 +137,47 @@ export async function recalculateFileState(file: File) {
   // If the file is not already released, lets update its embargo stage
   const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   const embargoStage = getEmbargoStage(file);
-  if (isPublic(file)) {
-    if (embargoStage !== EmbargoStage.PUBLIC) {
-      // A currently public file has been calculated as needing to be restricted
-      // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
-      logger.debug(
-        'recalculateFileState()',
-        file.fileId,
-        `${file.releaseState} file embargo calculated to be`,
-        embargoStage,
-        'Setting release state to',
-        FileReleaseState.QUEUE_TO_RESTRICTED,
-      );
-      updates.releaseState = FileReleaseState.QUEUE_TO_RESTRICTED;
-    }
-  } else {
-    // If this file is ready for PUBLIC access:
-    //  - set the embargo stage to ASSOCIATE_ACCESS (2nd highest)
-    //  - set the release state to queued
-    if (embargoStage === EmbargoStage.PUBLIC) {
-      updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-      updates.releaseState = FileReleaseState.QUEUE_TO_PUBLIC;
-    } else {
-      updates.embargoStage = embargoStage;
-      updates.releaseState = FileReleaseState.RESTRICTED;
-    }
+  switch (file.releaseState) {
+    case FileReleaseState.PUBLIC:
+      if (embargoStage !== EmbargoStage.PUBLIC) {
+        // A currently public file has been calculated as needing to be restricted
+        // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
+        logger.debug(
+          'recalculateFileState()',
+          file.fileId,
+          `PUBLIC file embargo calculated to be`,
+          embargoStage,
+          'Setting release state to',
+          FileReleaseState.QUEUE_TO_RESTRICTED,
+        );
+        updates.releaseState = FileReleaseState.QUEUE_TO_RESTRICTED;
+      }
+      break;
+    case FileReleaseState.QUEUE_TO_RESTRICTED:
+      // File is queued for restricted, so if embargo stage is calculated as public we can just return this file to PUBLIC state
+      // Otherwise, it is in the right stage and there is nothing to do.
+      if (embargoStage === EmbargoStage.PUBLIC) {
+        updates.releaseState = FileReleaseState.PUBLIC;
+      }
+      break;
+    case FileReleaseState.RESTRICTED:
+    case FileReleaseState.QUEUE_TO_PUBLIC:
+      // Currently restricted files, default promotion logic
+      if (embargoStage === EmbargoStage.PUBLIC) {
+        // Cant push a file to PUBLIC except during a release, so mark as queued to public
+        updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
+        updates.releaseState = FileReleaseState.QUEUE_TO_PUBLIC;
+      } else {
+        updates.embargoStage = embargoStage;
+        updates.releaseState = FileReleaseState.RESTRICTED;
+      }
+      break;
   }
 
-  if (updates.embargoStage !== file.embargoStage || updates.releaseState !== file.releaseState) {
+  if (
+    (updates.embargoStage && updates.embargoStage !== file.embargoStage) ||
+    (updates.releaseState && updates.releaseState !== file.releaseState)
+  ) {
     return await fileService.updateFileReleaseProperties(file.objectId, updates);
   }
   return file;
