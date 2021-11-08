@@ -112,7 +112,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
 
           const fileSummary = fileSummaryResponse(results);
           const response = {
-            message: `Successfully updated and re-indexed ${fileSummary.total} files. adminPromote value set to ${stage}`,
+            message: `Successfully updated ${fileSummary.total} file(s). adminPromote value set to ${stage}`,
             ...fileSummary,
             errors,
           };
@@ -179,7 +179,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
 
           const fileSummary = fileSummaryResponse(results);
           const response = {
-            message: `Successfully updated and re-indexed ${fileSummary.total} files. adminDemote value set to ${stage}`,
+            message: `Successfully updated ${fileSummary.total} file(s). adminDemote value set to ${stage}`,
             ...fileSummary,
             errors,
           };
