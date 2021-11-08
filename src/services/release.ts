@@ -32,6 +32,7 @@ import { Program, PublicReleaseMessage } from 'kafkaMessages';
 
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
+import { getEmbargoStage } from './embargo';
 
 import Logger from '../logger';
 import { ANALYSIS_STATE } from '../utils/constants';
@@ -97,7 +98,8 @@ export async function calculateRelease(): Promise<void> {
  * Build public indices for a release and save as snapshot.
  * This does:
  *  - Create the new public indices, adding and removing the files as required
- *  - TODO: Update from song (and clincial eventually) all files kept and added in the release
+ *  - Update from data center all files kept and added in the release
+ *  - TODO: Get Clinical updates for each file
  *  - Snapshot the new indices in ES
  * This does not:
  *  - Alias the new indices (no change to the live platform data)
@@ -129,9 +131,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
     const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
     const programIds = new Set<string>();
-    filesKept.forEach(file => programIds.add(file.programId));
-    filesAdded.forEach(file => programIds.add(file.programId));
-    filesRemoved.forEach(file => programIds.add(file.programId));
+    [...filesKept, ...filesAdded, ...filesRemoved].forEach(file => programIds.add(file.programId));
 
     filesKept.forEach(file => {
       const program = file.programId;
@@ -279,7 +279,8 @@ export async function publishActiveRelease(): Promise<void> {
     await indexer.release({ publicRelease: true, indices: release.indices });
     logger.debug(`Release Indices have been aliased.`);
 
-    // 4. Update DB with published changes
+    // 4. Update DB Release State of with published changes
+    // 4.a. Newly released Files
     await PromisePool.withConcurrency(20)
       .for(release.filesAdded)
       .handleError((error, file) => {
@@ -289,6 +290,21 @@ export async function publishActiveRelease(): Promise<void> {
         await fileService.updateFileReleaseProperties(file, {
           embargoStage: EmbargoStage.PUBLIC,
           releaseState: FileReleaseState.PUBLIC,
+        });
+      });
+    logger.debug(`File records in DB updated with new published states.`);
+
+    // 4.b. Files demoted to restricted or Unpublished
+    await PromisePool.withConcurrency(20)
+      .for(release.filesRemoved)
+      .handleError((error, file) => {
+        logger.error(`Failed to update release status in DB for ${file}`);
+      })
+      .process(async file => {
+        const dbFile = await fileService.getFileByObjId(file);
+        await fileService.updateFileReleaseProperties(file, {
+          embargoStage: getEmbargoStage(dbFile),
+          releaseState: FileReleaseState.RESTRICTED,
         });
       });
     logger.debug(`File records in DB updated with new published states.`);
