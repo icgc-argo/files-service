@@ -80,7 +80,7 @@ export async function updateFileFromRdpcData(
     });
   }
 
-  return recalculateFileState(dbFile);
+  return dbFile;
 }
 
 type SaveAndIndexResults = {
@@ -102,9 +102,10 @@ export async function saveAndIndexFilesFromRdpcData(
   const fileCentricDocuments = await Promise.all(
     await rdpcFileDocs.map(async rdpcFile => {
       // update local records
-      const dbFile = await updateFileFromRdpcData(rdpcFile, dataCenterId);
+      const file = await updateFileFromRdpcData(rdpcFile, dataCenterId);
+      const fileWithUpdatedState = await recalculateFileState(file);
       // convert to file centric documents
-      return buildDocument({ dbFile, rdpcFile });
+      return buildDocument({ dbFile: fileWithUpdatedState, rdpcFile });
     }),
   );
 
@@ -268,7 +269,7 @@ export async function fetchFileUpdatesFromDataCenter(
         .for(rdpcFiles) // For each file doc retrieved from that rdpc
         .process(async rdpcFile => {
           const dbFile = await updateFileFromRdpcData(rdpcFile, data.dataCenterId);
-          const fileCentricDoc = await buildDocument({ dbFile, rdpcFile });
+          const fileCentricDoc = buildDocument({ dbFile, rdpcFile });
           output.push(fileCentricDoc);
         });
     });
