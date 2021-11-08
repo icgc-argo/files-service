@@ -171,7 +171,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     const additionalIndices: string[] = options && options.indices ? options.indices : [];
 
     logger.info(
-      `[Indexer] Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
+      `Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
         nextIndices.restricted,
       )}`,
     );
@@ -187,7 +187,7 @@ export const getIndexer = async (): Promise<Indexer> => {
 
     if (additionalIndices.length) {
       logger.info(
-        `[Indexer]  Preparing to release... Additional indices requested to release: ${additionalIndices}`,
+        `Preparing to release... Additional indices requested to release: ${additionalIndices}`,
       );
     }
 
@@ -199,7 +199,7 @@ export const getIndexer = async (): Promise<Indexer> => {
         logger.error(`Failed to release index: ${index.indexName}`);
       })
       .process(async index => {
-        logger.info(`[Indexer] Releasing index to file alias: ${index.indexName}`);
+        logger.info(`Releasing index to file alias: ${index.indexName}`);
         await rollcall.release(index);
       });
 
