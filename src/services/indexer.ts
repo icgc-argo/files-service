@@ -546,8 +546,6 @@ function camelCaseKeysToUnderscore(obj: any) {
 // Separate list of file documents into distinct list per program.
 type FileDocsSortedByProgramsArray = Array<{ files: FileCentricDocument[]; program: string }>;
 function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedByProgramsArray {
-  const output: FileDocsSortedByProgramsArray = [];
-
   // Sort Files into programs
   const programMap = files.reduce((acc: { [program: string]: FileCentricDocument[] }, file) => {
     const program = file.studyId;
@@ -560,9 +558,10 @@ function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedB
   }, {});
 
   // For each program, add an element to output array
-  Object.entries(programMap).forEach(([program, files]) => {
-    output.push({ program, files });
-  });
+  const output: FileDocsSortedByProgramsArray = Object.entries(
+    programMap,
+  ).map(([program, files]) => ({ program, files }));
+
   return output;
 }
 // Separate list of files into distinct list per program.

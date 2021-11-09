@@ -57,10 +57,10 @@ export async function calculateRelease(): Promise<void> {
       releaseState: FileReleaseState.PUBLIC,
     });
     const queuedToPublicFiles = await fileService.getFilesByState({
-      releaseState: FileReleaseState.QUEUE_TO_PUBLIC,
+      releaseState: FileReleaseState.QUEUED_TO_PUBLIC,
     });
     const queuedToRestrictedFiles = await fileService.getFilesByState({
-      releaseState: FileReleaseState.QUEUE_TO_RESTRICTED,
+      releaseState: FileReleaseState.QUEUED_TO_RESTRICT,
     });
 
     // Don't add anything that is not PUBLISHED in song

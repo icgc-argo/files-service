@@ -68,19 +68,18 @@ export async function getOrCreateFileFromRdcData(
   return await fileService.getOrCreateFileByObjId(fileToCreate);
 }
 
-export async function updateFileFromRdpcData(
+export async function updateStatusFromRdpcData(
   dbFile: File,
   rdpcFileDocument: RdpcFileDocument,
-  dataCenterId: string,
 ): Promise<File> {
-  // Update file if it has a changed status (publish date, unpublished/suppressed)
-  const newStatus = rdpcFileDocument.analysis.analysisState;
-  const newPublishDate = rdpcFileDocument.analysis.firstPublishedAt;
-  if (dbFile.status !== newStatus || dbFile.firstPublished !== newPublishDate) {
-    dbFile = await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
+  // Update relevant properties from RDPC
+  const status = rdpcFileDocument.analysis.analysisState;
+  if (status !== dbFile.status) {
+    // Update the status of the object and in the DB
+    await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
       status: rdpcFileDocument.analysis.analysisState,
-      firstPublished: rdpcFileDocument.analysis.firstPublishedAt,
     });
+    dbFile.status = rdpcFileDocument.analysis.analysisState;
   }
 
   return dbFile;
@@ -106,7 +105,7 @@ export async function saveAndIndexFilesFromRdpcData(
     await rdpcFileDocs.map(async rdpcFile => {
       // update local records
       const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
-      const updatedFile = await updateFileFromRdpcData(createdFile, rdpcFile, dataCenterId);
+      const updatedFile = await updateStatusFromRdpcData(createdFile, rdpcFile);
       const fileWithUpdatedState = await recalculateFileState(updatedFile);
       // convert to file centric documents
       return buildDocument({ dbFile: fileWithUpdatedState, rdpcFile });
@@ -153,12 +152,12 @@ export async function recalculateFileState(file: File) {
           `PUBLIC file embargo calculated to be`,
           embargoStage,
           'Setting release state to',
-          FileReleaseState.QUEUE_TO_RESTRICTED,
+          FileReleaseState.QUEUED_TO_RESTRICT,
         );
-        updates.releaseState = FileReleaseState.QUEUE_TO_RESTRICTED;
+        updates.releaseState = FileReleaseState.QUEUED_TO_RESTRICT;
       }
       break;
-    case FileReleaseState.QUEUE_TO_RESTRICTED:
+    case FileReleaseState.QUEUED_TO_RESTRICT:
       // File is queued for restricted, so if embargo stage is calculated as public we can just return this file to PUBLIC state
       // Otherwise, it is in the right stage and there is nothing to do.
       if (embargoStage === EmbargoStage.PUBLIC) {
@@ -166,12 +165,12 @@ export async function recalculateFileState(file: File) {
       }
       break;
     case FileReleaseState.RESTRICTED:
-    case FileReleaseState.QUEUE_TO_PUBLIC:
+    case FileReleaseState.QUEUED_TO_PUBLIC:
       // Currently restricted files, default promotion logic
       if (embargoStage === EmbargoStage.PUBLIC) {
         // Cant push a file to PUBLIC except during a release, so mark as queued to public
         updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-        updates.releaseState = FileReleaseState.QUEUE_TO_PUBLIC;
+        updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
       } else {
         updates.embargoStage = embargoStage;
         updates.releaseState = FileReleaseState.RESTRICTED;
@@ -283,11 +282,7 @@ export async function fetchFileUpdatesFromDataCenter(
         .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
         .process(async resultPair => {
           if (resultPair.rdpcFile) {
-            const dbFile = await updateFileFromRdpcData(
-              resultPair.file,
-              resultPair.rdpcFile,
-              data.dataCenterId,
-            );
+            const dbFile = await updateStatusFromRdpcData(resultPair.file, resultPair.rdpcFile);
             const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
             output.push(fileCentricDoc);
           } else {
