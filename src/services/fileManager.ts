@@ -45,15 +45,12 @@ import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import PromisePool from '@supercharge/promise-pool/dist';
 import { ANALYSIS_STATE } from '../utils/constants';
-import { isPublic } from './utils/fileUtils';
 const logger = Logger('FileManager');
 
-export async function updateFileFromRdpcData(
+export async function getOrCreateFileFromRdcData(
   rdpcFileDocument: RdpcFileDocument,
   dataCenterId: string,
 ): Promise<File> {
-  // Get or Create the file from the partialFile data
-  let dbFile: File;
   const fileToCreate: FileInput = {
     analysisId: rdpcFileDocument.analysis.analysisId,
     objectId: rdpcFileDocument.objectId,
@@ -68,8 +65,14 @@ export async function updateFileFromRdpcData(
 
     labels: [],
   };
-  dbFile = await fileService.getOrCreateFileByObjId(fileToCreate);
+  return await fileService.getOrCreateFileByObjId(fileToCreate);
+}
 
+export async function updateFileFromRdpcData(
+  dbFile: File,
+  rdpcFileDocument: RdpcFileDocument,
+  dataCenterId: string,
+): Promise<File> {
   // Update file if it has a changed status (publish date, unpublished/suppressed)
   const newStatus = rdpcFileDocument.analysis.analysisState;
   const newPublishDate = rdpcFileDocument.analysis.firstPublishedAt;
@@ -102,8 +105,9 @@ export async function saveAndIndexFilesFromRdpcData(
   const fileCentricDocuments = await Promise.all(
     await rdpcFileDocs.map(async rdpcFile => {
       // update local records
-      const file = await updateFileFromRdpcData(rdpcFile, dataCenterId);
-      const fileWithUpdatedState = await recalculateFileState(file);
+      const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
+      const updatedFile = await updateFileFromRdpcData(createdFile, rdpcFile, dataCenterId);
+      const fileWithUpdatedState = await recalculateFileState(updatedFile);
       // convert to file centric documents
       return buildDocument({ dbFile: fileWithUpdatedState, rdpcFile });
     }),
@@ -184,9 +188,13 @@ export async function recalculateFileState(file: File) {
   return file;
 }
 
-type RdpcSortedFiles = {
+type RdpcResultPair = {
+  file: File;
+  rdpcFile?: RdpcFileDocument;
+};
+type SortedRdpcResults = {
   dataCenterId: string;
-  files: RdpcFileDocument[];
+  results: RdpcResultPair[];
 }[];
 /**
  * Given a list of files, fetch the updated file data for them from song
@@ -196,10 +204,10 @@ type RdpcSortedFiles = {
  * @param files
  * @returns
  */
-export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFiles> {
+export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResults> {
   logger.info(`Preparing to fetch RDPC data for ${files.length} files`);
 
-  const output: RdpcSortedFiles = [];
+  const output: SortedRdpcResults = [];
 
   // Group into DataCenters and RDPCs
   const dataCenters = _.groupBy(files, file => file.repoId);
@@ -235,10 +243,18 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
     const rdpcFiles = await maestro.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
     // Filter files to only include the ones requested for updates:
-    const dcFileIds = dcFiles.map(file => file.objectId);
-    const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
-    logger.debug(`Successfully retrieved ${filteredFiles.length} files from ${dataCenterId}`);
-    output.push({ dataCenterId, files: filteredFiles });
+    // const dcFileIds = dcFiles.map(file => file.objectId);
+    // const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
+    const results = files.map(file => {
+      const rdpcFile = rdpcFiles.find(rdpcFile => file.objectId === rdpcFile.objectId);
+      return { file, rdpcDoc: rdpcFile };
+    });
+    logger.debug(
+      `Successfully retrieved ${
+        results.filter(result => result.rdpcDoc).length
+      } rdpc files from ${dataCenterId} for ${dcFiles.length} input files`,
+    );
+    output.push({ dataCenterId, results });
   }
 
   return output;
@@ -257,20 +273,28 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
 export async function fetchFileUpdatesFromDataCenter(
   files: File[],
 ): Promise<FileCentricDocument[]> {
-  const rdpcFilesToAdd = await getRdpcDataForFiles(files);
+  const rdpcSortedResults = await getRdpcDataForFiles(files);
 
   const output: FileCentricDocument[] = [];
 
   await PromisePool.withConcurrency(1)
-    .for(rdpcFilesToAdd) // For each rdpc in the files to add
+    .for(rdpcSortedResults) // For each rdpc in the files to add
     .process(async data => {
-      const rdpcFiles = data.files;
+      const rdpcFilePairs = data.results;
       await PromisePool.withConcurrency(10)
-        .for(rdpcFiles) // For each file doc retrieved from that rdpc
-        .process(async rdpcFile => {
-          const dbFile = await updateFileFromRdpcData(rdpcFile, data.dataCenterId);
-          const fileCentricDoc = buildDocument({ dbFile, rdpcFile });
-          output.push(fileCentricDoc);
+        .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
+        .process(async resultPair => {
+          if (resultPair.rdpcFile) {
+            const dbFile = await updateFileFromRdpcData(
+              resultPair.file,
+              resultPair.rdpcFile,
+              data.dataCenterId,
+            );
+            const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
+            output.push(fileCentricDoc);
+          } else {
+            logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
+          }
         });
     });
 
