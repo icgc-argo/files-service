@@ -242,16 +242,14 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
     // convert analyses documents to rdpcFileDocs
     const rdpcFiles = await maestro.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
-    // Filter files to only include the ones requested for updates:
-    // const dcFileIds = dcFiles.map(file => file.objectId);
-    // const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
-    const results = files.map(file => {
+    // Pair up the files in this data center with the rdpcFiles returned from maestro
+    const results: RdpcResultPair[] = dcFiles.map(file => {
       const rdpcFile = rdpcFiles.find(rdpcFile => file.objectId === rdpcFile.objectId);
-      return { file, rdpcDoc: rdpcFile };
+      return { file, rdpcFile };
     });
     logger.debug(
       `Successfully retrieved ${
-        results.filter(result => result.rdpcDoc).length
+        results.filter(result => result.rdpcFile).length
       } rdpc files from ${dataCenterId} for ${dcFiles.length} input files`,
     );
     output.push({ dataCenterId, results });
