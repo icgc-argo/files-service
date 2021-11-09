@@ -47,12 +47,10 @@ import PromisePool from '@supercharge/promise-pool/dist';
 import { ANALYSIS_STATE } from '../utils/constants';
 const logger = Logger('FileManager');
 
-export async function updateFileFromRdpcData(
+export async function getOrCreateFileFromRdcData(
   rdpcFileDocument: RdpcFileDocument,
   dataCenterId: string,
 ): Promise<File> {
-  // Get or Create the file from the partialFile data
-  let dbFile: File;
   const fileToCreate: FileInput = {
     analysisId: rdpcFileDocument.analysis.analysisId,
     objectId: rdpcFileDocument.objectId,
@@ -67,19 +65,24 @@ export async function updateFileFromRdpcData(
 
     labels: [],
   };
-  dbFile = await fileService.getOrCreateFileByObjId(fileToCreate);
+  return await fileService.getOrCreateFileByObjId(fileToCreate);
+}
 
-  // Update file if it has a changed status (publish date, unpublished/suppressed)
-  const newStatus = rdpcFileDocument.analysis.analysisState;
-  const newPublishDate = rdpcFileDocument.analysis.firstPublishedAt;
-  if (dbFile.status !== newStatus || dbFile.firstPublished !== newPublishDate) {
-    dbFile = await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
+export async function updateStatusFromRdpcData(
+  dbFile: File,
+  rdpcFileDocument: RdpcFileDocument,
+): Promise<File> {
+  // Update relevant properties from RDPC
+  const status = rdpcFileDocument.analysis.analysisState;
+  if (status !== dbFile.status) {
+    // Update the status of the object and in the DB
+    await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
       status: rdpcFileDocument.analysis.analysisState,
-      firstPublished: rdpcFileDocument.analysis.firstPublishedAt,
     });
+    dbFile.status = rdpcFileDocument.analysis.analysisState;
   }
 
-  return recalculateFileState(dbFile);
+  return dbFile;
 }
 
 type SaveAndIndexResults = {
@@ -101,9 +104,11 @@ export async function saveAndIndexFilesFromRdpcData(
   const fileCentricDocuments = await Promise.all(
     await rdpcFileDocs.map(async rdpcFile => {
       // update local records
-      const dbFile = await updateFileFromRdpcData(rdpcFile, dataCenterId);
+      const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
+      const updatedFile = await updateStatusFromRdpcData(createdFile, rdpcFile);
+      const fileWithUpdatedState = await recalculateFileState(updatedFile);
       // convert to file centric documents
-      return buildDocument({ dbFile, rdpcFile });
+      return buildDocument({ dbFile: fileWithUpdatedState, rdpcFile });
     }),
   );
 
@@ -134,36 +139,61 @@ export async function saveAndIndexFilesFromRdpcData(
 
 export async function recalculateFileState(file: File) {
   // If the file is not already released, lets update its embargo stage
-  const updates: any = {};
+  const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   const embargoStage = getEmbargoStage(file);
-  if (file.releaseState === FileReleaseState.PUBLIC) {
-    if (embargoStage !== EmbargoStage.PUBLIC) {
-      // A currently public file has been calculated as needing to be restricted
-      // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
-      updates.embargoStage = embargoStage;
-    }
-  } else {
-    // If this file is ready for PUBLIC access:
-    //  - set the embargo stage to ASSOCIATE_ACCESS (2nd highest)
-    //  - set the release state to queued
-    if (embargoStage === EmbargoStage.PUBLIC) {
-      updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-      updates.releaseState = FileReleaseState.QUEUED;
-    } else {
-      updates.embargoStage = embargoStage;
-      updates.releaseState = FileReleaseState.RESTRICTED;
-    }
+  switch (file.releaseState) {
+    case FileReleaseState.PUBLIC:
+      if (embargoStage !== EmbargoStage.PUBLIC) {
+        // A currently public file has been calculated as needing to be restricted
+        // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
+        logger.debug(
+          'recalculateFileState()',
+          file.fileId,
+          `PUBLIC file embargo calculated to be`,
+          embargoStage,
+          'Setting release state to',
+          FileReleaseState.QUEUED_TO_RESTRICT,
+        );
+        updates.releaseState = FileReleaseState.QUEUED_TO_RESTRICT;
+      }
+      break;
+    case FileReleaseState.QUEUED_TO_RESTRICT:
+      // File is queued for restricted, so if embargo stage is calculated as public we can just return this file to PUBLIC state
+      // Otherwise, it is in the right stage and there is nothing to do.
+      if (embargoStage === EmbargoStage.PUBLIC) {
+        updates.releaseState = FileReleaseState.PUBLIC;
+      }
+      break;
+    case FileReleaseState.RESTRICTED:
+    case FileReleaseState.QUEUED_TO_PUBLIC:
+      // Currently restricted files, default promotion logic
+      if (embargoStage === EmbargoStage.PUBLIC) {
+        // Cant push a file to PUBLIC except during a release, so mark as queued to public
+        updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
+        updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
+      } else {
+        updates.embargoStage = embargoStage;
+        updates.releaseState = FileReleaseState.RESTRICTED;
+      }
+      break;
   }
 
-  if (updates.embargoStage !== file.embargoStage || updates.releaseState !== file.releaseState) {
+  if (
+    (updates.embargoStage && updates.embargoStage !== file.embargoStage) ||
+    (updates.releaseState && updates.releaseState !== file.releaseState)
+  ) {
     return await fileService.updateFileReleaseProperties(file.objectId, updates);
   }
   return file;
 }
 
-type RdpcSortedFiles = {
+type RdpcResultPair = {
+  file: File;
+  rdpcFile?: RdpcFileDocument;
+};
+type SortedRdpcResults = {
   dataCenterId: string;
-  files: RdpcFileDocument[];
+  results: RdpcResultPair[];
 }[];
 /**
  * Given a list of files, fetch the updated file data for them from song
@@ -173,10 +203,10 @@ type RdpcSortedFiles = {
  * @param files
  * @returns
  */
-export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFiles> {
+export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResults> {
   logger.info(`Preparing to fetch RDPC data for ${files.length} files`);
 
-  const output: RdpcSortedFiles = [];
+  const output: SortedRdpcResults = [];
 
   // Group into DataCenters and RDPCs
   const dataCenters = _.groupBy(files, file => file.repoId);
@@ -211,11 +241,17 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
     // convert analyses documents to rdpcFileDocs
     const rdpcFiles = await maestro.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
-    // Filter files to only include the ones requested for updates:
-    const dcFileIds = dcFiles.map(file => file.objectId);
-    const filteredFiles = rdpcFiles.filter(file => dcFileIds.includes(file.objectId));
-    logger.debug(`Successfully retrieved ${filteredFiles.length} files from ${dataCenterId}`);
-    output.push({ dataCenterId, files: filteredFiles });
+    // Pair up the files in this data center with the rdpcFiles returned from maestro
+    const results: RdpcResultPair[] = dcFiles.map(file => {
+      const rdpcFile = rdpcFiles.find(rdpcFile => file.objectId === rdpcFile.objectId);
+      return { file, rdpcFile };
+    });
+    logger.debug(
+      `Successfully retrieved ${
+        results.filter(result => result.rdpcFile).length
+      } rdpc files from ${dataCenterId} for ${dcFiles.length} input files`,
+    );
+    output.push({ dataCenterId, results });
   }
 
   return output;
@@ -234,20 +270,24 @@ export async function getRdpcDataForFiles(files: File[]): Promise<RdpcSortedFile
 export async function fetchFileUpdatesFromDataCenter(
   files: File[],
 ): Promise<FileCentricDocument[]> {
-  const rdpcFilesToAdd = await getRdpcDataForFiles(files);
+  const rdpcSortedResults = await getRdpcDataForFiles(files);
 
   const output: FileCentricDocument[] = [];
 
   await PromisePool.withConcurrency(1)
-    .for(rdpcFilesToAdd) // For each rdpc in the files to add
+    .for(rdpcSortedResults) // For each rdpc in the files to add
     .process(async data => {
-      const rdpcFiles = data.files;
+      const rdpcFilePairs = data.results;
       await PromisePool.withConcurrency(10)
-        .for(rdpcFiles) // For each file doc retrieved from that rdpc
-        .process(async rdpcFile => {
-          const dbFile = await updateFileFromRdpcData(rdpcFile, data.dataCenterId);
-          const fileCentricDoc = await buildDocument({ dbFile, rdpcFile });
-          output.push(fileCentricDoc);
+        .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
+        .process(async resultPair => {
+          if (resultPair.rdpcFile) {
+            const dbFile = await updateStatusFromRdpcData(resultPair.file, resultPair.rdpcFile);
+            const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
+            output.push(fileCentricDoc);
+          } else {
+            logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
+          }
         });
     });
 

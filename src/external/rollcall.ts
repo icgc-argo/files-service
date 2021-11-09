@@ -135,7 +135,7 @@ export default async (): Promise<RollCallClient> => {
       shard: formatProgramShortName(programShortName),
       entity: indexEntity,
       type: indexType,
-      cloneFromReleasedIndex: cloneFromReleasedIndex || false,
+      cloneFromReleasedIndex: cloneFromReleasedIndex,
       releasePrefix,
     };
     try {

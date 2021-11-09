@@ -32,6 +32,7 @@ import { Program, PublicReleaseMessage } from 'kafkaMessages';
 
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
+import { getEmbargoStage } from './embargo';
 
 import Logger from '../logger';
 import { ANALYSIS_STATE } from '../utils/constants';
@@ -55,21 +56,23 @@ export async function calculateRelease(): Promise<void> {
     const publicFiles = await fileService.getFilesByState({
       releaseState: FileReleaseState.PUBLIC,
     });
-    const queuedFiles = await fileService.getFilesByState({
-      releaseState: FileReleaseState.QUEUED,
+    const queuedToPublicFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.QUEUED_TO_PUBLIC,
+    });
+    const queuedToRestrictedFiles = await fileService.getFilesByState({
+      releaseState: FileReleaseState.QUEUED_TO_RESTRICT,
     });
 
-    const added = queuedFiles
+    // Don't add anything that is not PUBLISHED in song
+    const added = queuedToPublicFiles
       .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
       .map(toObjectId);
 
-    // Find removed files - unpublished in song or demoted in file manager.
+    // Find removed files - combined those queued to restricted and those no longer published in song
     const unpublished = publicFiles
       .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
       .map(toObjectId);
-    const demoted = publicFiles
-      .filter(file => file.adminDemote && file.adminDemote !== EmbargoStage.PUBLIC)
-      .map(toObjectId);
+    const demoted = queuedToRestrictedFiles.map(toObjectId);
     const removed = unpublished.concat(demoted);
 
     // Keep all those that are not removed
@@ -84,7 +87,7 @@ export async function calculateRelease(): Promise<void> {
     logger.info(`Finishing release calculation!`);
     const { updated, message } = await releaseService.finishCalculatingActiveRelease();
     if (!updated) {
-      logger.error(`Unable to set release to Calculated: ${message}`);
+      logger.error(`Unable to set release to Calculated`, message);
       throw new Error('Release expected to be set as calculated but was in the wrong state.');
     }
   } catch (e) {
@@ -96,7 +99,8 @@ export async function calculateRelease(): Promise<void> {
  * Build public indices for a release and save as snapshot.
  * This does:
  *  - Create the new public indices, adding and removing the files as required
- *  - TODO: Update from song (and clincial eventually) all files kept and added in the release
+ *  - Update from data center all files kept and added in the release
+ *  - TODO: Get Clinical updates for each file
  *  - Snapshot the new indices in ES
  * This does not:
  *  - Alias the new indices (no change to the live platform data)
@@ -128,9 +132,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
     const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
     const programIds = new Set<string>();
-    filesKept.forEach(file => programIds.add(file.programId));
-    filesAdded.forEach(file => programIds.add(file.programId));
-    filesRemoved.forEach(file => programIds.add(file.programId));
+    [...filesKept, ...filesAdded, ...filesRemoved].forEach(file => programIds.add(file.programId));
 
     filesKept.forEach(file => {
       const program = file.programId;
@@ -263,22 +265,33 @@ export async function publishActiveRelease(): Promise<void> {
     // Need to get the latest data on all of the removed files so they can be inserted into restricted indices
     // so first data is fetched from RDPCs, then those files that are not PUBLISHED are filtered out since they shouldn't be indexed
 
-    // 2a. Get updated file data from Data Centers and update DB to match
-    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(filesRemoved);
+    // 2a. update the embargo and release props of the files to remove
+    const updatedFilesRemoved = filesRemoved.map(file => {
+      const output = _.clone(file);
+      output.embargoStage = getEmbargoStage(output);
+      output.releaseState = FileReleaseState.RESTRICTED;
+      return output;
+    });
 
-    // 2b. Filter out files being removed because they are not PUBLISHED in data center
+    // 2b. Get updated file data from Data Centers, update our DB with those details and get our centric docs
+    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(
+      updatedFilesRemoved,
+    );
+
+    // 2c. Filter out files being removed because they are not PUBLISHED in data center
     const fileCentricDocsMovingToRestricted = fileCentricDocsToRemove.filter(
       doc => doc.analysis.analysisState === 'PUBLISHED',
     );
 
-    //  2c. Add file data to restricted index
-    indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
+    //  2d. Add file data to restricted index
+    await indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
 
     // 3. Release all indices (public and restricted)
     await indexer.release({ publicRelease: true, indices: release.indices });
-    logger.debug(`Release Indices have been aliased.`);
+    logger.debug(`Release Indices have been aliased! The new release data should be now be live!`);
 
-    // 4. Update DB with published changes
+    // 4. Update DB Release State for files updated in the release
+    // 4a. DB Updates for added files
     await PromisePool.withConcurrency(20)
       .for(release.filesAdded)
       .handleError((error, file) => {
@@ -292,15 +305,29 @@ export async function publishActiveRelease(): Promise<void> {
       });
     logger.debug(`File records in DB updated with new published states.`);
 
+    // 4b. DB Updates for removed files
+    await PromisePool.withConcurrency(20)
+      .for(updatedFilesRemoved)
+      .handleError((error, file) => {
+        logger.error(`Failed to update release status in DB for ${file}`);
+      })
+      .process(async file => {
+        await fileService.updateFileReleaseProperties(file.objectId, {
+          embargoStage: file.embargoStage,
+          releaseState: file.releaseState,
+        });
+      });
+    logger.debug(`File records in DB updated with new published states.`);
+
     // 5. Update release state to published
     logger.info(`Finishing release publish!`);
     const { updated, message } = await releaseService.finishPublishingActiveRelease();
     if (updated) {
       // 5b. Send kafka message for public release
-      const kafkaMessage = buildKafkaMessage(release, filesAdded, filesRemoved);
+      const kafkaMessage = buildKafkaMessage(release, filesAdded, updatedFilesRemoved);
       sendPublicReleaseMessage(kafkaMessage);
     } else {
-      logger.error(`Unable to set release to published: ${message}`);
+      logger.error(`Unable to set release to published`, message);
       throw new Error('Release expected to be set as published but was in the wrong state.');
     }
   } catch (e) {

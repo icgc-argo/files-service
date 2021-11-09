@@ -83,8 +83,6 @@ export async function convertAnalysisFileDocuments(
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
 
-  logger.debug(`Requesting analysis-to-file conversion for ${analysis.analysisId}`);
-
   const result = await fetch(url, {
     body: JSON.stringify({ analyses: [analysis], repoCode }),
     method: 'POST',
@@ -108,8 +106,6 @@ export async function convertAnalysisFileDocuments(
   Object.keys(response).forEach((a: string) => {
     files.push(...response[a]);
   });
-
-  logger.debug(`Retrieved ${files.length} files for ${analysis.analysisId}`);
 
   return files;
 }

@@ -25,6 +25,7 @@ import { getClient } from '../external/elasticsearch';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
+import { isPublic, isRestricted } from './utils/fileUtils';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
@@ -170,14 +171,14 @@ export const getIndexer = async (): Promise<Indexer> => {
     const additionalIndices: string[] = options && options.indices ? options.indices : [];
 
     logger.info(
-      `[Indexer] Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
+      `Preparing to release indices to the file alias. Restricted Indices to release: ${Object.keys(
         nextIndices.restricted,
       )}`,
     );
     const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
       logger.info(
-        `[Indexer] Preparing to release... adding public indices to release list: ${Object.keys(
+        `Preparing to release... adding public indices to release list: ${Object.keys(
           nextIndices.public,
         )}`,
       );
@@ -186,31 +187,19 @@ export const getIndexer = async (): Promise<Indexer> => {
 
     if (additionalIndices.length) {
       logger.info(
-        `[Indexer]  Preparing to release... Additional indices requested to release: ${additionalIndices}`,
+        `Preparing to release... Additional indices requested to release: ${additionalIndices}`,
       );
     }
 
     // TODO: config for max simultaneous release?
-    // release indices tracked in nextIndices
+    // release indices tracked in nextIndices and requested in options.additionalIndices
     await PromisePool.withConcurrency(5)
-      .for(toRelease)
+      .for(toRelease.concat(additionalIndices.map(getIndexFromIndexName)))
       .handleError((error, index) => {
         logger.error(`Failed to release index: ${index.indexName}`);
       })
       .process(async index => {
-        logger.info(`[Indexer] Releasing index to file alias: ${index.indexName}`);
-        await rollcall.release(index);
-      });
-
-    // release indices requested in options.additionalIndices
-    await PromisePool.withConcurrency(5)
-      .for(additionalIndices)
-      .handleError((error, indexName) => {
-        logger.error(`Failed to release index: ${indexName}`);
-      })
-      .process(async indexName => {
-        logger.debug(`[Indexer] Releasing index to file alias: ${indexName}`);
-        const index = getIndexFromIndexName(indexName);
+        logger.info(`Releasing index to file alias: ${index.indexName}`);
         await rollcall.release(index);
       });
 
@@ -228,7 +217,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    */
   async function updateRestrictedFile(file: File): Promise<void> {
     // Don't update a file if it is PUBLIC already
-    if (file.releaseState === FileReleaseState.PUBLIC) {
+    if (isPublic(file)) {
       return;
     }
 
@@ -261,10 +250,8 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are not PUBLIC
-    const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
-    );
+    // Only indexing docs that are restricted
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     await PromisePool.withConcurrency(20)
       .for(sortedFiles)
@@ -300,9 +287,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    */
   async function removeRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only removing files that are not public
-    const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => doc.releaseState !== FileReleaseState.PUBLIC),
-    );
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     // TODO: configure concurrency for ES requests.
     await PromisePool.withConcurrency(5)
@@ -340,12 +325,9 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are not PUBLIC
+    // Only indexing docs that are PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(
-        doc =>
-          doc.releaseState === FileReleaseState.PUBLIC && doc.embargoStage === EmbargoStage.PUBLIC,
-      ),
+      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC),
     );
 
     await PromisePool.withConcurrency(20)
@@ -564,8 +546,6 @@ function camelCaseKeysToUnderscore(obj: any) {
 // Separate list of file documents into distinct list per program.
 type FileDocsSortedByProgramsArray = Array<{ files: FileCentricDocument[]; program: string }>;
 function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedByProgramsArray {
-  const output: FileDocsSortedByProgramsArray = [];
-
   // Sort Files into programs
   const programMap = files.reduce((acc: { [program: string]: FileCentricDocument[] }, file) => {
     const program = file.studyId;
@@ -578,9 +558,10 @@ function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedB
   }, {});
 
   // For each program, add an element to output array
-  Object.entries(programMap).forEach(([program, files]) => {
-    output.push({ program, files });
-  });
+  const output: FileDocsSortedByProgramsArray = Object.entries(
+    programMap,
+  ).map(([program, files]) => ({ program, files }));
+
   return output;
 }
 // Separate list of files into distinct list per program.
