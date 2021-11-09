@@ -178,7 +178,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
       logger.info(
-        `[Indexer] Preparing to release... adding public indices to release list: ${Object.keys(
+        `Preparing to release... adding public indices to release list: ${Object.keys(
           nextIndices.public,
         )}`,
       );

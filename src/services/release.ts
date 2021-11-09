@@ -63,6 +63,7 @@ export async function calculateRelease(): Promise<void> {
       releaseState: FileReleaseState.QUEUE_TO_RESTRICTED,
     });
 
+    // Don't add anything that is not PUBLISHED in song
     const added = queuedToPublicFiles
       .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
       .map(toObjectId);
@@ -264,7 +265,7 @@ export async function publishActiveRelease(): Promise<void> {
     // Need to get the latest data on all of the removed files so they can be inserted into restricted indices
     // so first data is fetched from RDPCs, then those files that are not PUBLISHED are filtered out since they shouldn't be indexed
 
-    // 2a. update the embargo and release props of the files to remove:
+    // 2a. update the embargo and release props of the files to remove
     const updatedFilesRemoved = filesRemoved.map(file => {
       const output = _.clone(file);
       output.embargoStage = getEmbargoStage(output);
@@ -272,17 +273,17 @@ export async function publishActiveRelease(): Promise<void> {
       return output;
     });
 
-    // 2a. Get updated file data from Data Centers and update DB to match
+    // 2b. Get updated file data from Data Centers, update our DB with those details and get our centric docs
     const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(
       updatedFilesRemoved,
     );
 
-    // 2b. Filter out files being removed because they are not PUBLISHED in data center
+    // 2c. Filter out files being removed because they are not PUBLISHED in data center
     const fileCentricDocsMovingToRestricted = fileCentricDocsToRemove.filter(
       doc => doc.analysis.analysisState === 'PUBLISHED',
     );
 
-    //  2c. Add file data to restricted index
+    //  2d. Add file data to restricted index
     await indexer.indexRestrictedFileDocs(fileCentricDocsMovingToRestricted);
 
     // 3. Release all indices (public and restricted)
