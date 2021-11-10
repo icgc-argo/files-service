@@ -131,6 +131,9 @@ export async function buildActiveRelease(label: string): Promise<void> {
     const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
     const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
 
+    // programIds is used to list all public indices that should be created.
+    // including filesRemoved in this list ensures that if we remove all files from a program's public index
+    // then an empty index is created to replace the existing one.
     const programIds = new Set<string>();
     [...filesKept, ...filesAdded, ...filesRemoved].forEach(file => programIds.add(file.programId));
 
@@ -207,6 +210,8 @@ The objectIDs of the files no longer PUBLISHED are: ${missingFileIds}`,
     fileCentricDocs.forEach(doc => {
       doc.embargoStage = EmbargoStage.PUBLIC;
       doc.releaseState = FileReleaseState.PUBLIC;
+      doc.meta.embargoStage = EmbargoStage.PUBLIC;
+      doc.meta.releaseState = FileReleaseState.PUBLIC;
     });
 
     // 3.d add the updated files to public indices
