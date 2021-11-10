@@ -69,20 +69,20 @@ export async function getOrCreateFileFromRdcData(
 }
 
 export async function updateStatusFromRdpcData(
-  dbFile: File,
+  file: File,
   rdpcFileDocument: RdpcFileDocument,
 ): Promise<File> {
   // Update relevant properties from RDPC
   const status = rdpcFileDocument.analysis.analysisState;
-  if (status !== dbFile.status) {
+  if (status !== file.status) {
     // Update the status of the object and in the DB
     await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
       status: rdpcFileDocument.analysis.analysisState,
     });
-    dbFile.status = rdpcFileDocument.analysis.analysisState;
+    file.status = rdpcFileDocument.analysis.analysisState;
   }
 
-  return dbFile;
+  return file;
 }
 
 type SaveAndIndexResults = {
@@ -90,7 +90,7 @@ type SaveAndIndexResults = {
   removed: string[];
 };
 /**
- * Given RDPC File data, update file in DB
+ * Given RDPC File data, update file in DB and Restricted Index
  * @param rdpcFileDocs
  * @param dataCenterId
  * @param indexer
@@ -278,7 +278,7 @@ export async function fetchFileUpdatesFromDataCenter(
     .for(rdpcSortedResults) // For each rdpc in the files to add
     .process(async data => {
       const rdpcFilePairs = data.results;
-      await PromisePool.withConcurrency(10)
+      await PromisePool.withConcurrency(1)
         .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
         .process(async resultPair => {
           if (resultPair.rdpcFile) {

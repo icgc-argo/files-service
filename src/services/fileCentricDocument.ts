@@ -33,6 +33,11 @@ const logger = Logger('FileDocumentService');
 export type FileCentricDocument = RdpcFileDocument & {
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
+  meta: {
+    embargoStage: EmbargoStage;
+    releaseState: FileReleaseState;
+    studyId: string;
+  };
 };
 
 type FileCentricDocumentInputs = {
