@@ -63,6 +63,7 @@ export interface AppConfig {
     url: string;
     fetchTimeout: number;
     batchSize: number;
+    gatewayUrl: string;
   };
   rollcall: {
     url: string;
@@ -174,6 +175,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       url: process.env.DC_URL || '',
       fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+      gatewayUrl: process.env.DC_GATEWAY_URL || '',
     },
     rollcall: {
       url: process.env.ROLLCALL_URL || 'http://localhost:9001',
