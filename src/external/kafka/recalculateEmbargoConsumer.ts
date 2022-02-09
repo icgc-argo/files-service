@@ -9,7 +9,7 @@ const logger = Logger('Kafka.recalculateEmbargoConsumer');
 
 let recalculateEmbargoConsumer: Consumer | undefined;
 
-export const init = (kafka: Kafka, consumerConfig: KafkaConsumerConfigurations) => {
+export const init = async (kafka: Kafka, consumerConfig: KafkaConsumerConfigurations) => {
   recalculateEmbargoConsumer = kafka.consumer({
     groupId: consumerConfig.group,
     retry: {
@@ -20,7 +20,7 @@ export const init = (kafka: Kafka, consumerConfig: KafkaConsumerConfigurations) 
   recalculateEmbargoConsumer.subscribe({
     topic: consumerConfig.topic,
   });
-  recalculateEmbargoConsumer.connect();
+  await recalculateEmbargoConsumer.connect();
 
   recalculateEmbargoConsumer
     .run({
@@ -45,5 +45,8 @@ export const disconnect = async () => {
 
 async function handleMessage() {
   logger.info(`Initiating recalculate file embargo job...`);
+  // No need to await for the job to complete...
+  // A job failure will be logged, and the calculations will be redone at the next scheduled event.
   recalculateFileEmbargo();
+  return;
 }

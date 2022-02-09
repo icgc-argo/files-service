@@ -53,11 +53,12 @@ export async function getPaginatedFiles(
     files: files,
   };
 }
-export async function* getAllFiles(filter: FileFilter): AsyncGenerator<File> {
+export async function* getAllFiles(filter: FileFilter): AsyncGenerator<File, void> {
   const fileIterator = fileModel.getFilesIterator(filter);
   for await (const doc of fileIterator) {
     yield toPojo(doc);
   }
+  return;
 }
 export async function countFiles(filter: FileFilter): Promise<number> {
   return await fileModel.countFiles(filter);

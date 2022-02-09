@@ -23,7 +23,6 @@ import Logger from './logger';
 import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
-import { Consumer, Producer } from 'kafkajs';
 import * as kafka from './external/kafka';
 import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
@@ -32,10 +31,6 @@ const serverLog = Logger('Server');
 const mongoLog = Logger('Mongo');
 
 let server: Server;
-let kafkaConnections: Promise<{
-  analysisUpdatesConsumer: Consumer | undefined;
-  analysisUpdatesDlqProducer: Producer | undefined;
-}>;
 
 // bootstraping the app and setting up connections to: db, kafka, experss server
 (async () => {
