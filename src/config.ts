@@ -135,12 +135,13 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       consumers: {
         analysisUpdates: {
           topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'song_analysis',
-          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'file-manager.default-group',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'file-manager.group.analysis-updates',
           dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
         recalculateEmbargo: {
           topic: process.env.KAFKA_RECALCULATE_EMBARGO_TOPIC || 'file-manager.recalculate-embargo',
-          group: process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.default-group',
+          group:
+            process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.group.recalculate-embargo',
           // No need for DLQ. Failures will get corrected on next attempt if scheduled to run regularly.
         },
       },
