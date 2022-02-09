@@ -219,6 +219,10 @@ FileSchema.plugin(mongoosePaginate);
 
 export type FileMongooseDocument = mongoose.Document & DbFile;
 
+export async function countFiles(filters: FileFilter) {
+  return (await FileModel.count(convertFiltersForMongoose(filters)).exec()) as number;
+}
+
 export async function getFiles(filters: FileFilter) {
   return (await FileModel.find(
     convertFiltersForMongoose(filters),
@@ -250,6 +254,17 @@ export async function getFileByObjId(objId: string) {
 
 export async function getFilesByState(filter: FileStateFilter) {
   return (await FileModel.find(filter).exec()) as FileMongooseDocument[];
+}
+
+export function getFilesIterator(filter: FileFilter): AsyncGenerator<FileMongooseDocument> {
+  return FileModel.find(convertFiltersForMongoose(filter));
+}
+
+export async function getPrograms(filter: FileFilter) {
+  return (await FileModel.distinct(
+    'programId',
+    convertFiltersForMongoose(filter),
+  ).exec()) as string[];
 }
 
 export async function create(file: FileInput) {

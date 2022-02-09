@@ -35,7 +35,7 @@ import * as fileModel from './file.model';
 import Logger from '../../logger';
 const logger = Logger('File.DataService');
 
-export async function getFilesQuery(
+export async function getPaginatedFiles(
   paginationFilter: PaginationFilter,
   queryFilter: QueryFilters,
 ): Promise<FilesResponse> {
@@ -53,30 +53,36 @@ export async function getFilesQuery(
     files: files,
   };
 }
-
+export async function* getAllFiles(filter: FileFilter): AsyncGenerator<File> {
+  const fileIterator = fileModel.getFilesIterator(filter);
+  for await (const doc of fileIterator) {
+    yield toPojo(doc);
+  }
+}
+export async function countFiles(filter: FileFilter): Promise<number> {
+  return await fileModel.countFiles(filter);
+}
 export async function getFiles(filter: FileFilter): Promise<File[]> {
   return (await fileModel.getFiles(filter)).map(toPojo);
 }
-export async function getFilesFromAnalysisId(analysisId: string): Promise<File[]> {
-  const results = await fileModel.getFiles({ include: { analyses: [analysisId] } });
-  return results.map(toPojo);
-}
-export async function getFilesFromObjectIds(objectIds: string[]): Promise<File[]> {
-  const results = objectIds.length ? await fileModel.getFiles({ include: { objectIds } }) : [];
-  return results.map(toPojo);
-}
-
 export async function getFileById(fileId: string): Promise<File> {
   const file = await getFileAsDoc(toNumericId(fileId));
   return toPojo(file);
 }
-
+export async function getFilesByAnalysisId(analysisId: string): Promise<File[]> {
+  const results = await fileModel.getFiles({ include: { analyses: [analysisId] } });
+  return results.map(toPojo);
+}
 export async function getFileByObjId(objId: string): Promise<File> {
   const file = await fileModel.getFileByObjId(objId);
   if (!file) {
     throw new Errors.NotFound('no file found for objId: ' + objId);
   }
   return toPojo(file);
+}
+export async function getFilesByObjectIds(objectIds: string[]): Promise<File[]> {
+  const results = objectIds.length ? await fileModel.getFiles({ include: { objectIds } }) : [];
+  return results.map(toPojo);
 }
 
 export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<File> {
@@ -91,6 +97,10 @@ export async function getOrCreateFileByObjId(fileToCreate: FileInput): Promise<F
 
 export async function getFilesByState(filter: FileStateFilter): Promise<File[]> {
   return (await fileModel.getFilesByState(filter)).map(toPojo);
+}
+
+export async function getPrograms(filter: FileFilter): Promise<string[]> {
+  return await fileModel.getPrograms(filter);
 }
 
 /**
@@ -184,7 +194,7 @@ export async function removeLabel(fileId: string, keys: string[]): Promise<File>
   return toPojo(updated);
 }
 
-export async function deleteAll(ids: string[]): Promise<void> {
+export async function deleteByIds(ids: string[]): Promise<void> {
   await fileModel.deleteAll(ids.map(toNumericId));
 }
 

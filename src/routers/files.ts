@@ -40,7 +40,7 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     authFilters.read,
     wrapAsync(async (req: Request, res: Response) => {
       return res.status(200).send(
-        await fileService.getFilesQuery(
+        await fileService.getPaginatedFiles(
           {
             page: (req.query as any)?.page,
             limit: (req.query as any)?.limit,
