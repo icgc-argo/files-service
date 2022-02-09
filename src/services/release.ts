@@ -38,7 +38,8 @@ import * as fileManager from './fileManager';
 import { getEmbargoStage } from './embargo';
 
 import Logger from '../logger';
-import { ANALYSIS_STATE } from '../utils/constants';
+import { ANALYSIS_STATUS } from '../utils/constants';
+import { isPublished } from './utils/fileUtils';
 const logger = Logger('ReleaseManager');
 
 function toObjectId(file: File) {
@@ -67,14 +68,10 @@ export async function calculateRelease(): Promise<void> {
     });
 
     // Don't add anything that is not PUBLISHED in song
-    const added = queuedToPublicFiles
-      .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
-      .map(toObjectId);
+    const added = queuedToPublicFiles.filter(isPublished).map(toObjectId);
 
     // Find removed files - combined those queued to restricted and those no longer published in song
-    const unpublished = publicFiles
-      .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
-      .map(toObjectId);
+    const unpublished = publicFiles.filter(file => !isPublished(file)).map(toObjectId);
     const demoted = queuedToRestrictedFiles.map(toObjectId);
     const removed = unpublished.concat(demoted);
 
