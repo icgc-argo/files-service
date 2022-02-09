@@ -58,9 +58,9 @@ const recalculateFileEmbargo = async () => {
     logger.info(`Finished!`);
   } catch (e) {
     if (e instanceof Error) {
-      logger.error(`Recalculate file embargo job failed with error:`, e.message, e.stack);
+      logger.error(`Recalculate file embargo job threw error:`, e.message, e.stack);
     } else {
-      logger.error(`Recalculate file embargo job failed with error:`, e);
+      logger.error(`Recalculate file embargo job failed:`, e);
     }
   }
 };
