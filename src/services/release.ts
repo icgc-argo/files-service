@@ -25,10 +25,13 @@ import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
 
 import { createSnapshot } from '../external/elasticsearch';
-import { sendPublicReleaseMessage } from '../external/kafka';
+import {
+  sendPublicReleaseMessage,
+  Program,
+  PublicReleaseMessage,
+} from '../external/kafka/publicReleaseProducer';
 
 import StringMap from '../utils/StringMap';
-import { Program, PublicReleaseMessage } from 'kafkaMessages';
 
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
@@ -348,18 +351,15 @@ function buildKafkaMessage(
   const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
 
   // get unique donor ids from filesAdded and filesRemoved:
-  const programsUpdated: Program[] = [];
-
-  Object.entries(filesUpdated).forEach(([programId, files]) => {
+  const programsUpdated: Program[] = Object.entries(filesUpdated).map(([programId, files]) => {
     const donorIds = new Set<string>();
     files.map(file => {
       donorIds.add(file.donorId);
     });
-    const program: Program = {
+    return {
       id: programId,
       donorsUpdated: Array.from(donorIds),
     };
-    programsUpdated.push(program);
   });
 
   const message: PublicReleaseMessage = {

@@ -67,6 +67,19 @@ let kafkaConnections: Promise<{
   await dbConnection.connectDb(appConfig);
 
   /**
+   * Connect to other external dependencies
+   *  - elasticsearch
+   *  - kafka
+   */
+
+  // Init ES client
+  await getClient();
+
+  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
+    await kafka.setup(appConfig);
+  }
+
+  /**
    * Start Express server.
    */
   const app = App(appConfig);
@@ -82,13 +95,6 @@ let kafkaConnections: Promise<{
     serverLog.debug(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
     serverLog.debug('Press CTRL-C to stop');
   });
-
-  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
-    kafkaConnections = kafka.setup(appConfig);
-  }
-
-  // Init ES client
-  await getClient();
 })();
 
 // terminate kafka connections before exiting
@@ -103,13 +109,7 @@ errorTypes.map(type => {
       serverLog.error(e.message);
       console.log(e); // Get full error output
       await mongoose.disconnect();
-      if (kafkaConnections) {
-        const kc = await kafkaConnections;
-        await Promise.all([
-          kc.analysisUpdatesConsumer?.disconnect(),
-          kc.analysisUpdatesDlqProducer?.disconnect(),
-        ]);
-      }
+      await kafka.disconnect();
       process.exit(0);
     } catch (_) {
       process.exit(1);
@@ -121,13 +121,7 @@ signalTraps.map(type => {
   process.once(type as any, async () => {
     try {
       await mongoose.disconnect();
-      if (kafkaConnections) {
-        const kc = await kafkaConnections;
-        await Promise.all([
-          kc.analysisUpdatesConsumer?.disconnect(),
-          kc.analysisUpdatesDlqProducer?.disconnect(),
-        ]);
-      }
+      await kafka.disconnect();
     } finally {
       process.kill(process.pid, type);
     }

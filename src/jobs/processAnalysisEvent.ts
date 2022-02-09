@@ -19,7 +19,7 @@
 
 import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
-import { AnalysisUpdateEvent } from '../external/kafka';
+import { AnalysisUpdateEvent } from '../external/kafka/analysisUpdatesConsumer';
 import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
 import { isRestricted } from '../services/utils/fileUtils';
 import { getIndexer } from '../services/indexer';
