@@ -23,37 +23,45 @@ import { getIndexer, Indexer } from '../services/indexer';
 const logger = Logger('Job:RecalculateFileEmbargo');
 
 const recalculateFileEmbargo = async () => {
-  logger.info(`Starting!`);
+  try {
+    logger.info(`Starting!`);
 
-  const indexer = await getIndexer();
+    const indexer = await getIndexer();
 
-  const fileCount = await fileService.countFiles({});
-  logger.debug(`total files: ${fileCount}`);
+    const fileCount = await fileService.countFiles({});
+    logger.debug(`total files: ${fileCount}`);
 
-  for await (const file of fileService.getAllFiles({})) {
-    logger.debug(
-      `checking file`,
-      file.programId,
-      file.fileId,
-      file.embargoStage,
-      file.releaseState,
-      file.firstPublished || '',
-    );
-    const updatedFile = await recalculateFileState(file);
+    for await (const file of fileService.getAllFiles({})) {
+      logger.debug(
+        `checking file`,
+        file.programId,
+        file.fileId,
+        file.embargoStage,
+        file.releaseState,
+        file.firstPublished || '',
+      );
+      const updatedFile = await recalculateFileState(file);
 
-    logger.debug(`updatedFile`, updatedFile.embargoStage, updatedFile.releaseState);
-    if (
-      updatedFile.embargoStage !== file.embargoStage ||
-      updatedFile.releaseState !== file.releaseState
-    ) {
-      logger.debug(`file has changed, updating!`);
-      await indexer.updateRestrictedFile(updatedFile);
+      logger.debug(`updatedFile`, updatedFile.embargoStage, updatedFile.releaseState);
+      if (
+        updatedFile.embargoStage !== file.embargoStage ||
+        updatedFile.releaseState !== file.releaseState
+      ) {
+        logger.debug(`file has changed, updating!`);
+        await indexer.updateRestrictedFile(updatedFile);
+      }
+    }
+
+    logger.info(`Indexing updated restricted files`);
+    indexer.release();
+
+    logger.info(`Finished!`);
+  } catch (e) {
+    if (e instanceof Error) {
+      logger.error(`Recalculate file embargo job failed with error:`, e.message, e.stack);
+    } else {
+      logger.error(`Recalculate file embargo job failed with error:`, e);
     }
   }
-
-  logger.info(`Indexing updated restricted files`);
-  indexer.release();
-
-  logger.info(`Finished!`);
 };
 export default recalculateFileEmbargo;
