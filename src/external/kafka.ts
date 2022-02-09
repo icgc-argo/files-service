@@ -21,9 +21,8 @@ import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 import retry from 'async-retry';
 import { AppConfig } from '../config';
 import { SongAnalysis } from './song';
-import analysisEventProcessor from '../services/processAnalysisEvent';
+import analysisEventProcessor from '../jobs/processAnalysisEvent';
 import { PublicReleaseMessage } from 'kafkaMessages';
-import { ANALYSIS_STATE } from '../utils/constants';
 import Logger from '../logger';
 const logger = Logger('Kafka');
 

@@ -20,12 +20,12 @@
 import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { AnalysisUpdateEvent } from '../external/kafka';
-import { saveAndIndexFilesFromRdpcData } from './fileManager';
-import { isRestricted } from './utils/fileUtils';
-import { getIndexer } from './indexer';
+import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
+import { isRestricted } from '../services/utils/fileUtils';
+import { getIndexer } from '../services/indexer';
 import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
-const logger = Logger('Process.AnalysisEvent');
+const logger = Logger('Job:ProcessAnalysisEvent');
 
 async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) {
   const rdpcFileDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
@@ -42,7 +42,7 @@ async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) 
  */
 async function handleSongUnpublishedAnalysis(analysisId: string, status: string) {
   // Get files based on analysis ID
-  const files = await fileService.getFilesFromAnalysisId(analysisId);
+  const files = await fileService.getFilesByAnalysisId(analysisId);
   if (files.length === 0) {
     logger.info(`No stored files for analysis ${analysisId}. No processing to do.`);
   }
@@ -69,7 +69,7 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
  * Song Kafka Message Handler
  * @param analysisEvent
  */
-const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
+const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent) => {
   const { analysis, analysisId, state, songServerId } = analysisEvent;
 
   logger.info(
@@ -87,4 +87,4 @@ const analysisEventHandler = async (analysisEvent: AnalysisUpdateEvent) => {
     `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
   );
 };
-export default analysisEventHandler;
+export default processAnalysisEvent;
