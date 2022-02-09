@@ -88,7 +88,7 @@ let kafkaConnections: Promise<{
   }
 
   // Init ES client
-  const esClient = getClient();
+  await getClient();
 })();
 
 // terminate kafka connections before exiting
@@ -99,8 +99,8 @@ const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 errorTypes.map(type => {
   process.on(type as any, async (e: Error) => {
     try {
-      mongoLog.info(`process.on ${type}`);
-      mongoLog.error(e.message);
+      serverLog.info(`process.on ${type}`);
+      serverLog.error(e.message);
       console.log(e); // Get full error output
       await mongoose.disconnect();
       if (kafkaConnections) {
