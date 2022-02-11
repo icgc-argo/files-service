@@ -23,7 +23,8 @@ import { AppConfig } from '../config';
 
 import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import analysisEventProcessor from '../services/processAnalysisEvent';
+import analysisEventProcessor from '../jobs/processAnalysisEvent';
+import recalculateFileEmbargo from '../jobs/recalculateFileEmbargo';
 import * as fileService from '../data/files';
 const logger = Logger('Debug.Router');
 
@@ -50,7 +51,7 @@ const createDebugRouter = (
     authFilter([config.auth.writeScope]),
     wrapAsync(async (req: Request, res: Response) => {
       const ids = (req.query.id as string | undefined)?.split(',') || [];
-      await fileService.deleteAll(ids);
+      await fileService.deleteByIds(ids);
       return res.status(201).send();
     }),
   );
@@ -62,6 +63,16 @@ const createDebugRouter = (
       const analysisEvent = req.body;
       const result = await analysisEventProcessor(analysisEvent);
       return res.status(201).send(result);
+    }),
+  );
+
+  router.post(
+    '/recalculateEmbargo',
+    authFilter([config.auth.writeScope]),
+    wrapAsync(async (req: Request, res: Response) => {
+      // start the job, don't wait for result
+      recalculateFileEmbargo();
+      return res.status(201).send('Started Job: Recalculate Embargo Stages for all files');
     }),
   );
 

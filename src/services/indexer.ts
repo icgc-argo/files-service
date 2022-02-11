@@ -25,7 +25,7 @@ import { getClient } from '../external/elasticsearch';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
-import { isPublic, isRestricted } from './utils/fileUtils';
+import { isPublic, isPublished, isRestricted } from './utils/fileUtils';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
@@ -218,6 +218,11 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function updateRestrictedFile(file: File): Promise<void> {
     // Don't update a file if it is PUBLIC already
     if (isPublic(file)) {
+      return;
+    }
+
+    // Don't run updates on unpublished files
+    if (!isPublished(file)) {
       return;
     }
 

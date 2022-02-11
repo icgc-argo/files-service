@@ -25,17 +25,21 @@ import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
 
 import { createSnapshot } from '../external/elasticsearch';
-import { sendPublicReleaseMessage } from '../external/kafka';
+import {
+  sendPublicReleaseMessage,
+  Program,
+  PublicReleaseMessage,
+} from '../external/kafka/publicReleaseProducer';
 
 import StringMap from '../utils/StringMap';
-import { Program, PublicReleaseMessage } from 'kafkaMessages';
 
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
 import { getEmbargoStage } from './embargo';
 
 import Logger from '../logger';
-import { ANALYSIS_STATE } from '../utils/constants';
+import { ANALYSIS_STATUS } from '../utils/constants';
+import { isPublished } from './utils/fileUtils';
 const logger = Logger('ReleaseManager');
 
 function toObjectId(file: File) {
@@ -64,14 +68,10 @@ export async function calculateRelease(): Promise<void> {
     });
 
     // Don't add anything that is not PUBLISHED in song
-    const added = queuedToPublicFiles
-      .filter(file => file.status === ANALYSIS_STATE.PUBLISHED)
-      .map(toObjectId);
+    const added = queuedToPublicFiles.filter(isPublished).map(toObjectId);
 
     // Find removed files - combined those queued to restricted and those no longer published in song
-    const unpublished = publicFiles
-      .filter(file => file.status !== ANALYSIS_STATE.PUBLISHED)
-      .map(toObjectId);
+    const unpublished = publicFiles.filter(file => !isPublished(file)).map(toObjectId);
     const demoted = queuedToRestrictedFiles.map(toObjectId);
     const removed = unpublished.concat(demoted);
 
@@ -127,9 +127,9 @@ export async function buildActiveRelease(label: string): Promise<void> {
     // 1. Sort files into programs, published and restricted
 
     const programs: StringMap<{ kept: File[]; added: File[] }> = {};
-    const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
-    const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
-    const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
+    const filesKept: File[] = await fileService.getFilesByObjectIds(release.filesKept);
+    const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
+    const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
 
     // programIds is used to list all public indices that should be created.
     // including filesRemoved in this list ensures that if we remove all files from a program's public index
@@ -257,8 +257,8 @@ export async function publishActiveRelease(): Promise<void> {
       throw new Error('Active release has no public indices. Nothing to publish.');
     }
 
-    const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
-    const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
+    const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
+    const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
 
     const indexer = await getIndexer();
 
@@ -348,18 +348,15 @@ function buildKafkaMessage(
   const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
 
   // get unique donor ids from filesAdded and filesRemoved:
-  const programsUpdated: Program[] = [];
-
-  Object.entries(filesUpdated).forEach(([programId, files]) => {
+  const programsUpdated: Program[] = Object.entries(filesUpdated).map(([programId, files]) => {
     const donorIds = new Set<string>();
     files.map(file => {
       donorIds.add(file.donorId);
     });
-    const program: Program = {
+    return {
       id: programId,
       donorsUpdated: Array.from(donorIds),
     };
-    programsUpdated.push(program);
   });
 
   const message: PublicReleaseMessage = {

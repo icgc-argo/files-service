@@ -19,7 +19,7 @@
 
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
-import { AnalysisUpdateEvent } from '../external/kafka';
+import { AnalysisUpdateEvent } from '../external/kafka/analysisUpdatesConsumer';
 import nock from 'nock';
 import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';

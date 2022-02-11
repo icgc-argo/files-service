@@ -32,7 +32,7 @@ export interface AppConfig {
     kafkaClientId: string;
     consumers: {
       analysisUpdates: KafkaConsumerConfigurations;
-      reindexing: KafkaConsumerConfigurations;
+      recalculateEmbargo: KafkaConsumerConfigurations;
     };
     producers: {
       publicRelease: KafkaProducerConfigurations;
@@ -77,7 +77,7 @@ export interface AppConfig {
 export interface KafkaConsumerConfigurations {
   topic: string;
   group: string;
-  dlq: string | undefined;
+  dlq?: string;
 }
 
 export interface KafkaProducerConfigurations {
@@ -135,13 +135,14 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       consumers: {
         analysisUpdates: {
           topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'song_analysis',
-          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'files-service-placeholder-analysis',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'file-manager.group.analysis-updates',
           dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
-        reindexing: {
-          topic: process.env.KAFKA_REINDEXING_TOPIC || 'files_reindexing',
-          group: process.env.KAFKA_REINDEXING_GROUP || 'files-service-placeholder-reindexing',
-          dlq: process.env.KAFKA_REINDEXING_DLQ,
+        recalculateEmbargo: {
+          topic: process.env.KAFKA_RECALCULATE_EMBARGO_TOPIC || 'file-manager.recalculate-embargo',
+          group:
+            process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.group.recalculate-embargo',
+          // No need for DLQ. Failures will get corrected on next attempt if scheduled to run regularly.
         },
       },
       producers: {

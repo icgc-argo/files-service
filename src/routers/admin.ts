@@ -25,7 +25,7 @@ import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
-import { reindexDataCenter } from '../services/processDataSyncRequest';
+import reindexDataCenter from '../jobs/reindexDataCenter';
 import { recalculateFileState } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
 
@@ -102,7 +102,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
               errors[file.objectId] = e;
             })
             .process(async file => {
-              logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
+              logger.debug(`Recalculating and reindexing file: ${file.fileId}`);
               const recalculatedFile = await recalculateFileState(file);
               await indexer.updateRestrictedFile(recalculatedFile);
               return file;
@@ -169,7 +169,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
               errors[file.objectId] = e;
             })
             .process(async file => {
-              logger.debug(`Recalculating and reindexing file: ${file.objectId}`);
+              logger.debug(`Recalculating and reindexing file: ${file.fileId}`);
               const recalculatedFile = await recalculateFileState(file);
               await indexer.updateRestrictedFile(recalculatedFile);
               return file;
