@@ -22,11 +22,19 @@ import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesByStudy } from '../external/song';
 import { streamToAsyncGenerator } from '../utils/streamToAsync';
-import { saveAndIndexFilesFromRdpcData } from './fileManager';
-import { getIndexer } from './indexer';
-const logger = Logger('Process.DataSync');
+import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
+import { getIndexer } from '../services/indexer';
+const logger = Logger('Job:ReindexDataCenter');
 
-export async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
+/**
+ * Fetch all analysis data from a given data center and use this data to make sure all files are up to date
+ * in DB and in ES
+ *
+ * A list of study IDS can be provided in the studyFilter to limit which studies are indexed.
+ * @param dataCenterId
+ * @param studyFilter
+ */
+async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
   try {
     logger.info(`Start: reindex data center ${dataCenterId}`);
     const { url } = await getDataCenter(dataCenterId);
@@ -72,3 +80,4 @@ async function generateStudyAnalyses(url: string, studyId: string) {
   // read one batch entry at a time
   return streamToAsyncGenerator<any>(pipeline, 1);
 }
+export default reindexDataCenter;

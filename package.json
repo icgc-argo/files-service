@@ -1,6 +1,6 @@
 {
   "name": "files-service",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "description": "",
   "scripts": {
     "start": "npm run serve",
@@ -9,8 +9,7 @@
     "resources": "copyfiles -u 1 src/resources/*.* dist/",
     "tslint": "tslint -c tslint.json -p tsconfig.json",
     "build": "npm run build-ts && npm run resources && npm run tslint",
-    "debug": "npm run build && sleep 3 && npm run watch-debug",
-    "watch-debug": "nodemon --delay 1000ms --inspect --watch  'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
+    "debug": "nodemon --delay 1000ms --inspect --watch  'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
     "test": "mocha --exit --inspect --timeout 60000 -r ts-node/register src/test/**/*.spec.ts",
     "migrate-up": "migrate-mongo up",
     "migrate-down": "migrate-mongo down",
@@ -20,7 +19,7 @@
     "type": "git",
     "url": "git+https://github.com/icgc-argo/service.git"
   },
-  "author": "blabadi",
+  "author": "OICR",
   "license": "AGPL-3.0",
   "bugs": {
     "url": "https://github.com/icgc-argo/service/issues"
@@ -28,8 +27,6 @@
   "homepage": "https://github.com/icgc-argo/service",
   "devDependencies": {
     "@types/async-retry": "^1.4.2",
-    "@types/bcrypt-nodejs": "^0.0.30",
-    "@types/bluebird": "^3.5.27",
     "@types/chai": "^4.2.12",
     "@types/chai-http": "^4.2.0",
     "@types/connect-mongo": "^0.0.42",

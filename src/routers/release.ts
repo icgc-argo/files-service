@@ -373,9 +373,9 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
 }
 async function getReleaseResponse(release: Release): Promise<ReleaseSummary> {
   // We need to get the donor and program details of our files
-  const filesKept: File[] = await fileService.getFilesFromObjectIds(release.filesKept);
-  const filesAdded: File[] = await fileService.getFilesFromObjectIds(release.filesAdded);
-  const filesRemoved: File[] = await fileService.getFilesFromObjectIds(release.filesRemoved);
+  const filesKept: File[] = await fileService.getFilesByObjectIds(release.filesKept);
+  const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
+  const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
 
   const totals = {
     files: {

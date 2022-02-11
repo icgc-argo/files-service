@@ -504,6 +504,18 @@ paths:
             application/json:
               schema:
                 type: object
+  /debug/recalculateEmbargo:
+    post:
+      tags:
+        - Debug
+      responses:
+        '200':
+          description:
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Job Started
   /debug/files:
     delete:
       tags:

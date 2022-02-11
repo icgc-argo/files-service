@@ -23,7 +23,6 @@ import Logger from './logger';
 import { Server } from 'http';
 import { getAppConfig } from './config';
 import { database, up } from 'migrate-mongo';
-import { Consumer, Producer } from 'kafkajs';
 import * as kafka from './external/kafka';
 import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
@@ -32,10 +31,6 @@ const serverLog = Logger('Server');
 const mongoLog = Logger('Mongo');
 
 let server: Server;
-let kafkaConnections: Promise<{
-  analysisUpdatesConsumer: Consumer | undefined;
-  analysisUpdatesDlqProducer: Producer | undefined;
-}>;
 
 // bootstraping the app and setting up connections to: db, kafka, experss server
 (async () => {
@@ -67,6 +62,19 @@ let kafkaConnections: Promise<{
   await dbConnection.connectDb(appConfig);
 
   /**
+   * Connect to other external dependencies
+   *  - elasticsearch
+   *  - kafka
+   */
+
+  // Init ES client
+  await getClient();
+
+  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
+    await kafka.setup(appConfig);
+  }
+
+  /**
    * Start Express server.
    */
   const app = App(appConfig);
@@ -82,13 +90,6 @@ let kafkaConnections: Promise<{
     serverLog.debug(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
     serverLog.debug('Press CTRL-C to stop');
   });
-
-  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
-    kafkaConnections = kafka.setup(appConfig);
-  }
-
-  // Init ES client
-  const esClient = getClient();
 })();
 
 // terminate kafka connections before exiting
@@ -99,17 +100,11 @@ const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 errorTypes.map(type => {
   process.on(type as any, async (e: Error) => {
     try {
-      mongoLog.info(`process.on ${type}`);
-      mongoLog.error(e.message);
+      serverLog.info(`process.on ${type}`);
+      serverLog.error(e.message);
       console.log(e); // Get full error output
       await mongoose.disconnect();
-      if (kafkaConnections) {
-        const kc = await kafkaConnections;
-        await Promise.all([
-          kc.analysisUpdatesConsumer?.disconnect(),
-          kc.analysisUpdatesDlqProducer?.disconnect(),
-        ]);
-      }
+      await kafka.disconnect();
       process.exit(0);
     } catch (_) {
       process.exit(1);
@@ -121,13 +116,7 @@ signalTraps.map(type => {
   process.once(type as any, async () => {
     try {
       await mongoose.disconnect();
-      if (kafkaConnections) {
-        const kc = await kafkaConnections;
-        await Promise.all([
-          kc.analysisUpdatesConsumer?.disconnect(),
-          kc.analysisUpdatesDlqProducer?.disconnect(),
-        ]);
-      }
+      await kafka.disconnect();
     } finally {
       process.kill(process.pid, type);
     }
