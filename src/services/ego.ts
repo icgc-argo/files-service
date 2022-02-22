@@ -56,6 +56,13 @@ const getEgoPublicKey = async (): Promise<string> => {
 
   if (config.auth.jwtKeyUrl) {
     const response = await fetch(config.auth.jwtKeyUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Ego public key fetch failed with non-200 response: ${response.status} ${response.statusText}`,
+      );
+    }
+
     return await response.text();
   }
 
@@ -78,6 +85,12 @@ const getApplicationJwt = async (
       'Content-type': 'application/json',
     },
   });
+
+  if (!response.ok) {
+    throw new Error(
+      `Auth request failed with non-200 response: ${response.status} ${response.statusText}`,
+    );
+  }
 
   const authResponse = await response.json();
 
