@@ -30,7 +30,7 @@ export type EgoApplicationCredential = {
   clientSecret: string;
 };
 
-export type ScoreAuthClient = {
+export type AuthClient = {
   getAuth: () => Promise<string>;
 };
 
@@ -103,22 +103,22 @@ const getApplicationJwt = async (
   return (authResponse as EgoAccessToken).access_token;
 };
 
-export const createScoreAuthClient = async () => {
+export const createAuthClient = async () => {
   let latestJwt: string;
 
   const config = await getAppConfig();
 
-  const scoreProxyAppCredentials = {
-    clientId: config.auth.egoScoreProxyClientId,
-    clientSecret: config.auth.egoScoreProxyClientSecret,
+  const appCredentials = {
+    clientId: config.auth.egoClientId,
+    clientSecret: config.auth.egoClientSecret,
   } as EgoApplicationCredential;
 
   const getAuth = async () => {
     if (latestJwt && egoTokenUtils(await getEgoPublicKey()).isValidJwt(latestJwt)) {
       return latestJwt;
     }
-    logger.debug(`Score Proxy JWT is no longer valid, fetching new token from ego...`);
-    return await getApplicationJwt(scoreProxyAppCredentials);
+    logger.debug(`JWT is no longer valid, fetching new token from ego...`);
+    return await getApplicationJwt(appCredentials);
   };
 
   return {

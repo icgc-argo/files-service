@@ -55,8 +55,8 @@ export interface AppConfig {
     writeScope: string;
     readScope: string;
     egoRootRest: string;
-    egoScoreProxyClientId: string;
-    egoScoreProxyClientSecret: string;
+    egoClientId: string;
+    egoClientSecret: string;
   };
   analysisConverterUrl: string;
   analysisConverterTimeout: number;
@@ -171,10 +171,8 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       writeScope: `${policy}.WRITE`,
       readScope: `${policy}.READ`,
       egoRootRest: process.env.EGO_ROOT_REST || 'http://localhost:8081',
-      egoScoreProxyClientId:
-        secrets.EGO_SCORE_PROXY_CLIENT_ID || process.env.EGO_SCORE_PROXY_CLIENT_ID,
-      egoScoreProxyClientSecret:
-        secrets.EGO_SCORE_PROXY_CLIENT_SECRET || process.env.EGO_SCORE_PROXY_CLIENT_SECRET,
+      egoClientId: secrets.EGO_CLIENT_ID || process.env.EGO_CLIENT_ID,
+      egoClientSecret: secrets.EGO_CLIENT_SECRET || process.env.EGO_CLIENT_SECRET,
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
     analysisConverterTimeout: Number(process.env.ANALYSIS_CONVERTER_TIMEOUT || 30 * 1000),
