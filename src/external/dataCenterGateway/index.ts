@@ -19,11 +19,11 @@
 
 import { get } from 'lodash';
 import { GraphQLClient } from 'graphql-request';
-import { getAppConfig } from '../config';
+import { getAppConfig } from '../../config';
 import ALIGNMENT_METRICS_BY_RUN_ID from './gql/ALIGNMENT_METRICS_BY_RUN_ID';
-import { createAuthClient } from '../services/ego';
+import { createAuthClient } from '../../services/ego';
 
-import Logger from '../logger';
+import Logger from '../../logger';
 const logger = Logger('DataCenterGateway');
 
 export const getAlignmentMetrics = async (runId: String) => {
