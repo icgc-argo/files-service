@@ -64,6 +64,9 @@ export interface AppConfig {
     fetchTimeout: number;
     batchSize: number;
   };
+  clinical: {
+    url: string;
+  };
   rollcall: {
     url: string;
     aliasName: string;
@@ -175,6 +178,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       url: process.env.DC_URL || '',
       fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
       batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+    },
+    clinical: {
+      url: process.env.CLINICAL_URL || 'http://localhost:3000',
     },
     rollcall: {
       url: process.env.ROLLCALL_URL || 'http://localhost:9001',
