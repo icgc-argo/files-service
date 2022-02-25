@@ -118,7 +118,8 @@ export const createAuthClient = async () => {
       return latestJwt;
     }
     logger.debug(`JWT is no longer valid, fetching new token from ego...`);
-    return await getApplicationJwt(appCredentials);
+    latestJwt = await getApplicationJwt(appCredentials);
+    return latestJwt;
   };
 
   return {
