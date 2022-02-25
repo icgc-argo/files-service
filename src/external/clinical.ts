@@ -22,6 +22,7 @@ import { getAppConfig } from '../config';
 
 import Logger from '../logger';
 import _ from 'lodash';
+import { getEgoToken } from '../services/ego';
 const logger = Logger('Clinical');
 
 /**
@@ -99,6 +100,11 @@ export async function fetchDonor(programId: string, donorId: string) {
     logger.debug(`Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
     const response = await fetch(
       `${config.clinical.url}/clinical/program/${programId}/donor/${donorId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${await getEgoToken()}`,
+        },
+      },
     );
     const donor = await response.json();
     return donor;
@@ -114,8 +120,14 @@ export async function fetchDonor(programId: string, donorId: string) {
 export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerator<ClinicalDonor> {
   const config = await getAppConfig();
 
+  const token = await getEgoToken();
+
   logger.debug(`Begining fetch of all donors for program: ${programId}`);
-  const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donors`);
+  const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donors`, {
+    headers: {
+      Authorization: `Bearer ${await getEgoToken()}`,
+    },
+  });
   // Expected response is json-lines: new line delimited JSON documents that will be streamed in chunks
   // The next section turns the body response stream into an async iterator
   const body = response.body;
