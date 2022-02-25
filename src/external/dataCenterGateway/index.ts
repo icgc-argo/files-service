@@ -21,7 +21,7 @@ import { get } from 'lodash';
 import { GraphQLClient } from 'graphql-request';
 import { getAppConfig } from '../../config';
 import ALIGNMENT_METRICS_BY_RUN_ID from './gql/ALIGNMENT_METRICS_BY_RUN_ID';
-import { createAuthClient } from '../../services/ego';
+import { getEgoToken } from '../../services/ego';
 
 import Logger from '../../logger';
 const logger = Logger('DataCenterGateway');
@@ -33,17 +33,16 @@ export const getAlignmentMetrics = async (runId: String) => {
   }
 
   const config = await getAppConfig();
-  const authClient = await createAuthClient();
   const url = config.datacenter.gatewayUrl;
   const graphQLClient = new GraphQLClient(url, {
     headers: {
-      authorization: `Bearer ${await authClient.getAuth()}`,
+      authorization: `Bearer ${await getEgoToken()}`,
     },
   });
   const query = ALIGNMENT_METRICS_BY_RUN_ID;
   const variables = { runId };
 
-  const data = await graphQLClient.request(query, variables).catch(err => {
+  const data = await graphQLClient.request(query, variables).catch((err: Error) => {
     logger.error(`Error fetching alignment metrics for run ${runId}: ${err}`);
     throw err;
   });
