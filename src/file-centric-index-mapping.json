@@ -605,7 +605,6 @@
         "copy_to": ["file_autocomplete"]
       },
       "metrics": {
-        "type": "nested",
         "properties": {
           "average_insert_size": {
             "type": "float"
