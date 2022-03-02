@@ -120,8 +120,6 @@ export async function fetchDonor(programId: string, donorId: string) {
 export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerator<ClinicalDonor> {
   const config = await getAppConfig();
 
-  const token = await getEgoToken();
-
   logger.debug(`Begining fetch of all donors for program: ${programId}`);
   const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donors`, {
     headers: {
