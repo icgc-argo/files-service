@@ -25,6 +25,8 @@ import Logger from '../logger';
 
 const logger = Logger('Ego');
 
+let authClient: AuthClient;
+
 export type EgoApplicationCredential = {
   clientId: string;
   clientSecret: string;
@@ -45,28 +47,6 @@ type EgoAccessToken = {
 type EgoAccessTokenError = {
   error: string;
   error_description: string;
-};
-
-const getEgoPublicKey = async (): Promise<string> => {
-  const config = await getAppConfig();
-
-  if (config.auth.jwtKey) {
-    return config.auth.jwtKey;
-  }
-
-  if (config.auth.jwtKeyUrl) {
-    const response = await fetch(config.auth.jwtKeyUrl);
-
-    if (!response.ok) {
-      throw new Error(
-        `Ego public key fetch failed with non-200 response: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    return await response.text();
-  }
-
-  return '';
 };
 
 const getApplicationJwt = async (
@@ -103,7 +83,40 @@ const getApplicationJwt = async (
   return (authResponse as EgoAccessToken).access_token;
 };
 
-export const createAuthClient = async () => {
+const getPublicKey = async (): Promise<string> => {
+  const config = await getAppConfig();
+
+  if (config.auth.jwtKey) {
+    return config.auth.jwtKey;
+  }
+
+  if (config.auth.jwtKeyUrl) {
+    const response = await fetch(config.auth.jwtKeyUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Ego public key fetch failed with non-200 response: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.text();
+  }
+
+  if (config.auth.enabled) {
+    throw new Error(`Missing configuration properties to acquire Ego Public Key`);
+  }
+  return '';
+};
+
+export const getEgoToken = async (): Promise<string> => {
+  if (!authClient) {
+    await createAuthClient();
+  }
+  return authClient.getAuth();
+};
+
+const createAuthClient = async () => {
+  const publicKey: string = await getPublicKey();
   let latestJwt: string;
 
   const config = await getAppConfig();
@@ -114,15 +127,15 @@ export const createAuthClient = async () => {
   } as EgoApplicationCredential;
 
   const getAuth = async () => {
-    if (latestJwt && egoTokenUtils(await getEgoPublicKey()).isValidJwt(latestJwt)) {
+    if (latestJwt && egoTokenUtils(publicKey).isValidJwt(latestJwt)) {
       return latestJwt;
     }
-    logger.debug(`JWT is no longer valid, fetching new token from ego...`);
+    logger.debug(`Fetching new token from ego...`);
     latestJwt = await getApplicationJwt(appCredentials);
     return latestJwt;
   };
 
-  return {
+  authClient = {
     getAuth,
   };
 };
