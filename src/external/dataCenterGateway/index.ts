@@ -49,6 +49,6 @@ export const getAlignmentMetrics = async (runId: String) => {
 
   // logger.info(JSON.stringify(data, null, 2));
 
-  const metrics = get(data, 'analyses.content[0].files[0].metrics', null);
+  const metrics = get(data, 'analyses.content[0].files[0].metrics', undefined);
   return metrics;
 };
