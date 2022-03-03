@@ -40,15 +40,13 @@ async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
     const { url } = await getDataCenter(dataCenterId);
     logger.info(`Datacenter URL: ${url}`);
     const studies: string[] = await getStudies(url);
+    const filteredStudies: string[] =
+      studyFilter.length > 0 ? studies.filter(study => studyFilter.includes(study)) : studies;
 
     const indexer = await getIndexer();
+    await indexer.createEmptyRestrictedIndices(filteredStudies);
 
-    for (const study of studies) {
-      if (studyFilter.length > 0 && !studyFilter.includes(study)) {
-        // Skip studies not in our requested list
-        logger.debug(`Skipping study not included in re-index request: ${study}`);
-        continue;
-      }
+    for (const study of filteredStudies) {
       logger.info(`Indexing study: ${study}`);
       try {
         const analysesStream = await generateStudyAnalyses(url, study);

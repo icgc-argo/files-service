@@ -52,7 +52,10 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
       // const dataCenterId = req.params.datacenter;
       // TODO: Current config hardcodes a single data center instead of retrieving connection details from data center registry
 
-      const studies: string[] = (req.query.study || []) as string[];
+      // Swagger UI isn't sending single studies as an array, so we need to parse it
+      const studies: string[] = ((typeof req.query.study === 'string'
+        ? [req.query.study]
+        : req.query.study) || []) as string[];
 
       const dataCenterId = config.datacenter.dataCenterId;
       reindexDataCenter(dataCenterId, studies);
