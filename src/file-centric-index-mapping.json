@@ -603,6 +603,46 @@
       "study_id": {
         "type": "keyword",
         "copy_to": ["file_autocomplete"]
+      },
+      "metrics": {
+        "properties": {
+          "average_insert_size": {
+            "type": "float"
+          },
+          "average_length": {
+            "type": "integer"
+          },
+          "duplicated_bases": {
+            "type": "long"
+          },
+          "error_rate": {
+            "type": "float"
+          },
+          "mapped_bases_cigar": {
+            "type": "long"
+          },
+          "mapped_reads": {
+            "type": "long"
+          },
+          "mismatch_bases": {
+            "type": "long"
+          },
+          "paired_reads": {
+            "type": "long"
+          },
+          "pairs_on_different_chromosomes": {
+            "type": "long"
+          },
+          "properly_paired_reads": {
+            "type": "long"
+          },
+          "total_bases": {
+            "type": "long"
+          },
+          "total_reads": {
+            "type": "long"
+          }
+        }
       }
     }
   }

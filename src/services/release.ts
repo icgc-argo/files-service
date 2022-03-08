@@ -160,7 +160,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
     release = await releaseService.updateActiveReleaseIndices([]);
 
     // 2.b Make new empty public indices from the current public indices.
-    const publicIndices = await indexer.preparePublicIndices(Array.from(programIds));
+    const publicIndices = await indexer.createEmptyPublicIndices(Array.from(programIds));
     release = await releaseService.updateActiveReleaseIndices(publicIndices);
 
     // 3. Add files all required files to public indices.

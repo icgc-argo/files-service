@@ -26,6 +26,7 @@ import { database, up } from 'migrate-mongo';
 import * as kafka from './external/kafka';
 import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
+import { getEgoToken } from './services/ego';
 
 const serverLog = Logger('Server');
 const mongoLog = Logger('Mongo');
@@ -62,9 +63,10 @@ let server: Server;
   await dbConnection.connectDb(appConfig);
 
   /**
-   * Connect to other external dependencies
+   * Connect to other external dependencies - failed connections will prevent server startup
    *  - elasticsearch
    *  - kafka
+   *  - ego
    */
 
   // Init ES client
@@ -73,6 +75,9 @@ let server: Server;
   if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
     await kafka.setup(appConfig);
   }
+
+  // Init Ego Connection
+  appConfig.auth.enabled && (await getEgoToken());
 
   /**
    * Start Express server.

@@ -47,7 +47,8 @@ export interface Indexer {
   removeFilesFromPublic: (files: File[]) => Promise<void>;
   removeFilesFromRestricted: (files: File[]) => Promise<void>;
 
-  preparePublicIndices: (programs: string[]) => Promise<string[]>;
+  createEmptyPublicIndices: (programs: string[]) => Promise<string[]>;
+  createEmptyRestrictedIndices: (programs: string[]) => Promise<string[]>;
   indexPublicFileDocs: (docs: FileCentricDocument[]) => Promise<void>;
   deleteIndices: (indices: string[]) => Promise<void>;
 
@@ -313,7 +314,7 @@ export const getIndexer = async (): Promise<Indexer> => {
       });
   }
 
-  async function preparePublicIndices(programs: string[]): Promise<string[]> {
+  async function createEmptyPublicIndices(programs: string[]): Promise<string[]> {
     const publicIndices: string[] = [];
     await PromisePool.withConcurrency(5)
       .for(programs)
@@ -322,6 +323,17 @@ export const getIndexer = async (): Promise<Indexer> => {
         publicIndices.push(index);
       });
     return publicIndices;
+  }
+
+  async function createEmptyRestrictedIndices(programs: string[]): Promise<string[]> {
+    const restrictedIndices: string[] = [];
+    await PromisePool.withConcurrency(5)
+      .for(programs)
+      .process(async program => {
+        const index = await getNextIndex(program, { isPublic: false, clone: false });
+        restrictedIndices.push(index);
+      });
+    return restrictedIndices;
   }
 
   /**
@@ -516,7 +528,8 @@ export const getIndexer = async (): Promise<Indexer> => {
     updateRestrictedFile,
 
     // Public Index Management
-    preparePublicIndices,
+    createEmptyPublicIndices,
+    createEmptyRestrictedIndices,
     indexPublicFileDocs,
     deleteIndices,
     removeFilesFromPublic,

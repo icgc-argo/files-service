@@ -39,12 +39,24 @@ import PromisePool from '@supercharge/promise-pool';
 import fetch from 'node-fetch';
 
 import { SongAnalysis } from './song';
+import { getAlignmentMetrics } from './dataCenterGateway';
 
 import { getAppConfig } from '../config';
 import Logger from '../logger';
 const logger = Logger('AnalysisConverter');
 
 const CONVERTER_CONCURRENT_REQUESTS = 5;
+
+const addMetricsToAlignedReadsFile = async (
+  fileDocument: { [k: string]: RdpcFileDocument[] },
+  objectId: string,
+): Promise<RdpcFileDocument[]> => {
+  const runId = fileDocument[objectId][0].analysis.workflow.run_id;
+  const metrics = await getAlignmentMetrics(runId);
+
+  const fileWithMetrics = [{ ...fileDocument[objectId][0], metrics }];
+  return fileWithMetrics;
+};
 
 export type RdpcFileDocument = { [k: string]: any } & {
   objectId: string;
@@ -103,9 +115,19 @@ export async function convertAnalysisFileDocuments(
   const files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response
-  Object.keys(response).forEach((a: string) => {
-    files.push(...response[a]);
-  });
+  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+    .for(Object.keys(response))
+    .process(async (objectId: string) => {
+      if (
+        response[objectId][0].dataType === 'Aligned Reads' &&
+        response[objectId][0].analysis.analysisState === 'PUBLISHED'
+      ) {
+        const fileWithMetrics = await addMetricsToAlignedReadsFile(response, objectId);
+        files.push(...fileWithMetrics);
+      } else {
+        files.push(...response[objectId]);
+      }
+    });
 
   return files;
 }
