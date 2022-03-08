@@ -1,12 +1,14 @@
-import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
-import { KafkaProducerConfigurations } from '../../config';
+import { Kafka, Producer } from 'kafkajs';
+import { getAppConfig, KafkaProducerConfiguration } from '../../config';
 import Logger from '../../logger';
 const logger = Logger('Kafka.publicReleaseProducer');
 
 let publicReleaseProducer: Producer;
-let config: KafkaProducerConfigurations;
+let config: KafkaProducerConfiguration;
 
-export const init = async (kafka: Kafka, producerConfig: KafkaProducerConfigurations) => {
+export const init = async (kafka: Kafka) => {
+  const producerConfig = (await getAppConfig()).kafkaProperties.producers.publicRelease;
+
   publicReleaseProducer = kafka.producer();
   await publicReleaseProducer.connect();
   config = producerConfig;

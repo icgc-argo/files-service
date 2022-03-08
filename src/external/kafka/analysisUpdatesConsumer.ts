@@ -1,7 +1,7 @@
 import retry from 'async-retry';
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
-import { KafkaConsumerConfigurations } from '../../config';
+import { getAppConfig } from '../../config';
 import { SongAnalysis } from '../song';
 import analysisEventProcessor from '../../jobs/processAnalysisEvent';
 
@@ -11,7 +11,9 @@ const logger = Logger('Kafka.analysisUpdatesConsumer');
 let analysisUpdatesConsumer: Consumer | undefined;
 let analysisUpdatesDlqProducer: Producer | undefined;
 
-export const init = async (kafka: Kafka, consumerConfig: KafkaConsumerConfigurations) => {
+export const init = async (kafka: Kafka) => {
+  const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.analysisUpdates;
+
   analysisUpdatesConsumer = kafka.consumer({
     groupId: consumerConfig.group,
     retry: {
@@ -44,12 +46,13 @@ export const init = async (kafka: Kafka, consumerConfig: KafkaConsumerConfigurat
       },
     })
     .catch(e => {
-      logger.error('Failed to run consumer ' + e.message, e);
+      logger.error('Failed to run consumer.', e);
       throw e;
     });
 };
 
 export const disconnect = async () => {
+  await analysisUpdatesConsumer?.stop();
   await analysisUpdatesConsumer?.disconnect();
   await analysisUpdatesDlqProducer?.disconnect();
 };
@@ -79,7 +82,7 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq?: string)
   try {
     await retry(
       async (_bail: Function) => {
-        // todo validate message body
+        // TODO: validate message body
         const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
         await analysisEventProcessor(analysisEvent);
       },
@@ -89,10 +92,7 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq?: string)
       },
     );
   } catch (err) {
-    logger.error(
-      `Failed to handle analysis message, offset: ${message.offset}, message ${err.message}`,
-      err,
-    );
+    logger.error(`Failed to handle analysis message, offset: ${message.offset}`, err);
     if (analysisDlq && analysisUpdatesDlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
