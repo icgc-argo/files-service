@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   vault:
-    container_name: vault
+    container_name: files_vault
     image: vault
 
     volumes:
@@ -20,7 +20,7 @@ services:
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
 
   mongodb:
-    container_name: app_db
+    container_name: files_db
     image: 'bitnami/mongodb:4.0'
     ports:
       - '27027:27017'
@@ -36,6 +36,7 @@ services:
   ####  Elastic containers    ####
   ################################
   elasticsearch:
+    container_name: files_es
     image: docker.elastic.co/elasticsearch/elasticsearch:7.10.2
     ports:
       - 9200:9200
@@ -48,13 +49,15 @@ services:
       - path.repo=/usr/share/elasticsearch
 
   kibana:
-    image: 'kibana:7.5.0'
+    container_name: files_kibana
+    image: docker.elastic.co/kibana/kibana:7.10.2
     depends_on:
       - elasticsearch
     ports:
       - 5601:5601
 
   rollcall:
+    container_name: files_rollcall
     image: overture/rollcall:2.6.0
     depends_on:
       - elasticsearch
@@ -135,8 +138,8 @@ services:
 
 volumes:
   mongodb_data:
-    name: appdb_db_vol
+    name: files_db_vol
     driver: local
   es_data:
-    name: es_data_vol
+    name: files_es_data_vol
     driver: local
