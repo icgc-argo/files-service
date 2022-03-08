@@ -23,7 +23,7 @@ import urljoin from 'url-join';
 import Logger from '../logger';
 import { getAppConfig } from '../config';
 import { getClient } from './elasticsearch';
-import fileCentricConfig from '../file-centric-index-mapping.json';
+import fileCentricConfig from '../resources/file-centric-index-mapping.json';
 const logger = Logger('Rollcall');
 
 export function getIndexFromIndexName(indexName: string): Index {

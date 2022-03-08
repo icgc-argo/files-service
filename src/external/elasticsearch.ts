@@ -20,7 +20,7 @@
 import { Client } from '@elastic/elasticsearch';
 
 import { getAppConfig } from '../config';
-import esMapping from '../resources/file_centric_example.json';
+import esMapping from '../resources/file-centric-index-mapping.json';
 import Logger from '../logger';
 const logger = Logger('Elasticsearch');
 

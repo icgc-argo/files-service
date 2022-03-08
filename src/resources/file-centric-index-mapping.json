@@ -562,7 +562,8 @@
       },
       "file_id": {
         "type": "keyword",
-        "copy_to": ["file_autocomplete"]
+        "copy_to": ["file_autocomplete"],
+        "search_analyzer": "lowercase_keyword"
       },
       "file_type": {
         "type": "keyword"
