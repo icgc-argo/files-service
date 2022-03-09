@@ -6,6 +6,9 @@ debug: dcompose
 dcompose:
 	docker-compose -f docker-compose/docker-compose.yaml up -d
 
+dockerlite:
+	docker-compose -f docker-compose/docker-compose.yaml up -d elasticsearch mongodb rollcall
+
 # run all tests
 verify:
 	npm run test

@@ -116,8 +116,10 @@ export const getEgoToken = async (): Promise<string> => {
 };
 
 const createAuthClient = async () => {
-  const publicKey: string = await getPublicKey();
   let latestJwt: string;
+
+  const publicKey = await getPublicKey();
+  const tokenUtils = egoTokenUtils(publicKey);
 
   const config = await getAppConfig();
 
@@ -127,7 +129,7 @@ const createAuthClient = async () => {
   } as EgoApplicationCredential;
 
   const getAuth = async () => {
-    if (latestJwt && egoTokenUtils(publicKey).isValidJwt(latestJwt)) {
+    if (latestJwt && tokenUtils.isValidJwt(latestJwt)) {
       return latestJwt;
     }
     logger.debug(`Fetching new token from ego...`);

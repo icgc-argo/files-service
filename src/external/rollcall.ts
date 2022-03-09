@@ -23,7 +23,7 @@ import urljoin from 'url-join';
 import Logger from '../logger';
 import { getAppConfig } from '../config';
 import { getClient } from './elasticsearch';
-import fileCentricConfig from '../file-centric-index-mapping.json';
+import fileCentricConfig from '../resources/file-centric-index-mapping.json';
 const logger = Logger('Rollcall');
 
 export function getIndexFromIndexName(indexName: string): Index {
@@ -176,7 +176,6 @@ export default async (): Promise<RollCallClient> => {
   const configureIndex = async (index: Index): Promise<void> => {
     try {
       await client.indices.close({ index: index.indexName });
-
       await client.indices.putSettings({
         index: index.indexName,
         body: { ...fileCentricConfig.settings, 'index.blocks.write': false },
@@ -187,7 +186,9 @@ export default async (): Promise<RollCallClient> => {
       });
       await client.indices.open({ index: index.indexName });
     } catch (e) {
-      console.error(JSON.stringify(e));
+      logger.error(`Failed to configure new index: ${index.indexName}`, e);
+      // Throw so we don't continue writing to/aliasing this index.
+      throw e;
     }
   };
 

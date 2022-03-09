@@ -31,11 +31,11 @@ export interface AppConfig {
     kafkaBrokers: string[];
     kafkaClientId: string;
     consumers: {
-      analysisUpdates: KafkaConsumerConfigurations;
-      recalculateEmbargo: KafkaConsumerConfigurations;
+      analysisUpdates: KafkaConsumerConfiguration;
+      recalculateEmbargo: KafkaConsumerConfiguration;
     };
     producers: {
-      publicRelease: KafkaProducerConfigurations;
+      publicRelease: KafkaProducerConfiguration;
     };
   };
   mongoProperties: MongoProps;
@@ -81,13 +81,13 @@ export interface AppConfig {
   };
 }
 
-export interface KafkaConsumerConfigurations {
+export interface KafkaConsumerConfiguration {
   topic: string;
   group: string;
   dlq?: string;
 }
 
-export interface KafkaProducerConfigurations {
+export interface KafkaProducerConfiguration {
   topic: string;
 }
 

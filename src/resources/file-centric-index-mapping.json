@@ -110,7 +110,13 @@
                 "type": "keyword"
               },
               "donor_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "height": {
                 "type": "integer"
@@ -128,7 +134,13 @@
                 "type": "keyword"
               },
               "submitter_donor_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "survival_time": {
                 "type": "integer"
@@ -151,7 +163,13 @@
                 "type": "keyword"
               },
               "follow_up_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "interval_of_followup": {
                 "type": "integer"
@@ -178,7 +196,13 @@
                 "type": "keyword"
               },
               "primary_diagnosis_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "recurrence_m_category": {
                 "type": "keyword"
@@ -202,13 +226,31 @@
                 "type": "keyword"
               },
               "submitter_follow_up_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "submitter_primary_diagnosis_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "submitter_treatment_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "treatment_id": {
                 "type": "keyword"
@@ -267,7 +309,13 @@
                 "type": "keyword"
               },
               "submitter_primary_diagnosis_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               }
             }
           },
@@ -326,10 +374,22 @@
                 "type": "keyword"
               },
               "submitter_primary_diagnosis_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "submitter_specimen_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "tumour_grade": {
                 "type": "keyword"
@@ -409,10 +469,22 @@
                 "type": "keyword"
               },
               "submitter_primary_diagnosis_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "submitter_treatment_id": {
-                "type": "keyword"
+                "type": "keyword",
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "toxicity_type": {
                 "type": "keyword"
@@ -476,7 +548,13 @@
                   },
                   "submitter_sample_id": {
                     "type": "keyword",
-                    "copy_to": ["file_autocomplete"]
+                    "copy_to": ["file_autocomplete"],
+                    "fields": {
+                      "lowercase": {
+                        "type": "text",
+                        "analyzer": "lowercase_keyword"
+                      }
+                    }
                   }
                 }
               },
@@ -492,7 +570,13 @@
               },
               "submitter_specimen_id": {
                 "type": "keyword",
-                "copy_to": ["file_autocomplete"]
+                "copy_to": ["file_autocomplete"],
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "tumour_normal_designation": {
                 "type": "keyword"
@@ -501,7 +585,13 @@
           },
           "submitter_donor_id": {
             "type": "keyword",
-            "copy_to": ["file_autocomplete"]
+            "copy_to": ["file_autocomplete"],
+            "fields": {
+              "lowercase": {
+                "type": "text",
+                "analyzer": "lowercase_keyword"
+              }
+            }
           }
         }
       },
@@ -562,7 +652,16 @@
       },
       "file_id": {
         "type": "keyword",
-        "copy_to": ["file_autocomplete"]
+        "copy_to": ["file_autocomplete"],
+        "fields": {
+          "lowercase": {
+            "type": "text",
+            "analyzer": "lowercase_keyword"
+          }
+        }
+      },
+      "file_number": {
+        "type": "integer"
       },
       "file_type": {
         "type": "keyword"
