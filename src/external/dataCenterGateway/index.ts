@@ -21,7 +21,7 @@ import { get } from 'lodash';
 import { GraphQLClient } from 'graphql-request';
 import { getAppConfig } from '../../config';
 import ALIGNMENT_METRICS_BY_RUN_ID from './gql/ALIGNMENT_METRICS_BY_RUN_ID';
-import { getEgoToken } from '../../services/ego';
+import { getEgoToken } from '../../external/ego';
 
 import Logger from '../../logger';
 const logger = Logger('DataCenterGateway');

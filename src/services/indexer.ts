@@ -376,66 +376,6 @@ export const getIndexer = async (): Promise<Indexer> => {
   }
 
   /**
-   * @deprecated - Building file documents directly from song instead of relying on their data in ES restricted indices
-   * Copy file data currently in a restricted index into a public index.
-   * @param files
-   */
-  async function copyFilesToPublic(files: File[]): Promise<void> {
-    const sortedFiles = sortFilesIntoPrograms(files);
-
-    // TODO: Configure ES request concurrency
-    await PromisePool.withConcurrency(5)
-      .for(sortedFiles)
-      .process(async programData => {
-        const program = programData.program;
-        const fileIds = programData.files.map(file => file.objectId);
-
-        const restrictedIndex = await getCurrentIndex(program, { isPublic: false });
-        const publicIndex = await getNextIndex(program, {
-          isPublic: true,
-          clone: true,
-        });
-
-        if (!restrictedIndex) {
-          throw new Error(
-            `Failed to move file from restricted to public: no restricted index aliased for ${program}`,
-          );
-        }
-
-        const body = {
-          source: {
-            index: restrictedIndex,
-            query: {
-              bool: {
-                filter: {
-                  terms: {
-                    object_id: fileIds,
-                  },
-                },
-              },
-            },
-          },
-          dest: {
-            index: publicIndex,
-          },
-          // This script makes the indexed document change releaseState and embargoStage to PUBLIC
-          // This is the only mechanism used to put a file document into a public index, so this is responsible for making sure the Stage is correct.
-          script: {
-            source: `ctx._source.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.embargo_stage = "${EmbargoStage.PUBLIC}";ctx._source.meta.release_state = "${FileReleaseState.PUBLIC}"; ctx._source.meta.embargo_stage = "${EmbargoStage.PUBLIC}";`,
-          },
-        };
-
-        const response = await client.reindex({
-          wait_for_completion: true,
-          refresh: true,
-          body,
-        });
-
-        return;
-      });
-  }
-
-  /**
    * Note: No longer used in release process. Keeping this for use in emergency updates to public indices requiring removing files from an index.
    * @param files
    */

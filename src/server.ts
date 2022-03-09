@@ -26,7 +26,7 @@ import { database, up } from 'migrate-mongo';
 import * as kafka from './external/kafka';
 import { getClient } from './external/elasticsearch';
 import * as dbConnection from './data/dbConnection';
-import { getEgoToken } from './services/ego';
+import { getEgoToken } from './external/ego';
 
 const serverLog = Logger('Server');
 const mongoLog = Logger('Mongo');

@@ -22,7 +22,7 @@ import { getAppConfig } from '../config';
 
 import Logger from '../logger';
 import _ from 'lodash';
-import { getEgoToken } from '../services/ego';
+import { getEgoToken } from '../external/ego';
 const logger = Logger('Clinical');
 
 /**

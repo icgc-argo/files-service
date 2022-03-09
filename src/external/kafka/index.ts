@@ -33,9 +33,9 @@ export const setup = async (config: AppConfig): Promise<void> => {
 
   logger.info('Initializing Kafka connections...');
   await Promise.all([
-    analysisUpdatesConsumer.init(kafka, config.kafkaProperties.consumers.analysisUpdates),
-    recalculateEmbargoConsumer.init(kafka, config.kafkaProperties.consumers.recalculateEmbargo),
-    publicReleaseProducer.init(kafka, config.kafkaProperties.producers.publicRelease),
+    analysisUpdatesConsumer.init(kafka),
+    recalculateEmbargoConsumer.init(kafka),
+    publicReleaseProducer.init(kafka),
   ]);
   logger.info('Connected.');
 };

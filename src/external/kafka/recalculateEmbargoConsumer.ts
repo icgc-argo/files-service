@@ -1,7 +1,7 @@
 import retry from 'async-retry';
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
-import { KafkaConsumerConfigurations } from '../../config';
+import { getAppConfig, KafkaConsumerConfiguration } from '../../config';
 import recalculateFileEmbargo from '../../jobs/recalculateFileEmbargo';
 
 import Logger from '../../logger';
@@ -9,7 +9,9 @@ const logger = Logger('Kafka.recalculateEmbargoConsumer');
 
 let recalculateEmbargoConsumer: Consumer | undefined;
 
-export const init = async (kafka: Kafka, consumerConfig: KafkaConsumerConfigurations) => {
+export const init = async (kafka: Kafka) => {
+  const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.recalculateEmbargo;
+
   recalculateEmbargoConsumer = kafka.consumer({
     groupId: consumerConfig.group,
     retry: {
@@ -34,12 +36,13 @@ export const init = async (kafka: Kafka, consumerConfig: KafkaConsumerConfigurat
       },
     })
     .catch(e => {
-      logger.error('Failed to run consumer ' + e.message, e);
+      logger.error('Failed to run consumer.', e);
       throw e;
     });
 };
 
 export const disconnect = async () => {
+  await recalculateEmbargoConsumer?.stop();
   await recalculateEmbargoConsumer?.disconnect();
 };
 
