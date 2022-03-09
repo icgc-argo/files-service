@@ -7,7 +7,7 @@
     "strict": true,
     "strictNullChecks": true,
     "skipLibCheck": true,
-    "lib": ["esnext.array"],
+    "lib": ["esnext"],
     "noImplicitAny": true,
     "allowJs": true,
     "resolveJsonModule": true,
