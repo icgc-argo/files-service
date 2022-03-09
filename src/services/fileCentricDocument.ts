@@ -78,6 +78,7 @@ export const buildDocument = ({
   const output: FileCentricDocument = {
     ...filePartialDocument,
     fileId: dbFile.fileId,
+    fileNumber: dbFile.fileNumber,
     embargoStage: dbFile.embargoStage,
     releaseState: dbFile.releaseState,
     meta: {
