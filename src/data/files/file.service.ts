@@ -224,6 +224,7 @@ function toPojo(f: FileMongooseDocument): File {
   }
   return {
     fileId: `FL${f.fileId}`,
+    fileNumber: f.fileId,
     objectId: f.objectId,
     repoId: f.repoId,
 

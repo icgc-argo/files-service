@@ -83,6 +83,7 @@ interface DbFile {
 // File is the POJO with proper types for a document read from the DB
 export interface File {
   fileId: string;
+  fileNumber: number;
   objectId: string;
   repoId: string;
   status: string;
