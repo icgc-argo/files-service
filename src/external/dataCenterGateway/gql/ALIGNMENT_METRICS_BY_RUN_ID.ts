@@ -27,8 +27,9 @@ const ALIGNMENT_METRICS_BY_RUN_ID = gql`
         analysisState
         studyId
         analysisType
-        files {
+        files(filter: { analysisTools: ["Samtools:stats"] }) {
           fileType
+          analysisTools
           objectId
           metrics
         }

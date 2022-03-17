@@ -120,7 +120,8 @@ export async function convertAnalysisFileDocuments(
     .process(async (objectId: string) => {
       if (
         response[objectId][0].dataType === 'Aligned Reads' &&
-        response[objectId][0].analysis.analysisState === 'PUBLISHED'
+        response[objectId][0].analysis.analysisState === 'PUBLISHED' &&
+        response[objectId][0].analysis.workflow.workflow_name === 'DNA Seq Alignment'
       ) {
         const fileWithMetrics = await addMetricsToAlignedReadsFile(response, objectId);
         files.push(...fileWithMetrics);
