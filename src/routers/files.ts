@@ -46,10 +46,11 @@ const createFilesRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             limit: (req.query as any)?.limit,
           },
           {
-            analysisId: (req.query as any)?.analysisId?.split(','),
-            objectId: (req.query as any)?.objectId?.split(','),
-            programId: (req.query as any)?.programId?.split(','),
-            donorId: (req.query as any)?.donorId?.split(','),
+            analyses: (req.query as any)?.analyses?.split(','),
+            objectIds: (req.query as any)?.objectIds?.split(','),
+            programs: (req.query as any)?.programs?.split(','),
+            donors: (req.query as any)?.donors?.split(','),
+            fileIds: (req.query as any)?.fileIds?.split(','),
           },
         ),
       );
