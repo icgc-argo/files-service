@@ -524,7 +524,13 @@
         "properties": {
           "donor_id": {
             "type": "keyword",
-            "copy_to": ["file_autocomplete"]
+            "copy_to": ["file_autocomplete"],
+            "fields": {
+              "lowercase": {
+                "type": "text",
+                "analyzer": "lowercase_keyword"
+              }
+            }
           },
           "gender": {
             "type": "keyword"
@@ -537,11 +543,23 @@
                 "properties": {
                   "matched_normal_submitter_sample_id": {
                     "type": "keyword",
-                    "copy_to": ["file_autocomplete"]
+                    "copy_to": ["file_autocomplete"],
+                    "fields": {
+                      "lowercase": {
+                        "type": "text",
+                        "analyzer": "lowercase_keyword"
+                      }
+                    }
                   },
                   "sample_id": {
                     "type": "keyword",
-                    "copy_to": ["file_autocomplete"]
+                    "copy_to": ["file_autocomplete"],
+                    "fields": {
+                      "lowercase": {
+                        "type": "text",
+                        "analyzer": "lowercase_keyword"
+                      }
+                    }
                   },
                   "sample_type": {
                     "type": "keyword"
@@ -560,7 +578,13 @@
               },
               "specimen_id": {
                 "type": "keyword",
-                "copy_to": ["file_autocomplete"]
+                "copy_to": ["file_autocomplete"],
+                "fields": {
+                  "lowercase": {
+                    "type": "text",
+                    "analyzer": "lowercase_keyword"
+                  }
+                }
               },
               "specimen_tissue_source": {
                 "type": "keyword"
@@ -701,7 +725,13 @@
       },
       "study_id": {
         "type": "keyword",
-        "copy_to": ["file_autocomplete"]
+        "copy_to": ["file_autocomplete"],
+        "fields": {
+          "lowercase": {
+            "type": "text",
+            "analyzer": "lowercase_keyword"
+          }
+        }
       },
       "metrics": {
         "properties": {
