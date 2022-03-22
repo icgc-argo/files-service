@@ -54,29 +54,36 @@ paths:
           required: false
           schema:
             type: number
-        - name: analysisId
+        - name: analyses
           description: List of analysis ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
-        - name: objectId
+        - name: objectIds
           description: List of file object Ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
-        - name: programId
+        - name: programs
           description: List of file program Ids, csv
           in: query
           required: false
           schema:
             type: string
             format: csv
-        - name: donorId
+        - name: donors
           description: List of file donor Ids, csv
+          in: query
+          required: false
+          schema:
+            type: string
+            format: csv
+        - name: fileIds
+          description: List of file file Ids, csv
           in: query
           required: false
           schema:

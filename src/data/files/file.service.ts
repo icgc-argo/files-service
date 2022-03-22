@@ -17,27 +17,26 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import _ from 'lodash';
+import Logger from '../../logger';
+import * as fileModel from './file.model';
 import {
-  File,
-  FileInput,
-  FileMongooseDocument,
-  FileLabel,
-  FileFilter,
-  QueryFilters,
   EmbargoStage,
+  File,
+  FileFilter,
+  FileFilterProperties,
+  FileInput,
+  FileLabel,
+  FileMongooseDocument,
   FileReleaseState,
+  FilesResponse,
   FileStateFilter,
   PaginationFilter,
-  FilesResponse,
 } from './file.model';
-import * as fileModel from './file.model';
-import Logger from '../../logger';
 const logger = Logger('File.DataService');
 
 export async function getPaginatedFiles(
   paginationFilter: PaginationFilter,
-  queryFilter: QueryFilters,
+  queryFilter: FileFilterProperties,
 ): Promise<FilesResponse> {
   const response = await fileModel.getFilesQuery(paginationFilter, queryFilter);
   const files = response.docs.map(toPojo);

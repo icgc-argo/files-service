@@ -26,6 +26,7 @@ import { FILE_PAGE_SIZE_LIMIT } from '../../config';
 // select, sort, offset, page, limit  ect.. It's easy to code with and
 // the return value gives extra info such prevPage, nextPage, totalDocs.
 import mongoosePaginate from 'mongoose-paginate-v2';
+import { isEmpty } from 'lodash';
 
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
@@ -181,13 +182,6 @@ const FileSchema = new mongoose.Schema(
   { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
 );
 
-export type QueryFilters = {
-  analysisId?: string[];
-  programId?: string[];
-  objectId?: string[];
-  donorId?: string[];
-};
-
 export type PaginationFilter = {
   page?: number;
   limit?: number;
@@ -232,7 +226,7 @@ export async function getFiles(filters: FileFilter) {
 
 export async function getFilesQuery(
   paginationFilters: PaginationFilter,
-  filters: QueryFilters,
+  filters: FileFilterProperties,
 ): Promise<mongoose.PaginateResult<FileMongooseDocument>> {
   const paginateOptions = {
     page: paginationFilters.page ? paginationFilters.page : 1,
@@ -318,90 +312,59 @@ const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as Pa
   FileMongooseDocument
 >;
 
-function buildQueryFilters(filters: QueryFilters) {
-  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};
-  if (filters.analysisId && filters.analysisId.length > 0) {
-    queryFilters.analysisId = {
-      $in: filters.analysisId,
-    };
+function buildQueryFilters(filters: FileFilterProperties, include: boolean = true) {
+  const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];
+  const filterOperation = include ? '$in' : '$nin';
+  if (filters.analyses && filters.analyses.length > 0) {
+    conditions.push({
+      analysisId: {
+        [filterOperation]: filters.analyses,
+      },
+    });
   }
-  if (filters.programId && filters.programId.length > 0) {
-    queryFilters.programId = {
-      $in: filters.programId,
-    };
+  if (filters.programs && filters.programs.length > 0) {
+    conditions.push({
+      programId: {
+        [filterOperation]: filters.programs,
+      },
+    });
   }
-  if (filters.objectId && filters.objectId.length > 0) {
-    queryFilters.objectId = {
-      $in: filters.objectId,
-    };
+  if (filters.objectIds && filters.objectIds.length > 0) {
+    conditions.push({
+      objectId: {
+        [filterOperation]: filters.objectIds,
+      },
+    });
   }
-  if (filters.donorId && filters.donorId.length > 0) {
-    queryFilters.donorId = {
-      $in: filters.donorId,
-    };
+  if (filters.donors && filters.donors.length > 0) {
+    conditions.push({
+      donorId: {
+        [filterOperation]: filters.donors,
+      },
+    });
   }
-  return queryFilters;
+  if (filters.fileIds && filters.fileIds.length > 0) {
+    conditions.push({
+      fileId: {
+        [filterOperation]: filters.fileIds.map(fileIdFromString),
+      },
+    });
+  }
+  return conditions.length > 0 ? { $or: conditions } : {};
 }
 const fileIdFromString = (fileId: string): number => {
   return parseInt(fileId.replace(/^FL/, ''));
 };
 
 function convertFiltersForMongoose(filters: FileFilter) {
-  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = {};
-  if (filters.include) {
-    if (filters.include.analyses && filters.include.analyses.length > 0) {
-      queryFilters.analysisId = {
-        $in: filters.include.analyses,
-      };
-    }
-    if (filters.include.programs && filters.include.programs.length > 0) {
-      queryFilters.programId = {
-        $in: filters.include.programs,
-      };
-    }
-    if (filters.include.donors && filters.include.donors.length > 0) {
-      queryFilters.donorId = {
-        $in: filters.include.donors,
-      };
-    }
-    if (filters.include.objectIds && filters.include.objectIds.length > 0) {
-      queryFilters.objectId = {
-        $in: filters.include.objectIds,
-      };
-    }
-    if (filters.include.fileIds && filters.include.fileIds.length > 0) {
-      queryFilters.fileId = {
-        $in: filters.include.fileIds.map(fileIdFromString),
-      };
-    }
-  }
+  const includeConditions = filters.include ? buildQueryFilters(filters.include) : {};
+  const excludeConditions = filters.exclude ? buildQueryFilters(filters.exclude, false) : {};
+  const combinedConditions = [includeConditions, excludeConditions].filter(x => !isEmpty(x));
+  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(
+    combinedConditions,
+  )
+    ? {}
+    : { $and: combinedConditions };
 
-  if (filters.exclude) {
-    if (filters.exclude.analyses && filters.exclude.analyses.length > 0) {
-      queryFilters.analysisId = {
-        $nin: filters.exclude.analyses,
-      };
-    }
-    if (filters.exclude.programs && filters.exclude.programs.length > 0) {
-      queryFilters.programId = {
-        $nin: filters.exclude.programs,
-      };
-    }
-    if (filters.exclude.donors && filters.exclude.donors.length > 0) {
-      queryFilters.donorId = {
-        $nin: filters.exclude.donors,
-      };
-    }
-    if (filters.exclude.objectIds && filters.exclude.objectIds.length > 0) {
-      queryFilters.objectId = {
-        $nin: filters.exclude.objectIds,
-      };
-    }
-    if (filters.exclude.fileIds && filters.exclude.fileIds.length > 0) {
-      queryFilters.fileId = {
-        $nin: filters.exclude.fileIds.map(fileIdFromString),
-      };
-    }
-  }
   return queryFilters;
 }
