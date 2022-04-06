@@ -33,6 +33,7 @@ export interface AppConfig {
     consumers: {
       analysisUpdates: KafkaConsumerConfiguration;
       recalculateEmbargo: KafkaConsumerConfiguration;
+      clinicalUpdates: KafkaConsumerConfiguration;
     };
     producers: {
       publicRelease: KafkaProducerConfiguration;
@@ -150,6 +151,11 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
           group:
             process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.group.recalculate-embargo',
           // No need for DLQ. Failures will get corrected on next attempt if scheduled to run regularly.
+        },
+        clinicalUpdates: {
+          topic: process.env.KAFKA_ANALYSIS_UPDATES_TOPIC || 'clinical_program_update',
+          group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'file-manager.group.clinical-updates',
+          dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
       },
       producers: {
