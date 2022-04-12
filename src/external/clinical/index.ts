@@ -65,7 +65,7 @@ export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerat
   // The next section turns the body response stream into an async iterator
   let donorCount = 0;
   let unprocessedResponse = '';
-  for await (let chunk of response.body) {
+  for await (const chunk of response.body) {
     let leftovers = '';
     unprocessedResponse += chunk;
     const splitResponse = unprocessedResponse.split('\n');
