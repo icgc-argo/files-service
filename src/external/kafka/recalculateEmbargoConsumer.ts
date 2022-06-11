@@ -7,24 +7,24 @@ import recalculateFileEmbargo from '../../jobs/recalculateFileEmbargo';
 import Logger from '../../logger';
 const logger = Logger('Kafka.recalculateEmbargoConsumer');
 
-let recalculateEmbargoConsumer: Consumer | undefined;
+let consumer: Consumer | undefined;
 
 export const init = async (kafka: Kafka) => {
   const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.recalculateEmbargo;
 
-  recalculateEmbargoConsumer = kafka.consumer({
+  consumer = kafka.consumer({
     groupId: consumerConfig.group,
     retry: {
       retries: 5,
       factor: 1.5,
     },
   });
-  recalculateEmbargoConsumer.subscribe({
+  consumer.subscribe({
     topic: consumerConfig.topic,
   });
-  await recalculateEmbargoConsumer.connect();
+  await consumer.connect();
 
-  recalculateEmbargoConsumer
+  consumer
     .run({
       autoCommit: true,
       autoCommitThreshold: 10,
@@ -42,8 +42,8 @@ export const init = async (kafka: Kafka) => {
 };
 
 export const disconnect = async () => {
-  await recalculateEmbargoConsumer?.stop();
-  await recalculateEmbargoConsumer?.disconnect();
+  await consumer?.stop();
+  await consumer?.disconnect();
 };
 
 async function handleMessage() {

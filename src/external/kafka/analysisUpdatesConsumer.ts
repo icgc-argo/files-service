@@ -8,40 +8,40 @@ import analysisEventProcessor from '../../jobs/processAnalysisEvent';
 import Logger from '../../logger';
 const logger = Logger('Kafka.analysisUpdatesConsumer');
 
-let analysisUpdatesConsumer: Consumer | undefined;
-let analysisUpdatesDlqProducer: Producer | undefined;
+let consumer: Consumer | undefined;
+let dlqProducer: Producer | undefined;
 
 export const init = async (kafka: Kafka) => {
   const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.analysisUpdates;
 
-  analysisUpdatesConsumer = kafka.consumer({
+  consumer = kafka.consumer({
     groupId: consumerConfig.group,
     retry: {
       retries: 5,
       factor: 1.5,
     },
   });
-  analysisUpdatesConsumer.subscribe({
+  consumer.subscribe({
     topic: consumerConfig.topic,
   });
-  await analysisUpdatesConsumer.connect();
+  await consumer.connect();
 
-  const analysisDlq = consumerConfig.dlq;
-  if (analysisDlq) {
-    analysisUpdatesDlqProducer = kafka.producer({
+  const dlq = consumerConfig.dlq;
+  if (dlq) {
+    dlqProducer = kafka.producer({
       allowAutoTopicCreation: true,
     });
-    await analysisUpdatesDlqProducer.connect();
+    await dlqProducer.connect();
   }
 
-  await analysisUpdatesConsumer
+  await consumer
     .run({
       autoCommit: true,
       autoCommitThreshold: 10,
       autoCommitInterval: 10000,
       eachMessage: async ({ message }) => {
         logger.info(`New message received offset : ${message.offset}`);
-        await handleAnalysisUpdate(message, analysisDlq);
+        await handleAnalysisUpdate(message, dlq);
         logger.debug(`Message handled ok`);
       },
     })
@@ -52,9 +52,9 @@ export const init = async (kafka: Kafka) => {
 };
 
 export const disconnect = async () => {
-  await analysisUpdatesConsumer?.stop();
-  await analysisUpdatesConsumer?.disconnect();
-  await analysisUpdatesDlqProducer?.disconnect();
+  await consumer?.stop();
+  await consumer?.disconnect();
+  await dlqProducer?.disconnect();
 };
 
 export type AnalysisUpdateEvent = {
@@ -78,7 +78,7 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
   logger.debug(`DLQ message sent to ${dlqTopic}. response: ${JSON.stringify(result)}`);
 };
 
-async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq?: string) {
+async function handleAnalysisUpdate(message: KafkaMessage, dlq?: string) {
   try {
     await retry(
       async (_bail: Function) => {
@@ -93,12 +93,12 @@ async function handleAnalysisUpdate(message: KafkaMessage, analysisDlq?: string)
     );
   } catch (err) {
     logger.error(`Failed to handle analysis message, offset: ${message.offset}`, err);
-    if (analysisDlq && analysisUpdatesDlqProducer) {
+    if (dlq && dlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
         : { message: `invalid body, original offset: ${message.offset}` };
       logger.debug(`Sending message to dlq...`);
-      await sendDlqMessage(analysisUpdatesDlqProducer, analysisDlq, msg);
+      await sendDlqMessage(dlqProducer, dlq, msg);
     }
   }
 }
