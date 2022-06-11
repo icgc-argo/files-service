@@ -3,6 +3,7 @@ import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
 import { getAppConfig } from '../../config';
 import clinicalEventProcessor from '../../jobs/processClinicalEvent';
+import { isClinicalUpdateEvent } from './messages/ClinicalUpdateEvent';
 
 import Logger from '../../logger';
 const logger = Logger('Kafka.clinicalUpdatesConsumer');
@@ -56,11 +57,6 @@ export const disconnect = async () => {
   await dlqProducer?.disconnect();
 };
 
-export type ClinicalUpdateEvent = {
-  programId: string;
-  donorIds?: string[];
-};
-
 const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON: string) => {
   const result = await producer?.send({
     topic: dlqTopic,
@@ -76,11 +72,14 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
 async function handleMessage(message: KafkaMessage, clinicalDlq?: string) {
   try {
     await retry(
-      async (_bail: Function) => {
-        // TODO: validate message body
-        const clinicalEvent = JSON.parse(message.value?.toString() || '{}') as ClinicalUpdateEvent;
-        // TODO: Message handling goes here
-        await clinicalEventProcessor(clinicalEvent);
+      async (bail: Function) => {
+        const event = JSON.parse(message.value?.toString() || '{}');
+
+        if (isClinicalUpdateEvent(event)) {
+          await clinicalEventProcessor(event);
+        } else {
+          bail(new Error('Clinical Update Event message does not have expected structure.'));
+        }
       },
       {
         retries: 3,
