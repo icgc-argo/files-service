@@ -652,7 +652,7 @@ components:
           type: string
     ClinicalExemption:
       type: string
-      enum: [LEGACY_DATA, EARLY_RELEASE, ADMIN]
+      enum: [LEGACY, EARLY_RELEASE, ADMIN]
     EmbargoStage:
       type: string
       enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
