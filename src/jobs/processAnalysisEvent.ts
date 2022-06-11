@@ -16,9 +16,8 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
-import { AnalysisUpdateEvent } from '../external/kafka/analysisUpdatesConsumer';
 import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
 import { isRestricted } from '../services/utils/fileUtils';
 import { getIndexer } from '../services/indexer';
