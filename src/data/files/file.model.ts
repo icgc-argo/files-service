@@ -45,7 +45,7 @@ export enum EmbargoStage {
  * - ADMIN: DCC Admin has made the decision to make this file publicly available without requiring clinical data.
  */
 export enum ClinicalExemption {
-  LEGACY = 'LEGACY_DATA',
+  LEGACY = 'LEGACY',
   EARLY_RELEASE = 'EARLY_RELEASE',
   ADMIN = 'ADMIN',
 }
