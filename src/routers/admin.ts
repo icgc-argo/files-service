@@ -84,7 +84,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         const dryRun = req.query.dryRun === 'true';
 
         if (dryRun) {
-          res.status(200).json(dryRunFileFilter(filter));
+          res.status(200).json(await dryRunFileFilter(filter));
           return;
         }
 
@@ -135,7 +135,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         const dryRun = req.query.dryRun === 'true';
 
         if (dryRun) {
-          res.status(200).json(dryRunFileFilter(filter));
+          res.status(200).json(await dryRunFileFilter(filter));
           return;
         }
 
@@ -172,56 +172,6 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
   );
 
   /**
-   * '/clinicalExemption/:reason'
-   * Apply a clinical exemption to a selection of files
-   * Files with a clinical exemption do not require core complete clincial data to be released to the index
-   */
-  router.post(
-    '/clinicalExemption/:reason',
-    wrapAsync(async (req: Request, res: Response) => {
-      // Get Params:
-      try {
-        const filter = validator.fileFilter(req.body?.filter);
-        const reason = validator.clinicalExemption(req.params.reason);
-
-        const dryRun = req.query.dryRun === 'true';
-
-        if (dryRun) {
-          res.status(200).json(dryRunFileFilter(filter));
-          return;
-        }
-
-        try {
-          // Update files in DB
-          const updatedFiles = await fileService.applyClinicalExemption(filter, reason, {
-            returnDocuments: true,
-          });
-
-          if (!updatedFiles) {
-            res.status(400).send(`No files updated.`);
-            return;
-          }
-          const result = await indexUpdatedFiles(updatedFiles);
-
-          const response = {
-            message: `Successfully updated ${result.fileSummary.total} file(s) with clinical exemption "${reason}".`,
-            ...result.fileSummary,
-            errors: result.errors,
-          };
-          res.status(200).json(response);
-          return;
-        } catch (e) {
-          res.status(500).send(`Unexpected error updating files: ${e}`);
-          return;
-        }
-      } catch (error) {
-        // Catch Param Validation Errors
-        res.status(400).send(error.toString());
-        return;
-      }
-    }),
-  );
-  /**
    * '/clinicalExemption/remove'
    * Remove clinical exemption from files
    */
@@ -230,12 +180,12 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
     wrapAsync(async (req: Request, res: Response) => {
       // Get Params:
       try {
-        const filter = validator.fileFilter(req.body?.filter);
+        const filter = validator.fileFilter(req.body);
 
         const dryRun = req.query.dryRun === 'true';
 
         if (dryRun) {
-          res.status(200).json(dryRunFileFilter(filter));
+          res.status(200).json(await dryRunFileFilter(filter));
           return;
         }
 
@@ -270,12 +220,66 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
       }
     }),
   );
+
+  /**
+   * '/clinicalExemption/:reason'
+   * Apply a clinical exemption to a selection of files
+   * Files with a clinical exemption do not require core complete clincial data to be released to the index
+   */
+  router.post(
+    '/clinicalExemption/:reason',
+    wrapAsync(async (req: Request, res: Response) => {
+      // Get Params:
+      try {
+        const filter = validator.fileFilter(req.body);
+        const reason = validator.clinicalExemption(req.params.reason);
+
+        const dryRun = req.query.dryRun === 'true';
+
+        if (dryRun) {
+          res.status(200).json(await dryRunFileFilter(filter));
+          return;
+        }
+
+        try {
+          // Update files in DB
+          const updatedFiles = await fileService.applyClinicalExemption(filter, reason, {
+            returnDocuments: true,
+          });
+
+          if (!updatedFiles) {
+            res.status(400).send(`No files updated.`);
+            return;
+          }
+          const result = await indexUpdatedFiles(updatedFiles);
+
+          const response = {
+            message: `Successfully updated ${result.fileSummary.total} file(s) with clinical exemption: ${reason}.`,
+            reason,
+            ...result.fileSummary,
+            errors: result.errors,
+          };
+          res.status(200).json(response);
+          return;
+        } catch (e) {
+          res.status(500).send(`Unexpected error updating files: ${e}`);
+          return;
+        }
+      } catch (error) {
+        // Catch Param Validation Errors
+        res.status(400).send(error.toString());
+        return;
+      }
+    }),
+  );
+
   return router;
 };
 
 async function dryRunFileFilter(filter: fileService.FileFilter) {
   const selectedFiles = await fileService.getFiles(filter);
   const fileSummary = fileSummaryResponse(selectedFiles);
+
   return { message: 'DRY RUN ONLY - No changes made.', ...fileSummary };
 }
 
