@@ -86,7 +86,7 @@ interface DbFile {
   analysisId: string;
   firstPublished?: Date;
 
-  embargoStartDate?: Date;
+  embargoStart?: Date;
   embargoStage: string;
   releaseState: string;
 
@@ -112,7 +112,7 @@ export interface File {
   analysisId: string;
   firstPublished?: Date;
 
-  embargoStartDate?: Date;
+  embargoStart?: Date;
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
 
@@ -139,7 +139,7 @@ export interface FileInput {
   analysisId: string;
   firstPublished?: Date;
 
-  embargoStartDate?: Date;
+  embargoStart?: Date;
   embargoStage?: EmbargoStage;
   releaseState?: FileReleaseState;
 
@@ -162,7 +162,7 @@ const FileSchema = new mongoose.Schema(
     analysisId: { type: String, required: true },
     firstPublished: { type: Date, required: true },
 
-    embargoStartDate: { type: Date, required: false },
+    embargoStart: { type: Date, required: false },
     embargoStage: {
       type: String,
       required: true,
@@ -232,9 +232,7 @@ export async function countFiles(filters: FileFilter) {
 }
 
 export async function getFiles(filters: FileFilter) {
-  return (await FileModel.find(
-    convertFiltersForMongoose(filters),
-  ).exec()) as FileMongooseDocument[];
+  return (await FileModel.find(convertFiltersForMongoose(filters)).exec()) as FileMongooseDocument[];
 }
 
 export async function getFilesQuery(
@@ -269,10 +267,7 @@ export function getFilesIterator(filter: FileFilter): AsyncGenerator<FileMongoos
 }
 
 export async function getPrograms(filter: FileFilter) {
-  return (await FileModel.distinct(
-    'programId',
-    convertFiltersForMongoose(filter),
-  ).exec()) as string[];
+  return (await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec()) as string[];
 }
 
 export async function create(file: FileInput) {
@@ -321,9 +316,7 @@ export async function deleteAll(ids: number[]) {
   });
 }
 
-const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<
-  FileMongooseDocument
->;
+const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<FileMongooseDocument>;
 
 function buildQueryFilters(filters: FileFilterProperties, include: boolean = true) {
   const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];
@@ -373,9 +366,7 @@ function convertFiltersForMongoose(filters: FileFilter) {
   const includeConditions = filters.include ? buildQueryFilters(filters.include) : {};
   const excludeConditions = filters.exclude ? buildQueryFilters(filters.exclude, false) : {};
   const combinedConditions = [includeConditions, excludeConditions].filter(x => !isEmpty(x));
-  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(
-    combinedConditions,
-  )
+  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(combinedConditions)
     ? {}
     : { $and: combinedConditions };
 
