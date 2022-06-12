@@ -41,15 +41,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export default (service: string) => {
-  const buildServiceMessage = (...messages: (string | object)[]) => {
-    const strings: string[] = messages.map(m => (typeof m === 'object' ? JSON.stringify(m) : m));
+  const buildServiceMessage = (...messages: (string | object | number | undefined)[]) => {
+    const strings = messages.map(m => (typeof m === 'object' ? JSON.stringify(m) : `${m}`));
     return `[${service}] ${strings.join(' - ')}`;
   };
   return {
-    debug: (...messages: (string | object)[]) => logger.debug(buildServiceMessage(...messages)),
-    info: (...messages: (string | object)[]) => logger.info(buildServiceMessage(...messages)),
-    warn: (...messages: (string | object)[]) => logger.warn(buildServiceMessage(...messages)),
-    error: (message: string | object, ...meta: any[]) =>
-      logger.error(buildServiceMessage(message), ...meta),
+    debug: (...messages: (string | object | number | undefined)[]) => logger.debug(buildServiceMessage(...messages)),
+    info: (...messages: (string | object | number | undefined)[]) => logger.info(buildServiceMessage(...messages)),
+    warn: (...messages: (string | object | number | undefined)[]) => logger.warn(buildServiceMessage(...messages)),
+    error: (message: string | object, ...meta: any[]) => logger.error(buildServiceMessage(message), ...meta),
   };
 };
