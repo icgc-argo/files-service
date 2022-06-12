@@ -21,7 +21,6 @@ import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
 import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';

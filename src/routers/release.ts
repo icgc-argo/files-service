@@ -22,7 +22,6 @@ import { omit } from 'lodash';
 import { AppConfig } from '../config';
 import Logger from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import StringMap from '../utils/StringMap';
 import { Release } from '../data/releases';
 import * as releaseDataService from '../data/releases';
 import { File } from '../data/files';
@@ -330,7 +329,8 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
   /**
    * Reducer to accumulate all the files sorted by program
    */
-  type ProgramAccumulator = StringMap<{ kept: File[]; added: File[]; removed: File[] }>;
+  type ReleaseCounts = { kept: File[]; added: File[]; removed: File[] };
+  type ProgramAccumulator = Record<string, ReleaseCounts>;
   const programAccumulator: ProgramAccumulator = {};
 
   // Create a reducer for the kept, added, or removed list

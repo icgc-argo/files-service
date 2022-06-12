@@ -31,14 +31,11 @@ import {
   PublicReleaseMessage,
 } from '../external/kafka/publicReleaseProducer';
 
-import StringMap from '../utils/StringMap';
-
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
 import { getEmbargoStage } from './embargo';
 
 import Logger from '../logger';
-import { ANALYSIS_STATUS } from '../utils/constants';
 import { isPublished } from './utils/fileUtils';
 const logger = Logger('ReleaseManager');
 
@@ -125,8 +122,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
     }
 
     // 1. Sort files into programs, published and restricted
-
-    const programs: StringMap<{ kept: File[]; added: File[] }> = {};
+    const programs: Record<string, { kept: File[]; added: File[] }> = {};
     const filesKept: File[] = await fileService.getFilesByObjectIds(release.filesKept);
     const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
     const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
