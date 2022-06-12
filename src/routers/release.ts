@@ -33,9 +33,7 @@ const logger = Logger('Release.Router');
  * @param version
  * @returns data object with result of validation check
  */
-async function validateActiveReleaseVersion(
-  version: string,
-): Promise<{ success: boolean; error?: string }> {
+async function validateActiveReleaseVersion(version: string): Promise<{ success: boolean; error?: string }> {
   const release = await releaseDataService.getActiveRelease();
   if (!release) {
     return { success: false, error: `No Active Release. Calculate a new release and try again.` };
@@ -49,10 +47,7 @@ async function validateActiveReleaseVersion(
   return { success: true };
 }
 
-const createReleaseRouter = (
-  config: AppConfig,
-  authFilter: (scopes: string[]) => RequestHandler,
-) => {
+const createReleaseRouter = (config: AppConfig, authFilter: (scopes: string[]) => RequestHandler) => {
   const router = Router();
 
   const authFilters = {
@@ -118,12 +113,7 @@ const createReleaseRouter = (
     authFilters.write,
     wrapAsync(async (req, res) => {
       logger.info(`Attempting to begin calculating release...`);
-      const {
-        release,
-        previousState,
-        message,
-        updated,
-      } = await releaseDataService.beginCalculatingActiveRelease();
+      const { release, previousState, message, updated } = await releaseDataService.beginCalculatingActiveRelease();
       if (updated) {
         logger.info(`Release set to calculating...`);
         const releaseSummary = getShortReleaseResponse(release);
@@ -164,12 +154,7 @@ const createReleaseRouter = (
       }
 
       logger.info(`Attempting to begin building release...`);
-      const {
-        release,
-        previousState,
-        message,
-        updated,
-      } = await releaseDataService.beginBuildingActiveRelease();
+      const { release, previousState, message, updated } = await releaseDataService.beginBuildingActiveRelease();
       if (updated) {
         logger.info(`Release set to building...`);
         const releaseSummary = await getShortReleaseResponse(release);
@@ -203,12 +188,7 @@ const createReleaseRouter = (
       }
 
       logger.info(`Attempting to begin publishing release...`);
-      const {
-        release,
-        previousState,
-        message,
-        updated,
-      } = await releaseDataService.beginPublishingActiveRelease();
+      const { release, previousState, message, updated } = await releaseDataService.beginPublishingActiveRelease();
       if (updated) {
         logger.info(`Release set to publishing...`);
         const releaseSummary = await getShortReleaseResponse(release);
@@ -329,8 +309,8 @@ function summarizePrograms(kept: File[], added: File[], removed: File[]) {
   /**
    * Reducer to accumulate all the files sorted by program
    */
-  type ReleaseCounts = { kept: File[]; added: File[]; removed: File[] };
-  type ProgramAccumulator = Record<string, ReleaseCounts>;
+  type ReleaseFilesSummary = { kept: File[]; added: File[]; removed: File[] };
+  type ProgramAccumulator = Record<string, ReleaseFilesSummary>;
   const programAccumulator: ProgramAccumulator = {};
 
   // Create a reducer for the kept, added, or removed list
