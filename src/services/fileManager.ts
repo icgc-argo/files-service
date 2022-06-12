@@ -39,7 +39,7 @@ import { SongAnalysis } from '../external/song';
 
 import * as fileService from '../data/files';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
-import { getEmbargoStage } from './embargo';
+import { calculateEmbargoStage } from './embargo';
 import { Indexer } from './indexer';
 import Logger from '../logger';
 import { getDataCenter } from '../external/dataCenterRegistry';
@@ -68,10 +68,7 @@ export async function getOrCreateFileFromRdcData(
   return await fileService.getOrCreateFileByObjId(fileToCreate);
 }
 
-export async function updateStatusFromRdpcData(
-  file: File,
-  rdpcFileDocument: RdpcFileDocument,
-): Promise<File> {
+export async function updateStatusFromRdpcData(file: File, rdpcFileDocument: RdpcFileDocument): Promise<File> {
   // Update relevant properties from RDPC
   const status = rdpcFileDocument.analysis.analysisState;
   if (status !== file.status) {
@@ -140,7 +137,7 @@ export async function saveAndIndexFilesFromRdpcData(
 export async function recalculateFileState(file: File) {
   // If the file is not already released, lets update its embargo stage
   const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
-  const embargoStage = getEmbargoStage(file);
+  const embargoStage = calculateEmbargoStage(file);
   switch (file.releaseState) {
     case FileReleaseState.PUBLIC:
       if (embargoStage !== EmbargoStage.PUBLIC) {
@@ -247,9 +244,9 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
       return { file, rdpcFile };
     });
     logger.debug(
-      `Successfully retrieved ${
-        results.filter(result => result.rdpcFile).length
-      } rdpc files from ${dataCenterId} for ${dcFiles.length} input files`,
+      `Successfully retrieved ${results.filter(result => result.rdpcFile).length} rdpc files from ${dataCenterId} for ${
+        dcFiles.length
+      } input files`,
     );
     output.push({ dataCenterId, results });
   }
@@ -267,9 +264,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
  * @param files
  * @returns
  */
-export async function fetchFileUpdatesFromDataCenter(
-  files: File[],
-): Promise<FileCentricDocument[]> {
+export async function fetchFileUpdatesFromDataCenter(files: File[]): Promise<FileCentricDocument[]> {
   const rdpcSortedResults = await getRdpcDataForFiles(files);
 
   const output: FileCentricDocument[] = [];
