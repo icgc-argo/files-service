@@ -22,11 +22,12 @@ import Logger from '../logger';
 import { EmbargoStage, File, FileReleaseState } from '../data/files';
 const logger = Logger('Embargo');
 
-const stageOrder = {
-  [EmbargoStage.PROGRAM_ONLY]: 0,
-  [EmbargoStage.MEMBER_ACCESS]: 1,
-  [EmbargoStage.ASSOCIATE_ACCESS]: 2,
-  [EmbargoStage.PUBLIC]: 3,
+const stageOrder: Record<EmbargoStage, number> = {
+  [EmbargoStage.UNRELEASED]: 0,
+  [EmbargoStage.PROGRAM_ONLY]: 1,
+  [EmbargoStage.MEMBER_ACCESS]: 2,
+  [EmbargoStage.ASSOCIATE_ACCESS]: 3,
+  [EmbargoStage.PUBLIC]: 4,
 };
 export const sortStages = (stages: EmbargoStage[]): EmbargoStage[] => {
   return stages.sort(compareStages);

@@ -31,6 +31,7 @@ import { isEmpty } from 'lodash';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export enum EmbargoStage {
+  UNRELEASED = 'UNRELEASED',
   PROGRAM_ONLY = 'PROGRAM_ONLY',
   MEMBER_ACCESS = 'MEMBER_ACCESS',
   ASSOCIATE_ACCESS = 'ASSOCIATE_ACCESS',
@@ -51,6 +52,7 @@ export enum ClinicalExemption {
 }
 
 export enum FileReleaseState {
+  UNRELEASED = 'UNRELEASED',
   RESTRICTED = 'RESTRICTED',
   QUEUED_TO_PUBLIC = 'QUEUED',
   PUBLIC = 'PUBLIC',
@@ -84,6 +86,7 @@ interface DbFile {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStartDate?: Date;
   embargoStage: string;
   releaseState: string;
 
@@ -109,6 +112,7 @@ export interface File {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStartDate?: Date;
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
 
@@ -135,6 +139,7 @@ export interface FileInput {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStartDate?: Date;
   embargoStage?: EmbargoStage;
   releaseState?: FileReleaseState;
 
@@ -155,19 +160,20 @@ const FileSchema = new mongoose.Schema(
     programId: { type: String, required: true },
     donorId: { type: String, required: true },
     analysisId: { type: String, required: true },
-
     firstPublished: { type: Date, required: true },
+
+    embargoStartDate: { type: Date, required: false },
     embargoStage: {
       type: String,
       required: true,
       enum: Object.values(EmbargoStage),
-      default: EmbargoStage.PROGRAM_ONLY,
+      default: EmbargoStage.UNRELEASED,
     },
     releaseState: {
       type: String,
       required: true,
       enum: Object.values(FileReleaseState),
-      default: FileReleaseState.RESTRICTED,
+      default: FileReleaseState.UNRELEASED,
     },
 
     adminPromote: {
