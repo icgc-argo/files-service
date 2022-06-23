@@ -37,16 +37,20 @@ async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) 
 
 /**
  * This handles all analysis events from song that have the state different than PUBLISHED.
- * This includes UNPUBLISHED and SUPPRESSED, but neither makes a difference here. Just PUBLISHED and NOT-PUBLISHED.
+ *  This includes UNPUBLISHED and SUPPRESSED, but the specific value makes no difference here:
+ *  Just PUBLISHED and NOT-PUBLISHED.
  * @param analysisId
  * @param status
  */
-async function handleSongUnpublishedAnalysis(analysisId: string, status: string) {
+async function handleSongUnpublishedAnalysis(analysisId: string, status: string): Promise<void> {
   // Get files based on analysis ID
+  // TODO: This should create the file if we don't have it yet
   const files = await fileService.getFilesByAnalysisId(analysisId);
   if (files.length === 0) {
     logger.info(`No stored files for analysis ${analysisId}. No processing to do.`);
+    return;
   }
+
   logger.info(`Updating Song status to ${status} for files ${files.map(file => file.objectId)}`);
   await PromisePool.withConcurrency(10)
     .for(files)

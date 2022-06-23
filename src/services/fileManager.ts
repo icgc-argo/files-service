@@ -135,7 +135,9 @@ export async function saveAndIndexFilesFromRdpcData(
 }
 
 export async function recalculateFileState(file: File) {
-  // If the file is not already released, lets update its embargo stage
+  // Check for embargoStart date, if not present  attempt to calculate it
+
+  // Recalculate embargoStage
   const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   const embargoStage = calculateEmbargoStage(file);
   switch (file.releaseState) {
