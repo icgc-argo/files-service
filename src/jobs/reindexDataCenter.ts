@@ -37,9 +37,9 @@ const logger = Logger('Job:ReindexDataCenter');
 async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
   try {
     logger.info(`Start: reindex data center ${dataCenterId}`);
-    const { url } = await getDataCenter(dataCenterId);
-    logger.info(`Datacenter URL: ${url}`);
-    const studies: string[] = await getStudies(url);
+    const { songUrl } = await getDataCenter(dataCenterId);
+    logger.info(`Datacenter URL: ${songUrl}`);
+    const studies: string[] = await getStudies(songUrl);
     const filteredStudies: string[] =
       studyFilter.length > 0 ? studies.filter(study => studyFilter.includes(study)) : studies;
 
@@ -49,7 +49,7 @@ async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
     for (const study of filteredStudies) {
       logger.info(`Indexing study: ${study}`);
       try {
-        const analysesStream = await generateStudyAnalyses(url, study);
+        const analysesStream = await generateStudyAnalyses(songUrl, study);
         for await (const analysesData of analysesStream) {
           const analyses = analysesData.map((a: { value: any }) => a.value);
           const analysisIds = analyses.map((a: { analysisId: string }) => a.analysisId);
