@@ -213,13 +213,21 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param file
    */
   async function updateRestrictedFile(file: File): Promise<void> {
-    // Don't update a file if it is PUBLIC already
-    if (isPublic(file)) {
+    // Don't update a file if it is not in a RESTRICTED releaseState
+    if (!isRestricted(file)) {
+      logger.warn(
+        `updateRestrictedFile()`,
+        `Returning without indexing file ${file.fileId} because it is not in a Restricted releaseState: ${file.releaseState}`,
+      );
       return;
     }
 
     // Don't run updates on unpublished files
     if (!isPublished(file)) {
+      logger.warn(
+        `updateRestrictedFile()`,
+        `Returning without indexing file ${file.fileId} because it is not Published in Song: ${file.status}`,
+      );
       return;
     }
 
@@ -252,8 +260,8 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are restricted
-    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
+    // Only indexing docs that are restricted and published in song
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(doc => isRestricted(doc) && isPublished(doc)));
 
     await PromisePool.withConcurrency(20)
       .for(sortedFiles)
@@ -340,7 +348,7 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC),
+      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC && isPublished(doc)),
     );
 
     await PromisePool.withConcurrency(20)
