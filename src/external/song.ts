@@ -26,6 +26,7 @@ import streamArray from 'stream-json/streamers/StreamArray';
 import { getAppConfig } from '../config';
 
 import Logger from '../logger';
+import { getDataCenter } from './dataCenterRegistry';
 const logger = Logger('Song');
 
 // TODO: Update kafka event parsers that use this
@@ -86,9 +87,14 @@ export const getAnalysesByStudy = async (url: string, studyId: string): Promise<
   return fetchAnalysesInBatches(analysesUrl);
 };
 
-export const getAnalysesById = async (url: string, studyId: string, analysisId: string): Promise<SongAnalysis> => {
+export const getAnalysesById = async (
+  dataCenterId: string,
+  studyId: string,
+  analysisId: string,
+): Promise<SongAnalysis> => {
+  const dataCenter = await getDataCenter(dataCenterId);
   const analysesUrl = urljoin(
-    url,
+    dataCenter.centerId,
     '/studies',
     studyId,
     '/analysis',
@@ -100,7 +106,7 @@ export const getAnalysesById = async (url: string, studyId: string, analysisId: 
     if (res.status === 200) {
       return (await res.json()) as SongAnalysis;
     } else {
-      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${url}`);
+      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
       throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
     }
   } catch (e) {
