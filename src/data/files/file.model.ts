@@ -356,7 +356,7 @@ function buildQueryFilters(filters: FileFilterProperties, include: boolean = tru
       },
     });
   }
-  return conditions.length > 0 ? { $or: conditions } : {};
+  return conditions.length > 0 ? { $and: conditions } : {};
 }
 const fileIdFromString = (fileId: string): number => {
   return parseInt(fileId.replace(/^FL/, ''));
