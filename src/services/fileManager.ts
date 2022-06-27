@@ -16,6 +16,7 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 /**
  * FileManager is responsible for maintaining the state of Files in the DB and syncing that content to ElasticSearch.
  * The content stored in the DB is only a subset of the file data, the relevant data to fetch the full file data from
@@ -26,25 +27,25 @@
  * - Song Analysis event received from Kafka that contains RDPC analysis data (processAnalysisEvent)
  * - Sync Data with RDPC event fetches all analysis from an RDPC (processDataSyncRequest)
  * - Release.build takes the FileCentricDocument from an existing index and copies it into Public indices
- * - TODO: Fetch analysis data from song to update file centric docs, initiated by build process to update Public indices.
  */
 
+import PromisePool from '@supercharge/promise-pool/dist';
 import _ from 'lodash';
 
+import * as fileService from '../data/files';
 import { File, FileInput, EmbargoStage, FileReleaseState } from '../data/files';
 import * as maestro from '../external/analysisConverter';
 import { RdpcFileDocument } from '../external/analysisConverter';
+import * as clinical from '../external/clinical';
 import * as song from '../external/song';
 import { SongAnalysis } from '../external/song';
-
-import * as fileService from '../data/files';
-import { buildDocument, FileCentricDocument } from './fileCentricDocument';
-import { calculateEmbargoStage } from './embargo';
-import { Indexer } from './indexer';
-import Logger from '../logger';
-import { getDataCenter } from '../external/dataCenterRegistry';
-import PromisePool from '@supercharge/promise-pool/dist';
 import { ANALYSIS_STATUS } from '../utils/constants';
+import * as dcGateway from '../external/dataCenterGateway';
+import { calculateEmbargoStage, calculateEmbargoStartDate } from './embargo';
+import { buildDocument, FileCentricDocument } from './fileCentricDocument';
+import { Indexer } from './indexer';
+
+import Logger from '../logger';
 const logger = Logger('FileManager');
 
 export async function getOrCreateFileFromRdcData(
@@ -134,11 +135,64 @@ export async function saveAndIndexFilesFromRdpcData(
   };
 }
 
-export async function recalculateFileState(file: File) {
+/**
+ * Return the embargo start date of the file, or calculate it if necessary.
+ * @param file
+ * @returns
+ */
+export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | undefined> {
+  if (file.embargoStart) {
+    return file.embargoStart;
+  }
+
+  // File does not have a start date recorded, so we will calculate. We need to make requests to fetch:
+  //  - matchedSamplePair from data center gateway
+  //  - analysis from Song
+  //  - donor from clinical (to confirm the completion stats)
+
+  try {
+    const matchedSamplePairs = await dcGateway.getMatchedPairsForDonor(file.donorId);
+    const songAnalysis = await song.getAnalysesById(file.repoId, file.programId, file.analysisId);
+    const clinicalDonor = await clinical.fetchDonor(file.programId, file.donorId);
+
+    const startDate = await calculateEmbargoStartDate({
+      dbFile: file,
+      matchedSamplePairs,
+      songAnalysis,
+      clinicalDonor,
+    });
+    if (startDate) {
+      logger.info(`An embargoStartDate has been found for file ${file.fileId}: ${startDate}`);
+    }
+    return startDate;
+  } catch (e) {
+    logger.error(`Failure fetching source data while checking file's embargo start date: ${e}`);
+  }
+}
+
+/**
+ * Calculate embargoStart date, embargoStage, and releaseState for the file, save to DB,
+ * and return the file with any changes.
+ * @param file
+ * @returns
+ */
+export async function recalculateFileState(file: File): Promise<File> {
   // Check for embargoStart date, if not present  attempt to calculate it
 
   // Recalculate embargoStage
-  const updates: { embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
+  const updates: { embargoStart?: Date; embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
+  const embargoStart = await getOrCheckFileEmbargoStart(file);
+
+  // If an embargo start date was not found, we don't need to continue. The file will remain unrealeased.
+  if (!embargoStart) {
+    return file;
+  }
+
+  // we need to store the original start date so we can compare with the update object at the end (for saving changes to DB)
+  //  but we also need to add the embargo start date to the file object to use it when calculating the embargo stage
+  let originalEmbargoStart = file.embargoStart;
+  file.embargoStart = updates.embargoStart;
+
   const embargoStage = calculateEmbargoStage(file);
   switch (file.releaseState) {
     case FileReleaseState.PUBLIC:
@@ -179,6 +233,7 @@ export async function recalculateFileState(file: File) {
 
   if (
     (updates.embargoStage && updates.embargoStage !== file.embargoStage) ||
+    (updates.embargoStart && updates.embargoStart !== originalEmbargoStart) ||
     (updates.releaseState && updates.releaseState !== file.releaseState)
   ) {
     return await fileService.updateFileReleaseProperties(file.objectId, updates);
@@ -216,8 +271,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
     const retrievedAnalyses: SongAnalysis[] = [];
 
     const dcFiles = dataCenters[dataCenterId];
-    const dcData = await getDataCenter(dataCenterId);
-    const dcUrl = dcData.url;
+
     const programs = _.groupBy(dcFiles, file => file.programId);
 
     // for each program, get the unique analysis IDs
@@ -233,7 +287,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
       await PromisePool.withConcurrency(10)
         .for(analyses)
         .process(async analysisId => {
-          const analysis = await song.getAnalysesById(dcUrl, programId, analysisId);
+          const analysis = await song.getAnalysesById(dataCenterId, programId, analysisId);
           retrievedAnalyses.push(analysis);
         });
     }
