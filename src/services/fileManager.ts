@@ -190,7 +190,7 @@ export async function recalculateFileState(file: File): Promise<File> {
 
   // we need to store the original start date so we can compare with the update object at the end (for saving changes to DB)
   //  but we also need to add the embargo start date to the file object to use it when calculating the embargo stage
-  let originalEmbargoStart = file.embargoStart;
+  const originalEmbargoStart = file.embargoStart;
   file.embargoStart = updates.embargoStart;
 
   const embargoStage = calculateEmbargoStage(file);

@@ -263,8 +263,11 @@ export async function publishActiveRelease(): Promise<void> {
     // 2a. update the embargo and release props of the files to remove
     const updatedFilesRemoved = filesRemoved.map(file => {
       const output = _.clone(file);
-      output.embargoStage = calculateEmbargoStage(output);
+
+      // Recalculate embargo stage for file being removed from Public.
+      // No need to calculate embargoStart before calculating the embargo stage, since you can't remove something from public that doesn't have a start date
       output.releaseState = FileReleaseState.RESTRICTED;
+      output.embargoStage = calculateEmbargoStage(output);
       return output;
     });
 
