@@ -2,8 +2,8 @@ import retry from 'async-retry';
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
 import { getAppConfig } from '../../config';
-import { SongAnalysis } from '../song';
 import analysisEventProcessor from '../../jobs/processAnalysisEvent';
+import { isAnalysisUpdateEvent } from './messages/AnalysisUpdateEvent';
 
 import Logger from '../../logger';
 const logger = Logger('Kafka.analysisUpdatesConsumer');
@@ -57,15 +57,6 @@ export const disconnect = async () => {
   await dlqProducer?.disconnect();
 };
 
-export type AnalysisUpdateEvent = {
-  analysisId: string;
-  studyId: string;
-  state: string; // PUBLISHED, UNPUBLISHED, SUPPRESSED -> maybe more in the future so leaving this as string
-  action: string; // PUBLISH, UNPUBLISH, SUPPRESS, CREATE -> future might add UPDATED
-  songServerId: string;
-  analysis: SongAnalysis;
-};
-
 const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON: string) => {
   const result = await producer?.send({
     topic: dlqTopic,
@@ -81,10 +72,14 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
 async function handleAnalysisUpdate(message: KafkaMessage, dlq?: string) {
   try {
     await retry(
-      async (_bail: Function) => {
-        // TODO: validate message body
-        const analysisEvent = JSON.parse(message.value?.toString() || '{}') as AnalysisUpdateEvent;
-        await analysisEventProcessor(analysisEvent);
+      async (bail: Function) => {
+        const event = JSON.parse(message.value?.toString() || '{}');
+
+        if (isAnalysisUpdateEvent(event)) {
+          await analysisEventProcessor(event);
+        } else {
+          bail(new Error('Analysis Update Event message does not have expected structure.'));
+        }
       },
       {
         retries: 3,

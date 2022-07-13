@@ -1,5 +1,7 @@
 import { Kafka, Producer } from 'kafkajs';
 import { getAppConfig, KafkaProducerConfiguration } from '../../config';
+import PublicReleaseMessage from './messages/PublicReleaseMessage';
+
 import Logger from '../../logger';
 const logger = Logger('Kafka.publicReleaseProducer');
 
@@ -23,13 +25,6 @@ export type Program = {
   donorsUpdated: string[];
 };
 
-export type PublicReleaseMessage = {
-  id: string;
-  publishedAt: Date;
-  label: string;
-  programs: Program[];
-};
-
 export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage) => {
   if (publicReleaseProducer) {
     const result = await publicReleaseProducer.send({
@@ -40,8 +35,6 @@ export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage
         },
       ],
     });
-    logger.debug(
-      `Release message sent to topic ${config.topic}. Response: ${JSON.stringify(result)}`,
-    );
+    logger.debug(`Release message sent to topic ${config.topic}. Response: ${JSON.stringify(result)}`);
   }
 };

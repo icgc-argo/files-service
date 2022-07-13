@@ -19,10 +19,10 @@
 
 import { StartedTestContainer, Wait, GenericContainer } from 'testcontainers';
 import { Client } from '@elastic/elasticsearch';
-import { AnalysisUpdateEvent } from '../external/kafka/analysisUpdatesConsumer';
 import nock from 'nock';
 import * as db from '../data/dbConnection';
 import { getAppConfig } from '../config';
+import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
 const ES_PORT = 9200;
 
 describe('analysisEventHandler', () => {

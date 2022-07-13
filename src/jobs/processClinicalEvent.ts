@@ -1,4 +1,3 @@
-import { ClinicalUpdateEvent } from '../external/kafka/clinicalUpdatesConsumer';
 import { getAppConfig } from '../config';
 import * as fileService from '../data/files';
 
@@ -6,6 +5,7 @@ import PromisePool from '@supercharge/promise-pool/dist';
 import { recalculateFileState } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
 import { isUnreleased } from '../services/utils/fileUtils';
+import ClinicalUpdateEvent from '../external/kafka/messages/ClinicalUpdateEvent';
 
 import Logger from '../logger';
 const logger = Logger('Job:ProcessClinicalEvent');
