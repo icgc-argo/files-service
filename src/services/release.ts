@@ -25,11 +25,7 @@ import { Release } from '../data/releases';
 import * as releaseService from '../data/releases';
 
 import { createSnapshot } from '../external/elasticsearch';
-import {
-  sendPublicReleaseMessage,
-  Program,
-  PublicReleaseMessage,
-} from '../external/kafka/publicReleaseProducer';
+import { sendPublicReleaseMessage, Program } from '../external/kafka/publicReleaseProducer';
 
 import StringMap from '../utils/StringMap';
 
@@ -40,6 +36,7 @@ import { getEmbargoStage } from './embargo';
 import Logger from '../logger';
 import { ANALYSIS_STATUS } from '../utils/constants';
 import { isPublished } from './utils/fileUtils';
+import PublicReleaseMessage from '../external/kafka/messages/PublicReleaseMessage';
 const logger = Logger('ReleaseManager');
 
 function toObjectId(file: File) {

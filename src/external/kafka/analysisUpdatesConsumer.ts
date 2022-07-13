@@ -2,9 +2,8 @@ import retry from 'async-retry';
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
 import { getAppConfig } from '../../config';
-import { SongAnalysis } from '../song';
 import analysisEventProcessor from '../../jobs/processAnalysisEvent';
-import AnalysisUpdateEvent, { isAnalysisUpdateEvent } from './messages/AnalysisUpdateEvent';
+import { isAnalysisUpdateEvent } from './messages/AnalysisUpdateEvent';
 
 import Logger from '../../logger';
 const logger = Logger('Kafka.analysisUpdatesConsumer');
