@@ -21,6 +21,7 @@ import Logger from '../../logger';
 import * as fileModel from './file.model';
 import {
   EmbargoStage,
+  ClinicalExemption,
   File,
   FileFilter,
   FileFilterProperties,
@@ -28,16 +29,27 @@ import {
   FileLabel,
   FileMongooseDocument,
   FileReleaseState,
-  FilesResponse,
   FileStateFilter,
   PaginationFilter,
 } from './file.model';
 const logger = Logger('File.DataService');
 
+export interface PaginatedFilesResponse {
+  files: File[];
+  meta: {
+    totalFiles: number;
+    pageSize: number;
+    totalPages: number;
+    hasPrevPage: boolean;
+    hasNextPage: boolean;
+    currentPage?: number;
+  };
+}
+
 export async function getPaginatedFiles(
   paginationFilter: PaginationFilter,
   queryFilter: FileFilterProperties,
-): Promise<FilesResponse> {
+): Promise<PaginatedFilesResponse> {
   const response = await fileModel.getFilesQuery(paginationFilter, queryFilter);
   const files = response.docs.map(toPojo);
   return {
@@ -140,6 +152,27 @@ export async function updateFileSongPublishStatus(
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
+export async function applyClinicalExemption(
+  filter: FileFilter,
+  clinicalExemption: ClinicalExemption,
+  options?: { returnDocuments: boolean },
+): Promise<File[] | void> {
+  const response = await fileModel.updateBulk(filter, { clinicalExemption }, options);
+  if (options?.returnDocuments) {
+    return response.map(toPojo);
+  }
+}
+
+export async function removeClinicalExemption(
+  filter: FileFilter,
+  options?: { returnDocuments: boolean },
+): Promise<File[] | void> {
+  const response = await fileModel.updateBulk(filter, { clinicalExemption: undefined }, options);
+  if (options?.returnDocuments) {
+    return response.map(toPojo);
+  }
+}
+
 export async function adminPromote(
   filter: FileFilter,
   stage: EmbargoStage,
@@ -162,6 +195,10 @@ export async function adminDemote(
   if (options?.returnDocuments) {
     return response.map(toPojo);
   }
+}
+
+export async function deleteByIds(ids: string[]): Promise<void> {
+  await fileModel.deleteAll(ids.map(toNumericId));
 }
 
 /**
@@ -192,10 +229,6 @@ export async function removeLabel(fileId: string, keys: string[]): Promise<File>
   file.labels = file.labels.filter(l => !keys.includes(l.key));
   const updated = await fileModel.save(file);
   return toPojo(updated);
-}
-
-export async function deleteByIds(ids: string[]): Promise<void> {
-  await fileModel.deleteAll(ids.map(toNumericId));
 }
 
 function toNumericId(id: string) {

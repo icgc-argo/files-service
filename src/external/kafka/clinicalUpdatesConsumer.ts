@@ -2,17 +2,17 @@ import retry from 'async-retry';
 import { Consumer, Kafka, KafkaMessage, Producer } from 'kafkajs';
 
 import { getAppConfig } from '../../config';
-import analysisEventProcessor from '../../jobs/processAnalysisEvent';
-import { isAnalysisUpdateEvent } from './messages/AnalysisUpdateEvent';
+import clinicalEventProcessor from '../../jobs/processClinicalEvent';
+import { isClinicalUpdateEvent } from './messages/ClinicalUpdateEvent';
 
 import Logger from '../../logger';
-const logger = Logger('Kafka.analysisUpdatesConsumer');
+const logger = Logger('Kafka.clinicalUpdatesConsumer');
 
 let consumer: Consumer | undefined;
 let dlqProducer: Producer | undefined;
 
 export const init = async (kafka: Kafka) => {
-  const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.analysisUpdates;
+  const consumerConfig = (await getAppConfig()).kafkaProperties.consumers.clinicalUpdates;
 
   consumer = kafka.consumer({
     groupId: consumerConfig.group,
@@ -41,7 +41,7 @@ export const init = async (kafka: Kafka) => {
       autoCommitInterval: 10000,
       eachMessage: async ({ message }) => {
         logger.info(`New message received offset : ${message.offset}`);
-        await handleAnalysisUpdate(message, dlq);
+        await handleMessage(message, dlq);
         logger.debug(`Message handled ok`);
       },
     })
@@ -69,16 +69,16 @@ const sendDlqMessage = async (producer: Producer, dlqTopic: string, messageJSON:
   logger.debug(`DLQ message sent to ${dlqTopic}. response: ${JSON.stringify(result)}`);
 };
 
-async function handleAnalysisUpdate(message: KafkaMessage, dlq?: string) {
+async function handleMessage(message: KafkaMessage, clinicalDlq?: string) {
   try {
     await retry(
       async (bail: Function) => {
         const event = JSON.parse(message.value?.toString() || '{}');
 
-        if (isAnalysisUpdateEvent(event)) {
-          await analysisEventProcessor(event);
+        if (isClinicalUpdateEvent(event)) {
+          await clinicalEventProcessor(event);
         } else {
-          bail(new Error('Analysis Update Event message does not have expected structure.'));
+          bail(new Error('Clinical Update Event message does not have expected structure.'));
         }
       },
       {
@@ -88,12 +88,12 @@ async function handleAnalysisUpdate(message: KafkaMessage, dlq?: string) {
     );
   } catch (err) {
     logger.error(`Failed to handle analysis message, offset: ${message.offset}`, err);
-    if (dlq && dlqProducer) {
+    if (clinicalDlq && dlqProducer) {
       const msg = message.value
         ? JSON.parse(message.value.toString())
         : { message: `invalid body, original offset: ${message.offset}` };
       logger.debug(`Sending message to dlq...`);
-      await sendDlqMessage(dlqProducer, dlq, msg);
+      await sendDlqMessage(dlqProducer, clinicalDlq, msg);
     }
   }
 }

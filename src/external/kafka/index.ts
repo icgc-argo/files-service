@@ -20,6 +20,7 @@
 import { Kafka } from 'kafkajs';
 import { AppConfig } from '../../config';
 import * as analysisUpdatesConsumer from './analysisUpdatesConsumer';
+import * as clinicalUpdatesConsumer from './analysisUpdatesConsumer';
 import * as recalculateEmbargoConsumer from './recalculateEmbargoConsumer';
 import * as publicReleaseProducer from './publicReleaseProducer';
 import Logger from '../../logger';
@@ -37,6 +38,12 @@ export const setup = async (config: AppConfig): Promise<void> => {
     recalculateEmbargoConsumer.init(kafka),
     publicReleaseProducer.init(kafka),
   ]);
+
+  if (config.features.clinicalDataIndexing) {
+    // Init the clinical updates consumer if clinical data indexing is enabled
+    await clinicalUpdatesConsumer.init(kafka);
+  }
+
   logger.info('Connected.');
 };
 
@@ -44,6 +51,7 @@ export const disconnect = async () => {
   logger.warn('Disconnecting all from Kafka...');
   await Promise.all([
     analysisUpdatesConsumer.disconnect(),
+    clinicalUpdatesConsumer.disconnect(), // safe to disconnect even if not initialized
     recalculateEmbargoConsumer.disconnect(),
     publicReleaseProducer.disconnect(),
   ]);

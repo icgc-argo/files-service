@@ -1,5 +1,7 @@
 import { Kafka, Producer } from 'kafkajs';
 import { getAppConfig, KafkaProducerConfiguration } from '../../config';
+import PublicReleaseMessage from './messages/PublicReleaseMessage';
+
 import Logger from '../../logger';
 const logger = Logger('Kafka.publicReleaseProducer');
 
@@ -21,13 +23,6 @@ export const disconnect = async () => {
 export type Program = {
   id: string;
   donorsUpdated: string[];
-};
-
-export type PublicReleaseMessage = {
-  id: string;
-  publishedAt: Date;
-  label: string;
-  programs: Program[];
 };
 
 export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage) => {

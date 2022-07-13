@@ -15,6 +15,7 @@ export {
   addOrUpdateFileLabel,
   adminPromote,
   adminDemote,
+  applyClinicalExemption,
   countFiles,
   deleteByIds,
   getFiles,
@@ -31,4 +32,5 @@ export {
   updateFileAdminControls,
   updateFileSongPublishStatus,
   removeLabel,
+  removeClinicalExemption,
 } from './file.service';

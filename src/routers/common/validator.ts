@@ -2,6 +2,7 @@ import Ajv, { JSONSchemaType, ErrorObject, DefinedError } from 'ajv';
 
 import { fileFilterSchema } from './FileFilter';
 import { EmbargoStage } from '../../data/files';
+import { ClinicalExemption } from '../../data/files/file.model';
 
 const ajv = new Ajv();
 
@@ -26,7 +27,15 @@ const embargoStageValidator = (value: any): EmbargoStage => {
   return value as EmbargoStage;
 };
 
+const clinicalExemptionValidator = (value: any): ClinicalExemption => {
+  if (!Object.values(ClinicalExemption).includes(value)) {
+    throw new Error(JSON.stringify({ message: `Invalid clinical exemption reason: ${value}` }));
+  }
+  return value as ClinicalExemption;
+};
+
 const validator = {
+  clinicalExemption: clinicalExemptionValidator,
   embargoStage: embargoStageValidator,
   fileFilter: createParamValidator(fileFilterSchema),
 };

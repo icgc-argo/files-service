@@ -33,6 +33,7 @@ export interface AppConfig {
     consumers: {
       analysisUpdates: KafkaConsumerConfiguration;
       recalculateEmbargo: KafkaConsumerConfiguration;
+      clinicalUpdates: KafkaConsumerConfiguration;
     };
     producers: {
       publicRelease: KafkaProducerConfiguration;
@@ -78,6 +79,9 @@ export interface AppConfig {
   };
   debug: {
     endpointsEnabled: boolean;
+  };
+  features: {
+    clinicalDataIndexing: boolean;
   };
 }
 
@@ -145,6 +149,11 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
           group: process.env.KAFKA_ANLYSIS_UPDATES_GROUP || 'file-manager.group.analysis-updates',
           dlq: process.env.KAFKA_ANALYSIS_UPDATES_DLQ,
         },
+        clinicalUpdates: {
+          topic: process.env.KAFKA_CLINICAL_UPDATES_TOPIC || 'clinical_program_update',
+          group: process.env.KAFKA_CLINICAL_UPDATES_GROUP || 'file-manager.group.clinical-updates',
+          dlq: process.env.KAFKA_CLINICAL_UPDATES_DLQ,
+        },
         recalculateEmbargo: {
           topic: process.env.KAFKA_RECALCULATE_EMBARGO_TOPIC || 'file-manager.recalculate-embargo',
           group:
@@ -197,6 +206,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     debug: {
       endpointsEnabled: process.env.ENABLE_DEBUG_ENDPOINTS === 'true', // false unless set to 'true'
+    },
+    features: {
+      clinicalDataIndexing: process.env.FEATURE_CLINICAL_DATA_INDEXING === 'true',
     },
   };
   return config;

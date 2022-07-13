@@ -37,6 +37,19 @@ export enum EmbargoStage {
   PUBLIC = 'PUBLIC',
 }
 
+/**
+ * A file with a clinical exemption can be released to the file index even if it fails to pass the clinical data requirements.
+ * The enum values indicate the reason the file was given the exemption:
+ * - LEGACY: This file was publicly available in the Legacy ICGC system so does not need to pass through the embargo stages.
+ * - EARLY_RELEASE: This file was published publicly in ARGO before the clinical embargo requirements were enforced.
+ * - ADMIN: DCC Admin has made the decision to make this file publicly available without requiring clinical data.
+ */
+export enum ClinicalExemption {
+  LEGACY = 'LEGACY',
+  EARLY_RELEASE = 'EARLY_RELEASE',
+  ADMIN = 'ADMIN',
+}
+
 export enum FileReleaseState {
   RESTRICTED = 'RESTRICTED',
   QUEUED_TO_PUBLIC = 'QUEUED',
@@ -78,6 +91,8 @@ interface DbFile {
   adminPromote?: string;
   adminDemote?: string;
 
+  clinicalExemption?: string;
+
   labels: FileLabel[];
 }
 
@@ -101,19 +116,9 @@ export interface File {
   adminPromote?: EmbargoStage;
   adminDemote?: EmbargoStage;
 
-  labels: FileLabel[];
-}
+  clinicalExemption?: ClinicalExemption;
 
-export interface FilesResponse {
-  files: File[];
-  meta: {
-    totalFiles: number;
-    pageSize: number;
-    totalPages: number;
-    hasPrevPage: boolean;
-    hasNextPage: boolean;
-    currentPage?: number;
-  };
+  labels: FileLabel[];
 }
 
 // FileInput matches the File object, but with optional fields where
@@ -176,6 +181,8 @@ const FileSchema = new mongoose.Schema(
       enum: Object.values(EmbargoStage),
     },
     adminHold: { type: Boolean, required: false },
+
+    clinicalExemption: { type: String, required: false, enum: Object.values(ClinicalExemption) },
 
     labels: [LabelSchema],
   },

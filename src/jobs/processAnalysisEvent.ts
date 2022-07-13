@@ -16,15 +16,15 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-import Logger from '../logger';
+import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
-import { AnalysisUpdateEvent } from '../external/kafka/analysisUpdatesConsumer';
 import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
 import { isRestricted } from '../services/utils/fileUtils';
 import { getIndexer } from '../services/indexer';
 import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
+
+import Logger from '../logger';
 const logger = Logger('Job:ProcessAnalysisEvent');
 
 async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) {
