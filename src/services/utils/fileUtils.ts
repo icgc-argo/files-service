@@ -27,6 +27,9 @@ export const isRestricted = (file: File | FileCentricDocument): boolean =>
 export const isReleased = (file: File | FileCentricDocument): boolean =>
   ![FileReleaseState.UNRELEASED].includes(file.releaseState);
 
+export const isUnreleased = (file: File | FileCentricDocument): boolean =>
+  [FileReleaseState.UNRELEASED].includes(file.releaseState);
+
 /**
  * Checks the file's AnalysisState to confirm that the file is published in Song
  *  Only files that are published in song should be indexed.
