@@ -144,8 +144,8 @@ export function calculateEmbargoStage(dbFile: File): EmbargoStage {
  * Calculate the embargoStart date for a file.
  * The rules for the start date are to find the most recent of these 3 properties:
  *  1. firstPublishedDate of the file from Song
- *  2. submissionDate of the tumor and normal sample in a matched pair, available from the RDPC Gateway API
- *  3. (optional) coreCompletionDate from Clinical Service
+ *  2. (unless clinicalExemption) submissionDate of the tumor and normal sample in a matched pair, available from the RDPC Gateway API
+ *  3. (unless clinicalExemption) coreCompletionDate from Clinical Service
  *
  * Clinical core completion data is not required for files marked with a clinicalExemption
  *
@@ -189,7 +189,7 @@ export function calculateEmbargoStartDate(inputs: {
   // 3. clinical core completion date
   const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats.coreCompletionDate);
 
-  if (analysisFirstPublished && matchedPairFirstPublished && (clinicalExemption || clinicalCoreCompletionDate)) {
+  if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
     const options = [analysisFirstPublished, matchedPairFirstPublished];
     if (!clinicalExemption) {
       // safe to cast to Date here based on if logic
