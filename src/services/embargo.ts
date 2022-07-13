@@ -171,9 +171,6 @@ export function calculateEmbargoStartDate(inputs: {
     );
   }
 
-  // utility method to make Date or Undefined out of optional string values
-  const maybeDate = (value?: string) => (value ? new Date(value) : undefined);
-
   // 1. First Published date of this file's song analysis
   const analysisFirstPublished = maybeDate(songAnalysis.firstPublishedAt);
 
@@ -217,4 +214,13 @@ export function calculateEmbargoStartDate(inputs: {
     );
     return undefined;
   }
+}
+
+/**
+ * utility method to make Date or Undefined out of optional string values
+ * @param value
+ * @returns
+ */
+function maybeDate(value?: string) {
+  return value ? new Date(value) : undefined;
 }
