@@ -494,6 +494,70 @@ paths:
                 $ref: '#components/schemas/SelectedFilesResponse'
         '400':
           description: No files updated, maybe the filter is too strict.
+  /admin/clinicalExemption/{reason}:
+    post:
+      tags:
+        - Admin
+      description: Mark the selected files as being exempt from the core clinical data requirement for being released into the file index.
+      parameters:
+        - name: reason
+          description: The reason the file is exempt form the core clinical data requirements
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ClinicalExemption'
+        - name: dryRun
+          description: Set to "true" to test the provided file filter selection. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for promotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated, then re-indexed as required.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
+  /admin/clinicalExemption/remove:
+    post:
+      tags:
+        - Admin
+      description: Remove the clinical exemption from the selected files.
+      parameters:
+        - name: dryRun
+          description: Set to "true" to test the provided file filter selection. No data changed if true.
+          in: query
+          required: false
+          schema:
+            type: boolean
+
+      requestBody:
+        description: Filters to apply to select files for promotion
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileFilter'
+
+      responses:
+        '200':
+          description: Files updated, then re-indexed as required.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/SelectedFilesResponse'
+        '400':
+          description: No files updated, maybe the filter is too strict.
 
   /debug/handleAnalysisEvent:
     post:
@@ -586,6 +650,9 @@ components:
           type: string
         analysisId:
           type: string
+    ClinicalExemption:
+      type: string
+      enum: [LEGACY, EARLY_RELEASE, ADMIN]
     EmbargoStage:
       type: string
       enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
