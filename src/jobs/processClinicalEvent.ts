@@ -1,5 +1,5 @@
-import { ClinicalUpdateEvent } from '../external/kafka/clinicalUpdatesConsumer';
 import { getAppConfig } from '../config';
+import ClinicalUpdateEvent from '../external/kafka/messages/ClinicalUpdateEvent';
 
 import Logger from '../logger';
 const logger = Logger('Job:ProcessClinicalEvent');
