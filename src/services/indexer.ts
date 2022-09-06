@@ -19,13 +19,21 @@
 
 import PromisePool from '@supercharge/promise-pool';
 
-import Logger from '../logger';
 import { EmbargoStage, FileReleaseState } from '../data/files';
 import { getClient } from '../external/elasticsearch';
 import { FileCentricDocument } from './fileCentricDocument';
 import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
-import { isPublic, isPublished, isRestricted } from './utils/fileUtils';
+import {
+  isPublic,
+  isPublished,
+  isRestricted,
+  sortFileDocsIntoPrograms,
+  sortFilesIntoPrograms,
+} from './utils/fileUtils';
+import { camelCaseKeysToSnakeCase } from '../utils/objectFormatter';
+
+import Logger from '../logger';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
@@ -78,10 +86,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     fetching: new Set<string>(),
   };
 
-  async function getCurrentIndex(
-    program: string,
-    options: { isPublic: boolean },
-  ): Promise<string | undefined> {
+  async function getCurrentIndex(program: string, options: { isPublic: boolean }): Promise<string | undefined> {
     const { isPublic } = options;
     const publicIdentifier = isPublic ? 'public' : 'restricted'; // for choosing correct section of resolvedIndices
 
@@ -123,10 +128,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param options public = false, current = false, clone = true
    * @returns
    */
-  const getNextIndex = async (
-    program: string,
-    options: { isPublic: boolean; clone: boolean },
-  ): Promise<string> => {
+  const getNextIndex = async (program: string, options: { isPublic: boolean; clone: boolean }): Promise<string> => {
     const { isPublic: isPublic, clone: cloneFromReleasedIndex } = options;
     const publicIdentifier = isPublic ? 'public' : 'restricted'; // for choosing correct section of resolvedIndices
 
@@ -178,18 +180,12 @@ export const getIndexer = async (): Promise<Indexer> => {
     );
     const toRelease = Object.values(nextIndices.restricted);
     if (publicRelease) {
-      logger.info(
-        `Preparing to release... adding public indices to release list: ${Object.keys(
-          nextIndices.public,
-        )}`,
-      );
+      logger.info(`Preparing to release... adding public indices to release list: ${Object.keys(nextIndices.public)}`);
       toRelease.concat(Object.values(nextIndices.public));
     }
 
     if (additionalIndices.length) {
-      logger.info(
-        `Preparing to release... Additional indices requested to release: ${additionalIndices}`,
-      );
+      logger.info(`Preparing to release... Additional indices requested to release: ${additionalIndices}`);
     }
 
     // TODO: config for max simultaneous release?
@@ -217,13 +213,21 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param file
    */
   async function updateRestrictedFile(file: File): Promise<void> {
-    // Don't update a file if it is PUBLIC already
-    if (isPublic(file)) {
+    // Don't update a file if it is not in a RESTRICTED releaseState
+    if (!isRestricted(file)) {
+      logger.warn(
+        `updateRestrictedFile()`,
+        `Returning without indexing file ${file.fileId} because it is not in a Restricted releaseState: ${file.releaseState}`,
+      );
       return;
     }
 
     // Don't run updates on unpublished files
     if (!isPublished(file)) {
+      logger.warn(
+        `updateRestrictedFile()`,
+        `Returning without indexing file ${file.fileId} because it is not Published in Song: ${file.status}`,
+      );
       return;
     }
 
@@ -256,8 +260,8 @@ export const getIndexer = async (): Promise<Indexer> => {
    * @param docs
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
-    // Only indexing docs that are restricted
-    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
+    // Only indexing docs that are restricted and published in song
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(doc => isRestricted(doc) && isPublished(doc)));
 
     await PromisePool.withConcurrency(20)
       .for(sortedFiles)
@@ -266,7 +270,7 @@ export const getIndexer = async (): Promise<Indexer> => {
           isPublic: false,
           clone: true,
         });
-        const camelcased = files.map(camelCaseKeysToUnderscore);
+        const camelcased = files.map(camelCaseKeysToSnakeCase);
         const body = camelcased.flatMap(file => [
           { update: { _id: file.object_id } },
           {
@@ -344,7 +348,7 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC),
+      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC && isPublished(doc)),
     );
 
     await PromisePool.withConcurrency(20)
@@ -354,7 +358,7 @@ export const getIndexer = async (): Promise<Indexer> => {
           isPublic: true,
           clone: true,
         });
-        const camelcased = files.map(camelCaseKeysToUnderscore);
+        const camelcased = files.map(camelCaseKeysToSnakeCase);
         const body = camelcased.flatMap(file => [
           { update: { _id: file.object_id } },
           {
@@ -477,70 +481,3 @@ export const getIndexer = async (): Promise<Indexer> => {
     release,
   };
 };
-
-function camelCaseKeysToUnderscore(obj: any) {
-  if (typeof obj != 'object') return obj;
-
-  for (const oldName in obj) {
-    // Camel to underscore
-    const newName = oldName.replace(/([A-Z])/g, function($1) {
-      return '_' + $1.toLowerCase();
-    });
-
-    // Only process if names are different
-    if (newName != oldName) {
-      // Check for the old property name to avoid a ReferenceError in strict mode.
-      if (obj.hasOwnProperty(oldName)) {
-        obj[newName] = obj[oldName];
-        delete obj[oldName];
-      }
-    }
-    if (typeof obj[newName] == 'object') {
-      obj[newName] = camelCaseKeysToUnderscore(obj[newName]);
-    }
-  }
-  return obj;
-}
-// Separate list of file documents into distinct list per program.
-type FileDocsSortedByProgramsArray = Array<{ files: FileCentricDocument[]; program: string }>;
-function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedByProgramsArray {
-  // Sort Files into programs
-  const programMap = files.reduce((acc: { [program: string]: FileCentricDocument[] }, file) => {
-    const program = file.studyId;
-    if (acc[program]) {
-      acc[program].push(file);
-    } else {
-      acc[program] = [file];
-    }
-    return acc;
-  }, {});
-
-  // For each program, add an element to output array
-  const output: FileDocsSortedByProgramsArray = Object.entries(
-    programMap,
-  ).map(([program, files]) => ({ program, files }));
-
-  return output;
-}
-// Separate list of files into distinct list per program.
-type FilesSortedByProgramsArray = Array<{ files: File[]; program: string }>;
-function sortFilesIntoPrograms(files: File[]): FilesSortedByProgramsArray {
-  const output: FilesSortedByProgramsArray = [];
-
-  // Sort Files into programs
-  const programMap = files.reduce((acc: { [program: string]: File[] }, file) => {
-    const program = file.programId;
-    if (acc[program]) {
-      acc[program].push(file);
-    } else {
-      acc[program] = [file];
-    }
-    return acc;
-  }, {});
-
-  // For each program, add an element to output array
-  Object.entries(programMap).forEach(([program, files]) => {
-    output.push({ program, files });
-  });
-  return output;
-}

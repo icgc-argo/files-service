@@ -26,25 +26,25 @@ import Logger from '../../logger';
 import { ClinicalDonor } from './types';
 const logger = Logger('Clinical');
 
-export async function fetchDonor(programId: string, donorId: string) {
+/**
+ * Fetch clinical data for a single donor, identified by programId and donorId
+ * @param programId
+ * @param donorId
+ * @returns
+ */
+export async function fetchDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
   const config = await getAppConfig();
   try {
-    logger.debug(`Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
-    const response = await fetch(
-      `${config.clinical.url}/clinical/program/${programId}/donor/${donorId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${await getEgoToken()}`,
-        },
+    logger.debug(`fetchDonor()`, `Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
+    const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donor/${donorId}`, {
+      headers: {
+        Authorization: `Bearer ${await getEgoToken()}`,
       },
-    );
+    });
     const donor = await response.json();
-    return donor;
+    return donor as ClinicalDonor;
   } catch (e) {
-    logger.warn(
-      `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`,
-      <Error>e,
-    );
+    logger.warn(`fetchDonor()`, `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`, <Error>e);
     return undefined;
   }
 }
@@ -52,7 +52,7 @@ export async function fetchDonor(programId: string, donorId: string) {
 export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerator<ClinicalDonor> {
   const config = await getAppConfig();
 
-  logger.debug(`Begining fetch of all donors for program: ${programId}`);
+  logger.debug(`fetchAllDonorsForProgram()`, `Begining fetch of all donors for program: ${programId}`);
 
   const logFrequency = 100;
 
@@ -85,7 +85,10 @@ export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerat
             return undefined;
           } else {
             // Should not see this, only Syntax Errors from JSON parsing incomplete objects. Adding this just to capture any strange results.
-            logger.error(`Unexpected error parsing data returned by Clinical API. ${err}`);
+            logger.error(
+              `fetchAllDonorsForProgram()`,
+              `Unexpected error parsing data returned by Clinical API. ${err}`,
+            );
             throw err;
           }
         }
@@ -101,9 +104,9 @@ export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerat
     unprocessedResponse = leftovers;
   }
 
-  logger.debug(`Retrieved ${donorCount} donors for program: ${programId}`);
+  logger.debug(`fetchAllDonorsForProgram()`, `Retrieved ${donorCount} donors for program: ${programId}`);
   if (!_.isEmpty(unprocessedResponse)) {
-    logger.warn(`Part of the API message was unprocessed! - ${unprocessedResponse}`);
+    logger.warn(`fetchAllDonorsForProgram()`, `Part of the API message was unprocessed! - ${unprocessedResponse}`);
   }
   return;
 }

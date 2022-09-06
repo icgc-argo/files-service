@@ -19,9 +19,8 @@
 
 import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
-import Logger from '../logger';
+import Logger, { unknownToString } from '../logger';
 import wrapAsync from '../utils/wrapAsync';
-import StringMap from '../utils/StringMap';
 import { AppConfig } from '../config';
 import validator from './common/validator';
 import * as fileService from '../data/files';
@@ -58,9 +57,8 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
       // TODO: Current config hardcodes a single data center instead of retrieving connection details from data center registry
 
       // Swagger UI isn't sending single studies as an array, so we need to parse it
-      const studies: string[] = ((typeof req.query.study === 'string'
-        ? [req.query.study]
-        : req.query.study) || []) as string[];
+      const studies: string[] = ((typeof req.query.study === 'string' ? [req.query.study] : req.query.study) ||
+        []) as string[];
 
       const dataCenterId = config.datacenter.dataCenterId;
       reindexDataCenter(dataCenterId, studies);
@@ -114,7 +112,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         }
       } catch (error) {
         // Catch Param Validation Errors
-        res.status(400).send(error.toString());
+        res.status(400).send({ error: unknownToString(error) });
         return;
       }
     }),
@@ -165,7 +163,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         }
       } catch (error) {
         // Catch Param Validation Errors
-        res.status(400).send(error.toString());
+        res.status(400).send({ error: unknownToString(error) });
         return;
       }
     }),
@@ -215,7 +213,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         }
       } catch (error) {
         // Catch Param Validation Errors
-        res.status(400).send(error.toString());
+        res.status(400).send({ error: unknownToString(error) });
         return;
       }
     }),
@@ -267,7 +265,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
         }
       } catch (error) {
         // Catch Param Validation Errors
-        res.status(400).send(error.toString());
+        res.status(400).send({ error: unknownToString(error) });
         return;
       }
     }),

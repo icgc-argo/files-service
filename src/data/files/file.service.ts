@@ -64,6 +64,11 @@ export async function getPaginatedFiles(
     files: files,
   };
 }
+/**
+ * Async generator to iteratre through files that match a filter
+ * @param filter filter with all conditions
+ * @returns
+ */
 export async function* getAllFiles(filter: FileFilter): AsyncGenerator<File, void> {
   const fileIterator = fileModel.getFilesIterator(filter);
   for await (const doc of fileIterator) {
@@ -119,15 +124,8 @@ export async function getPrograms(filter: FileFilter): Promise<string[]> {
  * Returns the updated File.
  */
 type ReleaseProperties = { embargoStage?: EmbargoStage; releaseState?: FileReleaseState };
-export async function updateFileReleaseProperties(
-  objectId: string,
-  updates: ReleaseProperties,
-): Promise<File> {
-  logger.debug(
-    `[File.Service] Updating file emabrgo and release properties: ${objectId} ${JSON.stringify(
-      updates,
-    )}`,
-  );
+export async function updateFileReleaseProperties(objectId: string, updates: ReleaseProperties): Promise<File> {
+  logger.debug(`[File.Service] Updating file emabrgo and release properties: ${objectId} ${JSON.stringify(updates)}`);
   const result = await fileModel.updateByObjectId(objectId, updates, { new: true });
   return toPojo(result);
 }
@@ -137,18 +135,12 @@ type AdminControls = {
   adminPromote?: EmbargoStage;
   adminDemote?: EmbargoStage;
 };
-export async function updateFileAdminControls(
-  objectId: string,
-  updates: AdminControls,
-): Promise<File> {
+export async function updateFileAdminControls(objectId: string, updates: AdminControls): Promise<File> {
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
 type FileSongPublishStatus = { status?: string; firstPublished?: Date };
-export async function updateFileSongPublishStatus(
-  objectId: string,
-  updates: FileSongPublishStatus,
-): Promise<File> {
+export async function updateFileSongPublishStatus(objectId: string, updates: FileSongPublishStatus): Promise<File> {
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
@@ -291,8 +283,7 @@ const validateLabels = (labels: FileLabel[]) => {
       throw new Errors.InvalidArgument(`Label at index ${i}, Keys cannot have comma in them.`);
     }
 
-    const hasDuplicates =
-      labels.filter(l2 => normalizeLabel(l2.key) == normalizeLabel(l.key)).length > 1;
+    const hasDuplicates = labels.filter(l2 => normalizeLabel(l2.key) == normalizeLabel(l.key)).length > 1;
 
     if (hasDuplicates) {
       throw new Errors.InvalidArgument(`Label at index ${i}, cannot submit duplicated label keys`);

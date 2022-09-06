@@ -35,8 +35,6 @@ export const sendPublicReleaseMessage = async (messageJSON: PublicReleaseMessage
         },
       ],
     });
-    logger.debug(
-      `Release message sent to topic ${config.topic}. Response: ${JSON.stringify(result)}`,
-    );
+    logger.debug(`Release message sent to topic ${config.topic}. Response: ${JSON.stringify(result)}`);
   }
 };

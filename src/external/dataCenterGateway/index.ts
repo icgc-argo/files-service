@@ -20,18 +20,14 @@
 import { get } from 'lodash';
 import { GraphQLClient } from 'graphql-request';
 import { getAppConfig } from '../../config';
-import ALIGNMENT_METRICS_BY_RUN_ID from './gql/ALIGNMENT_METRICS_BY_RUN_ID';
+import ALIGNMENT_METRICS_BY_RUN_ID from './gql/QUERY_ALIGNMENT_METRICS_BY_RUN_ID';
+import SAMPLE_MATCHED_ANALYSIS_BY_DONOR from './gql/QUERY_SAMPLE_MATCHED_ANALYSIS_BY_DONOR';
 import { getEgoToken } from '../../external/ego';
 
 import Logger from '../../logger';
 const logger = Logger('DataCenterGateway');
 
 export const getAlignmentMetrics = async (runId: String) => {
-  if (!runId || !runId.length) {
-    logger.error('runId is required');
-    throw new Error('runId is required');
-  }
-
   const config = await getAppConfig();
   const url = config.datacenter.gatewayUrl;
   const graphQLClient = new GraphQLClient(url, {
@@ -47,8 +43,30 @@ export const getAlignmentMetrics = async (runId: String) => {
     throw err;
   });
 
-  // logger.info(JSON.stringify(data, null, 2));
-
   const metrics = get(data, 'analyses.content[0].files[0].metrics', undefined);
   return metrics;
+};
+
+export type MatchedSamplePair = {
+  normalSampleAnalysis: { firstPublishedAt: string };
+  tumourSampleAnalysis: { firstPublishedAt: string };
+};
+export const getMatchedPairsForDonor = async (donorId: String): Promise<MatchedSamplePair[]> => {
+  const config = await getAppConfig();
+  const url = config.datacenter.gatewayUrl;
+  const graphQLClient = new GraphQLClient(url, {
+    headers: {
+      authorization: `Bearer ${await getEgoToken()}`,
+    },
+  });
+  const query = SAMPLE_MATCHED_ANALYSIS_BY_DONOR;
+  const variables = { donorId };
+
+  const data = await graphQLClient.request(query, variables).catch((err: Error) => {
+    logger.error(`Error fetching matched sample pairs for donor ${donorId}: ${err}`);
+    throw err;
+  });
+
+  // Any type will be converted by method signature to the MatchedSamplePair structure declared in the gql query
+  return data.sampleMatchedAnalysesForDonor;
 };

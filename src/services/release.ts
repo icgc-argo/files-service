@@ -27,14 +27,11 @@ import * as releaseService from '../data/releases';
 import { createSnapshot } from '../external/elasticsearch';
 import { sendPublicReleaseMessage, Program } from '../external/kafka/publicReleaseProducer';
 
-import StringMap from '../utils/StringMap';
-
 import { getIndexer } from './indexer';
 import * as fileManager from './fileManager';
-import { getEmbargoStage } from './embargo';
+import { calculateEmbargoStage } from './embargo';
 
 import Logger from '../logger';
-import { ANALYSIS_STATUS } from '../utils/constants';
 import { isPublished } from './utils/fileUtils';
 import PublicReleaseMessage from '../external/kafka/messages/PublicReleaseMessage';
 const logger = Logger('ReleaseManager');
@@ -122,8 +119,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
     }
 
     // 1. Sort files into programs, published and restricted
-
-    const programs: StringMap<{ kept: File[]; added: File[] }> = {};
+    const programs: Record<string, { kept: File[]; added: File[] }> = {};
     const filesKept: File[] = await fileService.getFilesByObjectIds(release.filesKept);
     const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
     const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
@@ -182,9 +178,7 @@ The objectIDs of the files not retrieved are: ${missingFileIds}`,
     }
 
     // 3b. Check if any of the files expected in our public release have been unpublished.
-    const publishedFileCentricDocs = fileCentricDocs.filter(
-      doc => doc.analysis.analysisState === 'PUBLISHED',
-    );
+    const publishedFileCentricDocs = fileCentricDocs.filter(doc => doc.analysis.analysisState === 'PUBLISHED');
 
     if (publishedFileCentricDocs.length < expectedPublicFiles.length) {
       const publishedFileIds = publishedFileCentricDocs.map(file => file.objectId);
@@ -270,15 +264,16 @@ export async function publishActiveRelease(): Promise<void> {
     // 2a. update the embargo and release props of the files to remove
     const updatedFilesRemoved = filesRemoved.map(file => {
       const output = _.clone(file);
-      output.embargoStage = getEmbargoStage(output);
+
+      // Recalculate embargo stage for file being removed from Public.
+      // No need to calculate embargoStart before calculating the embargo stage, since you can't remove something from public that doesn't have a start date
       output.releaseState = FileReleaseState.RESTRICTED;
+      output.embargoStage = calculateEmbargoStage(output);
       return output;
     });
 
     // 2b. Get updated file data from Data Centers, update our DB with those details and get our centric docs
-    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(
-      updatedFilesRemoved,
-    );
+    const fileCentricDocsToRemove = await fileManager.fetchFileUpdatesFromDataCenter(updatedFilesRemoved);
 
     // 2c. Filter out files being removed because they are not PUBLISHED in data center
     const fileCentricDocsMovingToRestricted = fileCentricDocsToRemove.filter(
@@ -337,11 +332,7 @@ export async function publishActiveRelease(): Promise<void> {
   }
 }
 
-function buildKafkaMessage(
-  release: Release,
-  filesAdded: File[],
-  filesRemoved: File[],
-): PublicReleaseMessage {
+function buildKafkaMessage(release: Release, filesAdded: File[], filesRemoved: File[]): PublicReleaseMessage {
   const filesUpdated = _.groupBy([...filesAdded, ...filesRemoved], file => file.programId);
 
   // get unique donor ids from filesAdded and filesRemoved:

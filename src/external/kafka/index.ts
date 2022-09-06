@@ -20,7 +20,7 @@
 import { Kafka } from 'kafkajs';
 import { AppConfig } from '../../config';
 import * as analysisUpdatesConsumer from './analysisUpdatesConsumer';
-import * as clinicalUpdatesConsumer from './analysisUpdatesConsumer';
+import * as clinicalUpdatesConsumer from './clinicalUpdatesConsumer';
 import * as recalculateEmbargoConsumer from './recalculateEmbargoConsumer';
 import * as publicReleaseProducer from './publicReleaseProducer';
 import Logger from '../../logger';
@@ -35,14 +35,10 @@ export const setup = async (config: AppConfig): Promise<void> => {
   logger.info('Initializing Kafka connections...');
   await Promise.all([
     analysisUpdatesConsumer.init(kafka),
+    clinicalUpdatesConsumer.init(kafka),
     recalculateEmbargoConsumer.init(kafka),
     publicReleaseProducer.init(kafka),
   ]);
-
-  if (config.features.clinicalDataIndexing) {
-    // Init the clinical updates consumer if clinical data indexing is enabled
-    await clinicalUpdatesConsumer.init(kafka);
-  }
 
   logger.info('Connected.');
 };

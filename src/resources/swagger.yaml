@@ -655,7 +655,7 @@ components:
       enum: [LEGACY, EARLY_RELEASE, ADMIN]
     EmbargoStage:
       type: string
-      enum: [PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
+      enum: [UNRELEASED, PROGRAM_ONLY, MEMBER_ACCESS, ASSOCIATE_ACCESS, PUBLIC]
     FilesResponse:
       type: object
       properties:

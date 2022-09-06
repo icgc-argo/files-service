@@ -26,9 +26,17 @@ import streamArray from 'stream-json/streamers/StreamArray';
 import { getAppConfig } from '../config';
 
 import Logger from '../logger';
+import { getDataCenter } from './dataCenterRegistry';
 const logger = Logger('Song');
 
-export type SongAnalysis = { [k: string]: any; analysisId: string; analysisState: string };
+// TODO: Update kafka event parsers that use this
+export type SongAnalysis = {
+  analysisId: string;
+  analysisState: string;
+  studyId: string;
+  firstPublishedAt?: string;
+  [k: string]: any;
+};
 
 export const getStudies = async (url: string) => {
   const studiesUrl = urljoin(url, '/studies/all');
@@ -80,12 +88,13 @@ export const getAnalysesByStudy = async (url: string, studyId: string): Promise<
 };
 
 export const getAnalysesById = async (
-  url: string,
+  dataCenterId: string,
   studyId: string,
   analysisId: string,
 ): Promise<SongAnalysis> => {
+  const dataCenter = await getDataCenter(dataCenterId);
   const analysesUrl = urljoin(
-    url,
+    dataCenter.centerId,
     '/studies',
     studyId,
     '/analysis',
@@ -97,10 +106,8 @@ export const getAnalysesById = async (
     if (res.status === 200) {
       return (await res.json()) as SongAnalysis;
     } else {
-      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${url}`);
-      throw new Error(
-        `Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`,
-      );
+      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
+      throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
     }
   } catch (e) {
     logger.error(`Error fetching analysis ${analysisId} for ${studyId} from ${analysesUrl}: ${e}`);

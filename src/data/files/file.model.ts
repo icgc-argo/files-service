@@ -31,6 +31,7 @@ import { isEmpty } from 'lodash';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export enum EmbargoStage {
+  UNRELEASED = 'UNRELEASED',
   PROGRAM_ONLY = 'PROGRAM_ONLY',
   MEMBER_ACCESS = 'MEMBER_ACCESS',
   ASSOCIATE_ACCESS = 'ASSOCIATE_ACCESS',
@@ -51,6 +52,7 @@ export enum ClinicalExemption {
 }
 
 export enum FileReleaseState {
+  UNRELEASED = 'UNRELEASED',
   RESTRICTED = 'RESTRICTED',
   QUEUED_TO_PUBLIC = 'QUEUED',
   PUBLIC = 'PUBLIC',
@@ -84,6 +86,7 @@ interface DbFile {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStart?: Date;
   embargoStage: string;
   releaseState: string;
 
@@ -109,6 +112,7 @@ export interface File {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStart?: Date;
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
 
@@ -135,6 +139,7 @@ export interface FileInput {
   analysisId: string;
   firstPublished?: Date;
 
+  embargoStart?: Date;
   embargoStage?: EmbargoStage;
   releaseState?: FileReleaseState;
 
@@ -155,19 +160,20 @@ const FileSchema = new mongoose.Schema(
     programId: { type: String, required: true },
     donorId: { type: String, required: true },
     analysisId: { type: String, required: true },
-
     firstPublished: { type: Date, required: true },
+
+    embargoStart: { type: Date, required: false },
     embargoStage: {
       type: String,
       required: true,
       enum: Object.values(EmbargoStage),
-      default: EmbargoStage.PROGRAM_ONLY,
+      default: EmbargoStage.UNRELEASED,
     },
     releaseState: {
       type: String,
       required: true,
       enum: Object.values(FileReleaseState),
-      default: FileReleaseState.RESTRICTED,
+      default: FileReleaseState.UNRELEASED,
     },
 
     adminPromote: {
@@ -226,9 +232,7 @@ export async function countFiles(filters: FileFilter) {
 }
 
 export async function getFiles(filters: FileFilter) {
-  return (await FileModel.find(
-    convertFiltersForMongoose(filters),
-  ).exec()) as FileMongooseDocument[];
+  return (await FileModel.find(convertFiltersForMongoose(filters)).exec()) as FileMongooseDocument[];
 }
 
 export async function getFilesQuery(
@@ -263,10 +267,7 @@ export function getFilesIterator(filter: FileFilter): AsyncGenerator<FileMongoos
 }
 
 export async function getPrograms(filter: FileFilter) {
-  return (await FileModel.distinct(
-    'programId',
-    convertFiltersForMongoose(filter),
-  ).exec()) as string[];
+  return (await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec()) as string[];
 }
 
 export async function create(file: FileInput) {
@@ -315,9 +316,7 @@ export async function deleteAll(ids: number[]) {
   });
 }
 
-const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<
-  FileMongooseDocument
->;
+const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<FileMongooseDocument>;
 
 function buildQueryFilters(filters: FileFilterProperties, include: boolean = true) {
   const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];
@@ -357,7 +356,7 @@ function buildQueryFilters(filters: FileFilterProperties, include: boolean = tru
       },
     });
   }
-  return conditions.length > 0 ? { $or: conditions } : {};
+  return conditions.length > 0 ? { $and: conditions } : {};
 }
 const fileIdFromString = (fileId: string): number => {
   return parseInt(fileId.replace(/^FL/, ''));
@@ -367,9 +366,7 @@ function convertFiltersForMongoose(filters: FileFilter) {
   const includeConditions = filters.include ? buildQueryFilters(filters.include) : {};
   const excludeConditions = filters.exclude ? buildQueryFilters(filters.exclude, false) : {};
   const combinedConditions = [includeConditions, excludeConditions].filter(x => !isEmpty(x));
-  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(
-    combinedConditions,
-  )
+  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(combinedConditions)
     ? {}
     : { $and: combinedConditions };
 
