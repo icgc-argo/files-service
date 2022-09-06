@@ -21,7 +21,7 @@ import { get } from 'lodash';
 import { GraphQLClient } from 'graphql-request';
 import { getAppConfig } from '../../config';
 import ALIGNMENT_METRICS_BY_RUN_ID from './gql/QUERY_ALIGNMENT_METRICS_BY_RUN_ID';
-import SAMPLE_MATCHED_ANALYSIS_BY_DONOR from './gql/QUERY_SAMPLE_MATCHED_ANALYSIS_BY_DONOR';
+import SAMPLE_MATCHED_ANALYSIS_BY_DONOR from './gql/QUERY_SAMPLE_MATCHED_ANALYSIS_BY_DONOR_ID';
 import { getEgoToken } from '../../external/ego';
 
 import Logger from '../../logger';
