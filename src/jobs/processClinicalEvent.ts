@@ -18,37 +18,30 @@ const clinicalUpdateEvent = async (clinicalEvent: ClinicalUpdateEvent): Promise<
   try {
     const { programId, donorIds } = clinicalEvent;
     const config = await getAppConfig();
-    if (config.features.clinicalDataIndexing) {
-      logger.info(
-        `START - processing clinical data update event for program ${programId} including ${donorIds?.length ||
-          0} donors`,
-      );
+    logger.info(
+      `START - processing clinical data update event for program ${programId} including ${donorIds?.length ||
+        0} donors`,
+    );
 
-      const indexer = await getIndexer();
+    const indexer = await getIndexer();
 
-      // get files for donors
-      const files = await fileService.getFiles({ include: { donors: donorIds } });
-      // we only need to do state updates for restricted files
-      const unreleasedFiles = files.filter(isUnreleased);
+    // get files for donors
+    const files = await fileService.getFiles({ include: { donors: donorIds } });
+    // we only need to do state updates for unreleased files
+    const unreleasedFiles = files.filter(isUnreleased);
 
-      // for each file check if they should be released and then reindex
-      PromisePool.withConcurrency(5)
-        .for(unreleasedFiles)
-        .process(async file => {
-          const updatedFile = await recalculateFileState(file);
+    // for each file check if they should be released and then reindex
+    PromisePool.withConcurrency(5)
+      .for(unreleasedFiles)
+      .process(async file => {
+        const updatedFile = await recalculateFileState(file);
 
-          if (updatedFile.releaseState !== fileService.FileReleaseState.UNRELEASED) {
-            indexer.updateRestrictedFile(updatedFile);
-          }
-        });
+        if (updatedFile.releaseState !== fileService.FileReleaseState.UNRELEASED) {
+          indexer.updateRestrictedFile(updatedFile);
+        }
+      });
 
-      logger.info(`DONE - processing clinical data update event for program ${programId}`);
-    } else {
-      logger.info(
-        `FEATURE DISABLED - no processing performed for clinical update event. Event is for program ${programId} including ${donorIds?.length ||
-          0} donors`,
-      );
-    }
+    logger.info(`DONE - processing clinical data update event for program ${programId}`);
   } catch (e) {
     logger.error(`FAILURE - processing clinical data update event failed`, e);
   }
