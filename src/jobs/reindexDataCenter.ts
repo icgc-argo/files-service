@@ -66,11 +66,11 @@ async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
 
     // Release all file updates.
     await indexer.release();
+    logger.info(`Done re-indexing data center`);
   } catch (err) {
     logger.error(`Error while indexing repository ${dataCenterId}`);
     throw err;
   }
-  logger.info(`Done indexing`);
 }
 
 async function generateStudyAnalyses(url: string, studyId: string) {

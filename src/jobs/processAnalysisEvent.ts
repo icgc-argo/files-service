@@ -73,22 +73,26 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
  * Song Kafka Message Handler
  * @param analysisEvent
  */
-const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent) => {
+const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
   const { analysis, analysisId, state, songServerId } = analysisEvent;
 
-  logger.info(
-    `START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
-  );
+  try {
+    logger.info(
+      `START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
+    );
 
-  if (state === 'PUBLISHED') {
-    await handleSongPublishedAnalysis(analysis, songServerId);
-  } else {
-    // Unpublish or Suppress
-    await handleSongUnpublishedAnalysis(analysisId, state);
+    if (state === 'PUBLISHED') {
+      await handleSongPublishedAnalysis(analysis, songServerId);
+    } else {
+      // Unpublish or Suppress
+      await handleSongUnpublishedAnalysis(analysisId, state);
+    }
+
+    logger.info(
+      `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
+    );
+  } catch (e) {
+    logger.error(`FAILURE - processing analysis event failed`, e);
   }
-
-  logger.info(
-    `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
-  );
 };
 export default processAnalysisEvent;
