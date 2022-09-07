@@ -20,7 +20,7 @@
 import { gql } from 'graphql-request';
 
 const QUERY_SAMPLE_MATCHED_ANALYSIS_BY_DONOR = gql`
-  query($donorId: String) {
+  query($donorId: String!) {
     sampleMatchedAnalysesForDonor(req: { donorId: $donorId }) {
       normalSampleAnalysis {
         firstPublishedAt
