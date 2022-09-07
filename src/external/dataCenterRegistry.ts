@@ -23,7 +23,7 @@
  *       datacenter information with a URL from the config and all other data from the
  *       DCR example response.
  */
-
+import fetch from 'node-fetch';
 import { isArray, isObjectLike, isString } from 'lodash';
 import urljoin from 'url-join';
 import { getAppConfig } from '../config';
