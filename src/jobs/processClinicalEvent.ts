@@ -33,6 +33,10 @@ const clinicalUpdateEvent = async (clinicalEvent: ClinicalUpdateEvent): Promise<
     // for each file check if they should be released and then reindex
     PromisePool.withConcurrency(5)
       .for(unreleasedFiles)
+      .handleError((e, file) => {
+        logger.error(`Update Doc Error: ${e}`);
+        logger.error(`Update Doc Error: ${e.stack}`);
+      })
       .process(async file => {
         const updatedFile = await recalculateFileState(file);
 
