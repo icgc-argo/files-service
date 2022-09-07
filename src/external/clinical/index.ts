@@ -41,7 +41,14 @@ export async function fetchDonor(programId: string, donorId: string): Promise<Cl
         Authorization: `Bearer ${await getEgoToken()}`,
       },
     });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`HTTP Error Response: ${response.status} ${errorBody}`);
+    }
+
     const donor = await response.json();
+    // TODO: Validate the response is the correct type, this casting is dangerous
     return donor as ClinicalDonor;
   } catch (e) {
     logger.warn(`fetchDonor()`, `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`, <Error>e);
