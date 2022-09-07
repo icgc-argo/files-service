@@ -166,9 +166,7 @@ export function calculateEmbargoStartDate(inputs: {
     logger.error(
       `calculateEmbargoStartDate() for file ${dbFile.fileId} does not have a clinical exemption so it requires clinicalDonor data. No clinicalDonor value provided.`,
     );
-    throw new Error(
-      `ClinicalDonor data required to calculate embargo stage for file ${dbFile.fileId} without a clinical exemption.`,
-    );
+    return undefined;
   }
 
   // 1. First Published date of this file's song analysis
@@ -193,12 +191,13 @@ export function calculateEmbargoStartDate(inputs: {
   logger.debug(`clinicalCoreCompletionDate date of clinical donor`, clinicalCoreCompletionDate);
 
   if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
-    const options = [analysisFirstPublished, matchedPairFirstPublished];
+    const options: Date[] = [analysisFirstPublished];
     if (!clinicalExemption) {
-      // safe to cast to Date here based on if logic
+      // safe to cast to Date here based on if logic above
       options.push(clinicalCoreCompletionDate as Date);
+      options.push(matchedPairFirstPublished as Date);
     }
-    const output = options.sort().slice(-1)[0];
+    const output = options.sort().slice(-1)[0]; // sort dates and take last one
     logger.debug(
       'calculateEmbargoStartDate()',
       `Calculated embargoStart value ${output} for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
@@ -233,7 +232,7 @@ function maybeDate(value?: string): Date | undefined {
     }
     return date;
   } catch (err) {
-    logger.warn(`Error thrown parsing value as date`, err);
+    logger.warn(`Error thrown parsing value as date`, value, err);
     return undefined;
   }
 }
