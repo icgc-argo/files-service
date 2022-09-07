@@ -173,6 +173,7 @@ export function calculateEmbargoStartDate(inputs: {
 
   // 1. First Published date of this file's song analysis
   const analysisFirstPublished = maybeDate(songAnalysis.firstPublishedAt);
+  logger.debug(`firstPublished date of analysis`, analysisFirstPublished);
 
   // 2. Most recent First Published date of all matched pairs for this donor
   //  This checks that each sample pair has a firstPublished date (to exclude pairs that havent been published before),
@@ -185,9 +186,11 @@ export function calculateEmbargoStartDate(inputs: {
     )
     .sort()
     .slice(-1)[0];
+  logger.debug(`matchedPairFirstPublished date matched analysis pair`, matchedPairFirstPublished);
 
   // 3. clinical core completion date
   const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats.coreCompletionDate);
+  logger.debug(`clinicalCoreCompletionDate date of clinical donor`, clinicalCoreCompletionDate);
 
   if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
     const options = [analysisFirstPublished, matchedPairFirstPublished];
@@ -221,6 +224,16 @@ export function calculateEmbargoStartDate(inputs: {
  * @param value
  * @returns
  */
-function maybeDate(value?: string) {
-  return value ? new Date(value) : undefined;
+function maybeDate(value?: string): Date | undefined {
+  try {
+    const date = value ? new Date(value) : undefined;
+    if (date && isNaN(date.getTime())) {
+      logger.warn(`Value could not be parsed into date`, value, date);
+      return undefined;
+    }
+    return date;
+  } catch (err) {
+    logger.warn(`Error thrown parsing value as date`, err);
+    return undefined;
+  }
 }
