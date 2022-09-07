@@ -18,6 +18,8 @@
 //  */
 
 import fetch from 'node-fetch';
+import urljoin from 'url-join';
+
 import { getAppConfig } from '../../config';
 
 import _ from 'lodash';
@@ -36,7 +38,8 @@ export async function fetchDonor(programId: string, donorId: string): Promise<Cl
   const config = await getAppConfig();
   try {
     logger.debug(`fetchDonor()`, `Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
-    const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donor/${donorId}`, {
+    const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donor', donorId);
+    const response = await fetch(requestUrl, {
       headers: {
         Authorization: `Bearer ${await getEgoToken()}`,
       },
@@ -63,7 +66,8 @@ export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerat
 
   const logFrequency = 100;
 
-  const response = await fetch(`${config.clinical.url}/clinical/program/${programId}/donors`, {
+  const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donors');
+  const response = await fetch(requestUrl, {
     headers: {
       Authorization: `Bearer ${await getEgoToken()}`,
     },
