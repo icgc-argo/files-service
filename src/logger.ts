@@ -53,14 +53,14 @@ export function unknownToString(input: LogPartialMessage): string {
 type LogPartialMessage = string | object | number | undefined | Error | unknown;
 
 export default (service: string) => {
-  const buildServiceMessage = (...messages: (string | object | number | undefined)[]) => {
+  const buildServiceMessage = (...messages: unknown[]) => {
     const strings = messages.map(unknownToString);
     return `[${service}] ${strings.join(' - ')}`;
   };
   return {
-    debug: (...messages: LogPartialMessage[]) => logger.debug(buildServiceMessage(messages)),
-    info: (...messages: LogPartialMessage[]) => logger.info(buildServiceMessage(messages)),
-    warn: (...messages: LogPartialMessage[]) => logger.warn(buildServiceMessage(messages)),
-    error: (...messages: LogPartialMessage[]) => logger.error(buildServiceMessage(messages)),
+    debug: (...messages: LogPartialMessage[]) => logger.debug(buildServiceMessage(...messages)),
+    info: (...messages: LogPartialMessage[]) => logger.info(buildServiceMessage(...messages)),
+    warn: (...messages: LogPartialMessage[]) => logger.warn(buildServiceMessage(...messages)),
+    error: (...messages: LogPartialMessage[]) => logger.error(buildServiceMessage(...messages)),
   };
 };
