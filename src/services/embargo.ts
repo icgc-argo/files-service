@@ -163,15 +163,16 @@ export function calculateEmbargoStartDate(inputs: {
   // Check for clinical exemption and ensure required data is provided.
   const clinicalExemption: boolean = dbFile.clinicalExemption !== undefined;
   if (!clinicalExemption && !clinicalDonor) {
-    logger.error(
-      `calculateEmbargoStartDate() for file ${dbFile.fileId} does not have a clinical exemption so it requires clinicalDonor data. No clinicalDonor value provided.`,
+    logger.info(
+      `calculateEmbargoStartDate()`,
+      dbFile.fileId,
+      `file ${dbFile.fileId} does not have a clinical exemption and has no clinical donor data provided.`,
     );
     return undefined;
   }
 
   // 1. First Published date of this file's song analysis
   const analysisFirstPublished = maybeDate(songAnalysis.firstPublishedAt);
-  logger.debug(`firstPublished date of analysis`, analysisFirstPublished);
 
   // 2. Most recent First Published date of all matched pairs for this donor
   //  This checks that each sample pair has a firstPublished date (to exclude pairs that havent been published before),
@@ -179,16 +180,14 @@ export function calculateEmbargoStartDate(inputs: {
   const matchedPairFirstPublished: Date | undefined = matchedSamplePairs
     .flatMap(pair =>
       pair.normalSampleAnalysis.firstPublishedAt && pair.tumourSampleAnalysis.firstPublishedAt
-        ? [new Date(pair.normalSampleAnalysis.firstPublishedAt), new Date(pair.tumourSampleAnalysis.firstPublishedAt)]
+        ? [maybeDate(pair.normalSampleAnalysis.firstPublishedAt), maybeDate(pair.tumourSampleAnalysis.firstPublishedAt)]
         : [],
     )
     .sort()
     .slice(-1)[0];
-  logger.debug(`matchedPairFirstPublished date matched analysis pair`, matchedPairFirstPublished);
 
   // 3. clinical core completion date
   const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats.coreCompletionDate);
-  logger.debug(`clinicalCoreCompletionDate date of clinical donor`, clinicalCoreCompletionDate);
 
   if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
     const options: Date[] = [analysisFirstPublished];
@@ -198,21 +197,25 @@ export function calculateEmbargoStartDate(inputs: {
       options.push(matchedPairFirstPublished as Date);
     }
     const output = options.sort().slice(-1)[0]; // sort dates and take last one
-    logger.debug(
+    logger.info(
       'calculateEmbargoStartDate()',
+      dbFile.fileId,
       `Calculated embargoStart value ${output} for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
-      analysisFirstPublished.toISOString(),
-      matchedPairFirstPublished.toISOString(),
-      clinicalExemption ? `clinical exemption: ${dbFile.clinicalExemption}` : clinicalCoreCompletionDate?.toISOString(),
+      `first published: ${analysisFirstPublished}`,
+      clinicalExemption
+        ? `clinical exemption: ${dbFile.clinicalExemption}`
+        : `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
     );
     return output;
   } else {
-    logger.debug(
+    logger.info(
       'calculateEmbargoStartDate()',
+      dbFile.fileId,
       `Calculated that there is no start date yet for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
-      analysisFirstPublished?.toISOString(),
-      matchedPairFirstPublished?.toISOString(),
-      clinicalExemption ? `clinical exemption: ${dbFile.clinicalExemption}` : clinicalCoreCompletionDate?.toISOString(),
+      `first published: ${analysisFirstPublished}`,
+      clinicalExemption
+        ? `clinical exemption: ${dbFile.clinicalExemption}`
+        : `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
     );
     return undefined;
   }
@@ -223,14 +226,18 @@ export function calculateEmbargoStartDate(inputs: {
  * @param value
  * @returns
  */
-function maybeDate(value?: string): Date | undefined {
+function maybeDate(value: string | number | undefined): Date | undefined {
   try {
-    const date = value ? new Date(value) : undefined;
-    if (date && isNaN(date.getTime())) {
-      logger.warn(`Value could not be parsed into date`, value, date);
-      return undefined;
+    const typeCheckedValue = isNaN(Number(value)) ? value : Number(value);
+    if (typeCheckedValue) {
+      const date = new Date(typeCheckedValue);
+      if (date && isNaN(date.getTime())) {
+        logger.warn(`Value could not be parsed into date`, value, date);
+        return undefined;
+      }
+      return date;
     }
-    return date;
+    return undefined;
   } catch (err) {
     logger.warn(`Error thrown parsing value as date`, value, err);
     return undefined;
