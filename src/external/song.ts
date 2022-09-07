@@ -94,7 +94,7 @@ export const getAnalysesById = async (
 ): Promise<SongAnalysis> => {
   const dataCenter = await getDataCenter(dataCenterId);
   const analysesUrl = urljoin(
-    dataCenter.centerId,
+    dataCenter.songUrl,
     '/studies',
     studyId,
     '/analysis',
