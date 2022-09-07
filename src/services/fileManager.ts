@@ -181,10 +181,10 @@ export async function recalculateFileState(file: File): Promise<File> {
 
   // Recalculate embargoStage
   const updates: { embargoStart?: Date; embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
-  const embargoStart = await getOrCheckFileEmbargoStart(file);
+  updates.embargoStart = await getOrCheckFileEmbargoStart(file);
 
   // If an embargo start date was not found, we don't need to continue. The file will remain unrealeased.
-  if (!embargoStart) {
+  if (!updates.embargoStart) {
     return file;
   }
 
