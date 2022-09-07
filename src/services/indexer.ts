@@ -26,10 +26,11 @@ import { File } from '../data/files';
 import getRollcall, { getIndexFromIndexName, Index } from '../external/rollcall';
 import {
   isPublic,
-  isPublished,
+  isFilePublished,
   isRestricted,
   sortFileDocsIntoPrograms,
   sortFilesIntoPrograms,
+  isFileCentricPublished,
 } from './utils/fileUtils';
 import { camelCaseKeysToSnakeCase } from '../utils/objectFormatter';
 
@@ -223,7 +224,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     }
 
     // Don't run updates on unpublished files
-    if (!isPublished(file)) {
+    if (!isFilePublished(file)) {
       logger.warn(
         `updateRestrictedFile()`,
         `Returning without indexing file ${file.fileId} because it is not Published in Song: ${file.status}`,
@@ -241,17 +242,16 @@ export const getIndexer = async (): Promise<Indexer> => {
       },
     };
 
-    const body = [{ update: { _id: file.objectId } }, { doc }];
-
     const index = await getNextIndex(file.programId, {
       isPublic: false,
       clone: true,
     });
-    await client.update({
+    const updateResult = await client.update({
       index,
       id: file.objectId,
       body: { doc },
     });
+    logger.warn(updateResult);
   }
 
   /**
@@ -261,7 +261,7 @@ export const getIndexer = async (): Promise<Indexer> => {
    */
   async function indexRestrictedFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are restricted and published in song
-    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(doc => isRestricted(doc) && isPublished(doc)));
+    const sortedFiles = sortFileDocsIntoPrograms(docs.filter(doc => isRestricted(doc) && isFileCentricPublished(doc)));
 
     await PromisePool.withConcurrency(20)
       .for(sortedFiles)
@@ -348,7 +348,7 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function indexPublicFileDocs(docs: FileCentricDocument[]): Promise<void> {
     // Only indexing docs that are PUBLIC
     const sortedFiles = sortFileDocsIntoPrograms(
-      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC && isPublished(doc)),
+      docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC && isFileCentricPublished(doc)),
     );
 
     await PromisePool.withConcurrency(20)

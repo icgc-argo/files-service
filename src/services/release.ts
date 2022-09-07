@@ -32,7 +32,7 @@ import * as fileManager from './fileManager';
 import { calculateEmbargoStage } from './embargo';
 
 import Logger from '../logger';
-import { isPublished } from './utils/fileUtils';
+import { isFilePublished } from './utils/fileUtils';
 import PublicReleaseMessage from '../external/kafka/messages/PublicReleaseMessage';
 const logger = Logger('ReleaseManager');
 
@@ -62,10 +62,10 @@ export async function calculateRelease(): Promise<void> {
     });
 
     // Don't add anything that is not PUBLISHED in song
-    const added = queuedToPublicFiles.filter(isPublished).map(toObjectId);
+    const added = queuedToPublicFiles.filter(isFilePublished).map(toObjectId);
 
     // Find removed files - combined those queued to restricted and those no longer published in song
-    const unpublished = publicFiles.filter(file => !isPublished(file)).map(toObjectId);
+    const unpublished = publicFiles.filter(file => !isFilePublished(file)).map(toObjectId);
     const demoted = queuedToRestrictedFiles.map(toObjectId);
     const removed = unpublished.concat(demoted);
 

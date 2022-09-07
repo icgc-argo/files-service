@@ -1,6 +1,7 @@
 import { ANALYSIS_STATUS } from '../../utils/constants';
 import { File, FileReleaseState } from '../../data/files';
 import { FileCentricDocument } from '../fileCentricDocument';
+import Logger from '../../logger';
 
 /**
  * Check if a is in a publicly released state
@@ -36,7 +37,16 @@ export const isUnreleased = (file: File | FileCentricDocument): boolean =>
  * @param file
  * @returns
  */
-export const isPublished = (file: File | FileCentricDocument): boolean => file.status === ANALYSIS_STATUS.PUBLISHED;
+export const isFilePublished = (file: File): boolean => file.status === ANALYSIS_STATUS.PUBLISHED;
+
+/**
+ * Checks the file's AnalysisState to confirm that the file is published in Song
+ *  Only files that are published in song should be indexed.
+ * @param file
+ * @returns
+ */
+export const isFileCentricPublished = (file: FileCentricDocument): boolean =>
+  file.analysis.analysisState === ANALYSIS_STATUS.PUBLISHED;
 
 /* ************ *
  * File Sorting *
@@ -49,15 +59,18 @@ export type FileDocsSortedByProgramsArray = Array<{
 }>;
 export function sortFileDocsIntoPrograms(files: FileCentricDocument[]): FileDocsSortedByProgramsArray {
   // Sort Files into programs
-  const programMap = files.reduce((acc: { [program: string]: FileCentricDocument[] }, file) => {
-    const program = file.studyId;
-    if (acc[program]) {
-      acc[program].push(file);
-    } else {
-      acc[program] = [file];
-    }
-    return acc;
-  }, {});
+  const programMap = files.reduce<Record<string, FileCentricDocument[]>>(
+    (acc: { [program: string]: FileCentricDocument[] }, file) => {
+      const program = file.studyId;
+      if (acc[program]) {
+        acc[program].push(file);
+      } else {
+        acc[program] = [file];
+      }
+      return acc;
+    },
+    {},
+  );
 
   // For each program, add an element to output array
   const output: FileDocsSortedByProgramsArray = Object.entries(programMap).map(([program, files]) => ({
