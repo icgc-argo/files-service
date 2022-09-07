@@ -86,6 +86,11 @@ export function getEmbargoStageForDate(startDate?: Date): EmbargoStage {
  */
 export function calculateEmbargoStage(dbFile: File): EmbargoStage {
   logger.debug('getEmbargoStage()', dbFile.fileId, 'Calculating embargo stage for file');
+  if (!dbFile.embargoStart) {
+    // if no embargo start, this is UNRELEASED no matter what
+    logger.info(`getEmabrgoStage()`, dbFile.fileId, 'No embargoStart value for file. Returning: UNRELEASED');
+    return EmbargoStage.UNRELEASED;
+  }
   let calculatedStage = getEmbargoStageForDate(dbFile.embargoStart);
 
   // if adminHold is true then no change from the dbFile

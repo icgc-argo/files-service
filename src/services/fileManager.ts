@@ -183,8 +183,8 @@ export async function recalculateFileState(file: File): Promise<File> {
   const updates: { embargoStart?: Date; embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
   updates.embargoStart = await getOrCheckFileEmbargoStart(file);
 
-  // If an embargo start date was not found, we don't need to continue. The file will remain unrealeased.
-  if (!updates.embargoStart) {
+  // If an unreleased file has noembargo start date, we don't need to continue. The file will remain unrealeased.
+  if (!updates.embargoStart && file.releaseState === FileReleaseState.UNRELEASED) {
     return file;
   }
 
@@ -218,11 +218,6 @@ export async function recalculateFileState(file: File): Promise<File> {
       }
       break;
     case FileReleaseState.UNRELEASED:
-      if (embargoStage === EmbargoStage.UNRELEASED) {
-        // still unreleased, do nothing more
-        break;
-      }
-    // else fall through
     case FileReleaseState.RESTRICTED:
     case FileReleaseState.QUEUED_TO_PUBLIC:
       // Currently restricted files, default promotion logic
@@ -230,9 +225,12 @@ export async function recalculateFileState(file: File): Promise<File> {
         // Cant push a file to PUBLIC except during a release, so mark as queued to public
         updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
         updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
+      } else if (embargoStage === EmbargoStage.UNRELEASED) {
+        updates.embargoStage = embargoStage;
+        updates.releaseState = FileReleaseState.UNRELEASED;
       } else {
         updates.embargoStage = embargoStage;
-        updates.releaseState = FileReleaseState.RESTRICTED; // Once released in restricted, we don't go back to UNRELEASED, so regardless of emabargoStage we can set to RESTRICTED
+        updates.releaseState = FileReleaseState.RESTRICTED;
       }
       break;
   }
