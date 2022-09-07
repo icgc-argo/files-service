@@ -211,6 +211,8 @@ export const getIndexer = async (): Promise<Indexer> => {
    *   - embargo_stage
    *   - release_state
    * Also update these values in the document meta data object.
+   *
+   * NOTE: This will throw an error if the file is not yet indexed.
    * @param file
    */
   async function updateRestrictedFile(file: File): Promise<void> {
@@ -232,26 +234,32 @@ export const getIndexer = async (): Promise<Indexer> => {
       return;
     }
 
-    // updates for the file in ES
-    const doc = {
-      embargo_stage: file.embargoStage,
-      release_state: file.releaseState,
-      meta: {
-        embargo_stage: file.embargoStage,
-        release_state: file.releaseState,
-      },
-    };
-
     const index = await getNextIndex(file.programId, {
       isPublic: false,
       clone: true,
     });
-    const updateResult = await client.update({
-      index,
-      id: file.objectId,
-      body: { doc },
-    });
-    logger.warn(updateResult);
+
+    // updates for the file in ES
+    if (file.releaseState === FileReleaseState.UNRELEASED) {
+      // Remove document
+      await client.delete({ index, id: file.objectId });
+    } else {
+      // Update document
+      const doc = {
+        embargo_stage: file.embargoStage,
+        release_state: file.releaseState,
+        meta: {
+          embargo_stage: file.embargoStage,
+          release_state: file.releaseState,
+        },
+      };
+
+      await client.update({
+        index,
+        id: file.objectId,
+        body: { doc },
+      });
+    }
   }
 
   /**
