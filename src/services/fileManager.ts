@@ -217,6 +217,12 @@ export async function recalculateFileState(file: File): Promise<File> {
         updates.releaseState = FileReleaseState.PUBLIC;
       }
       break;
+    case FileReleaseState.UNRELEASED:
+      if (embargoStage === EmbargoStage.UNRELEASED) {
+        // still unreleased, do nothing more
+        break;
+      }
+    // else fall through
     case FileReleaseState.RESTRICTED:
     case FileReleaseState.QUEUED_TO_PUBLIC:
       // Currently restricted files, default promotion logic
@@ -226,7 +232,7 @@ export async function recalculateFileState(file: File): Promise<File> {
         updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
       } else {
         updates.embargoStage = embargoStage;
-        updates.releaseState = FileReleaseState.RESTRICTED;
+        updates.releaseState = FileReleaseState.RESTRICTED; // Once released in restricted, we don't go back to UNRELEASED, so regardless of emabargoStage we can set to RESTRICTED
       }
       break;
   }
