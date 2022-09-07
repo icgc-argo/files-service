@@ -498,7 +498,7 @@ paths:
     post:
       tags:
         - Admin
-      description: Mark the selected files as being exempt from the core clinical data requirement for being released into the file index.
+      description: 'Mark the selected files as being exempt from the core clinical data requirement for being released into the file index. Note: This will not trigger updates to the search index so to see immediate changes you should trigger a reindex for data center or the recalculate embargo stage job.'
       parameters:
         - name: reason
           description: The reason the file is exempt form the core clinical data requirements
@@ -533,7 +533,7 @@ paths:
     post:
       tags:
         - Admin
-      description: Remove the clinical exemption from the selected files.
+      description: 'Remove the clinical exemption from the selected files. Note: If a file has been released to the index, it will stay released even if you now remove its clinical exemption. Therefore, the only use for this is to remove an exemption you just applied before the file gets released.  If we need to remove a released file from the index, we will also need to remove the embargoStart property from the file in the DB.'
       parameters:
         - name: dryRun
           description: Set to "true" to test the provided file filter selection. No data changed if true.

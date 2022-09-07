@@ -198,12 +198,8 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             return;
           }
 
-          const result = await indexUpdatedFiles(updatedFiles);
-
           const response = {
-            message: `Successfully updated ${result.fileSummary.total} file(s), removing any clinical exemptions.`,
-            ...result.fileSummary,
-            errors: result.errors,
+            message: `Successfully updated ${updatedFiles.length} file(s), removing any clinical exemptions.`,
           };
           res.status(200).json(response);
           return;
@@ -249,13 +245,9 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
             res.status(400).send(`No files updated.`);
             return;
           }
-          const result = await indexUpdatedFiles(updatedFiles);
 
           const response = {
-            message: `Successfully updated ${result.fileSummary.total} file(s) with clinical exemption: ${reason}.`,
-            reason,
-            ...result.fileSummary,
-            errors: result.errors,
+            message: `Successfully updated ${updatedFiles.length} file(s) with clinical exemption: ${reason}.`,
           };
           res.status(200).json(response);
           return;
