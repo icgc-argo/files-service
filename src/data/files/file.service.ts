@@ -267,6 +267,9 @@ function toPojo(f: FileMongooseDocument): File {
     adminDemote: f.adminDemote as EmbargoStage,
 
     labels: f.labels,
+
+    clinicalExemption: f.clinicalExemption as ClinicalExemption,
+    embargoStart: f.embargoStart,
   };
 }
 
