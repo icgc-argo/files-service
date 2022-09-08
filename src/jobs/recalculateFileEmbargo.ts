@@ -22,6 +22,35 @@ import { recalculateFileState } from '../services/fileManager';
 import { getIndexer, Indexer } from '../services/indexer';
 const logger = Logger('Job:RecalculateFileEmbargo');
 
+async function recalculateFile(file: fileService.File, indexer: Indexer) {
+  try {
+    logger.debug(
+      `checking file`,
+      file.programId,
+      file.fileId,
+      file.embargoStage,
+      file.releaseState,
+      file.embargoStart || '',
+    );
+    const updatedFile = await recalculateFileState(file);
+
+    logger.debug(
+      `updatedFile`,
+      file.programId,
+      file.fileId,
+      file.embargoStage,
+      file.releaseState,
+      file.embargoStart || '',
+    );
+    if (updatedFile.embargoStage !== file.embargoStage || updatedFile.releaseState !== file.releaseState) {
+      logger.debug(`file has changed, updating!`);
+      await indexer.updateRestrictedFile(updatedFile);
+    }
+  } catch (err) {
+    logger.error(`Error while recalculating embargo stage for file`, file.fileId, err);
+  }
+}
+
 const recalculateFileEmbargo = async () => {
   try {
     logger.info(`Starting!`);
@@ -31,25 +60,8 @@ const recalculateFileEmbargo = async () => {
     const fileCount = await fileService.countFiles({});
     logger.debug(`total files: ${fileCount}`);
 
-    for await (const file of fileService.getAllFiles({})) {
-      logger.debug(
-        `checking file`,
-        file.programId,
-        file.fileId,
-        file.embargoStage,
-        file.releaseState,
-        file.firstPublished || '',
-      );
-      const updatedFile = await recalculateFileState(file);
-
-      logger.debug(`updatedFile`, updatedFile.embargoStage, updatedFile.releaseState);
-      if (
-        updatedFile.embargoStage !== file.embargoStage ||
-        updatedFile.releaseState !== file.releaseState
-      ) {
-        logger.debug(`file has changed, updating!`);
-        await indexer.updateRestrictedFile(updatedFile);
-      }
+    for await (const file of fileService.getAllFiles()) {
+      await recalculateFile(file, indexer);
     }
 
     logger.info(`Indexing updated restricted files`);

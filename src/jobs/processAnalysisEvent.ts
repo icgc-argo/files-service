@@ -36,16 +36,20 @@ async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) 
 
 /**
  * This handles all analysis events from song that have the state different than PUBLISHED.
- * This includes UNPUBLISHED and SUPPRESSED, but neither makes a difference here. Just PUBLISHED and NOT-PUBLISHED.
+ *  This includes UNPUBLISHED and SUPPRESSED, but the specific value makes no difference here:
+ *  Just PUBLISHED and NOT-PUBLISHED.
  * @param analysisId
  * @param status
  */
-async function handleSongUnpublishedAnalysis(analysisId: string, status: string) {
+async function handleSongUnpublishedAnalysis(analysisId: string, status: string): Promise<void> {
   // Get files based on analysis ID
+  // TODO: This should create the file if we don't have it yet
   const files = await fileService.getFilesByAnalysisId(analysisId);
   if (files.length === 0) {
     logger.info(`No stored files for analysis ${analysisId}. No processing to do.`);
+    return;
   }
+
   logger.info(`Updating Song status to ${status} for files ${files.map(file => file.objectId)}`);
   await PromisePool.withConcurrency(10)
     .for(files)
@@ -69,22 +73,26 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
  * Song Kafka Message Handler
  * @param analysisEvent
  */
-const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent) => {
+const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
   const { analysis, analysisId, state, songServerId } = analysisEvent;
 
-  logger.info(
-    `START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
-  );
+  try {
+    logger.info(
+      `START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
+    );
 
-  if (state === 'PUBLISHED') {
-    await handleSongPublishedAnalysis(analysis, songServerId);
-  } else {
-    // Unpublish or Suppress
-    await handleSongUnpublishedAnalysis(analysisId, state);
+    if (state === 'PUBLISHED') {
+      await handleSongPublishedAnalysis(analysis, songServerId);
+    } else {
+      // Unpublish or Suppress
+      await handleSongUnpublishedAnalysis(analysisId, state);
+    }
+
+    logger.info(
+      `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
+    );
+  } catch (e) {
+    logger.error(`FAILURE - processing analysis event failed`, e);
   }
-
-  logger.info(
-    `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
-  );
 };
 export default processAnalysisEvent;

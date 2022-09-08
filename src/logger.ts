@@ -40,16 +40,27 @@ if (process.env.NODE_ENV !== 'production') {
   logger.debug('[Logger] Logging initialized at debug level.');
 }
 
+export function unknownToString(input: LogPartialMessage): string {
+  if (input instanceof Error) {
+    return input.message;
+  } else if (typeof input === 'object') {
+    return JSON.stringify(input);
+  } else {
+    return `${input}`;
+  }
+}
+
+type LogPartialMessage = string | object | number | undefined | Error | unknown;
+
 export default (service: string) => {
-  const buildServiceMessage = (...messages: (string | object)[]) => {
-    const strings: string[] = messages.map(m => (typeof m === 'object' ? JSON.stringify(m) : m));
+  const buildServiceMessage = (...messages: unknown[]) => {
+    const strings = messages.map(unknownToString);
     return `[${service}] ${strings.join(' - ')}`;
   };
   return {
-    debug: (...messages: (string | object)[]) => logger.debug(buildServiceMessage(...messages)),
-    info: (...messages: (string | object)[]) => logger.info(buildServiceMessage(...messages)),
-    warn: (...messages: (string | object)[]) => logger.warn(buildServiceMessage(...messages)),
-    error: (message: string | object, ...meta: any[]) =>
-      logger.error(buildServiceMessage(message), ...meta),
+    debug: (...messages: LogPartialMessage[]) => logger.debug(buildServiceMessage(...messages)),
+    info: (...messages: LogPartialMessage[]) => logger.info(buildServiceMessage(...messages)),
+    warn: (...messages: LogPartialMessage[]) => logger.warn(buildServiceMessage(...messages)),
+    error: (...messages: LogPartialMessage[]) => logger.error(buildServiceMessage(...messages)),
   };
 };

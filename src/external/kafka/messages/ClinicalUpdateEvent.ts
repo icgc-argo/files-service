@@ -5,8 +5,7 @@ export function isClinicalUpdateEvent(input: any): input is ClinicalUpdateEvent 
     isObjectLike(input) &&
     isString(input.programId) &&
     // donorIds is undefined or an array with all strings
-    (input.donorIds === undefined ||
-      (isArray(input.donorIds) && (input.donorIds as any[]).every(i => isString(i))))
+    (input.donorIds === undefined || (isArray(input.donorIds) && (input.donorIds as any[]).every(i => isString(i))))
   );
 }
 

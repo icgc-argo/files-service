@@ -111,7 +111,7 @@ export async function convertAnalysisFileDocuments(
   const response: {
     [k: string]: RdpcFileDocument[];
   } = await result.json();
-  // Convert the Analysis response (StringMap of FileCentricDocuments)
+  // Convert the Analysis response (Map of FileCentricDocuments)
   const files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response

@@ -36,12 +36,10 @@ export function streamToAsyncGenerator<T>(
     const endPromise = signalEnd(reader);
 
     while (true) {
-      console.log('reading..');
       // Next, similar to readToEnd function, we loop on the
       // Stream until we have read all of the data that we
       // can from the stream.
       while (reader.readable) {
-        console.log('readable');
         // First try to read the chunk size, but if that fails
         // then try reading the remainder of the stream.
         const val = reader.read(chunkSize) || reader.read();
@@ -61,7 +59,6 @@ export function streamToAsyncGenerator<T>(
       // We wait for either the `;end` or `;readable` event to fire
       const result = await Promise.race([endPromise, readablePromise]);
       if (result == 'done') {
-        console.log('race done');
         return;
       }
     }

@@ -23,56 +23,72 @@
  *       datacenter information with a URL from the config and all other data from the
  *       DCR example response.
  */
-
+import fetch from 'node-fetch';
+import { isArray, isObjectLike, isString } from 'lodash';
+import urljoin from 'url-join';
 import { getAppConfig } from '../config';
+import Logger from '../logger';
+const logger = Logger('DataCenterRegistry');
 
 export interface DataCenter {
   centerId: string;
-  country: string;
-  name: string;
-  organization: string;
-  contactEmail: string;
-  storageType: string;
-  url: string;
-  type: string;
+  songUrl: string;
 }
 
+function isDataCenter(input: any): input is DataCenter {
+  return isObjectLike(input) && isString(input.centerId) && isString(input.songUrl);
+}
+
+const getPlaceholder = async () => ({
+  centerId: 'collab',
+  songUrl: (await getAppConfig()).datacenter.url,
+});
+
 /**
- * TODO: This needs to call out to data center registry. Currently hardcoded response.
+ * Retrieves connection details for a data center by ID
  * @param dataCenterId
  * @returns
  */
 export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> => {
-  const url = (await getAppConfig()).datacenter.url;
+  const config = await getAppConfig();
+  try {
+    const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers', dataCenterId);
 
-  const placeholderDatacenter = {
-    centerId: 'collab',
-    country: 'CA',
-    name: 'Cancer Collaboratory Cloud2',
-    organization: 'Acme',
-    contactEmail: 'joe.smith@example.com',
-    storageType: 'S3',
-    type: 'RDPC',
+    const response = await fetch(requestUrl);
+    const data = await response.json();
 
-    // URL from config:
-    url,
-  };
-  return placeholderDatacenter;
+    if (isDataCenter(data)) {
+      return data;
+    }
+
+    throw new Error(
+      `Response object returned for Data Center is badly formed or missing a required field. Response data: ${data}`,
+    );
+  } catch (e) {
+    logger.error(`Failed to fetch Data Centers ${dataCenterId}: ${e}`);
+    throw e;
+  }
 };
 
+/**
+ * Retrieves connection details for all data centers
+ * Note: This will filter out any objects in the response array that are missing required properties for the DataCenter type
+ */
 export const getAllDataCenters = async (): Promise<DataCenter[]> => {
-  const url = (await getAppConfig()).datacenter.url;
-  const placeholderDatacenter = {
-    centerId: 'collab',
-    country: 'CA',
-    name: 'Cancer Collaboratory Cloud2',
-    organization: 'Acme',
-    contactEmail: 'joe.smith@example.com',
-    storageType: 'S3',
-    type: 'RDPC',
+  const config = await getAppConfig();
 
-    // URL from config:
-    url,
-  };
-  return [placeholderDatacenter];
+  try {
+    const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers');
+
+    const response = await fetch(requestUrl);
+    const data = await response.json();
+
+    if (isArray(data)) {
+      return data.filter(isDataCenter) as DataCenter[];
+    }
+    throw new Error(`Response object returned for Data Centers is badly formed (Not an array). Response data: ${data}`);
+  } catch (e) {
+    logger.error(`Failed to fetch all Data Centers: ${e}`);
+    throw e;
+  }
 };
