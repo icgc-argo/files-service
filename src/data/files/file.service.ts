@@ -66,10 +66,10 @@ export async function getPaginatedFiles(
 }
 /**
  * Async generator to iteratre through files that match a filter
- * @param filter filter with all conditions
+ * @param filter filter with all conditions - default filter is select all files
  * @returns
  */
-export async function* getAllFiles(filter: FileFilter): AsyncGenerator<File, void> {
+export async function* getAllFiles(filter: FileFilter = {}): AsyncGenerator<File, void> {
   const fileIterator = fileModel.getFilesIterator(filter);
   for await (const doc of fileIterator) {
     yield toPojo(doc);
