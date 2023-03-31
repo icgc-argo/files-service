@@ -17,17 +17,11 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-def commit = "UNKNOWN"
-def version = "UNKNOWN"
-def serviceName = "files-service"
-def dockerRepo = "icgcargo/${serviceName}"
-def repoName = "icgc-argo"
-
 pipeline {
     agent {
         kubernetes {
             label 'ci-executor'
-            yaml """
+            yaml '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -59,121 +53,206 @@ spec:
   volumes:
   - name: docker-graph-storage
     emptyDir: {}
-"""
+'''
         }
     }
+
+    environment {
+        gitHubRegistry = 'ghcr.io'
+        gitHubRepo = 'icgc-argo/files-service'
+        gitHubImageName = "${gitHubRegistry}/${gitHubRepo}"
+        DEPLOY_TO_DEV = false
+        PUBLISH_IMAGE = false
+
+        commit = sh(
+            returnStdout: true,
+            script: 'git describe --always'
+        ).trim()
+
+        version = sh(
+            returnStdout: true,
+            script:
+                'cat ./package.json | ' +
+                'grep "version" | ' +
+                'cut -d : -f2 | ' +
+                "sed \'s:[\",]::g\'"
+        ).trim()
+        slackNotificationsUrl = credentials('JenkinsFailuresSlackChannelURL')
+    }
+
+    parameters {
+        booleanParam(
+            name: 'DEPLOY_TO_DEV',
+            defaultValue: "${env.DEPLOY_TO_DEV}",
+            description: 'Deploys your branch to argo-dev'
+        )
+        booleanParam(
+            name: 'PUBLISH_IMAGE',
+            defaultValue: "${env.PUBLISH_IMAGE ?: params.DEPLOY_TO_DEV}",
+            description: 'Publishes an image with {git commit} tag'
+        )
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
     stages {
-        stage('Prepare') {
+        stage('Run tests') {
             steps {
-                script {
-                    commit = sh(returnStdout: true, script: 'git describe --always').trim()
-                }
-                script {
-                    version = sh(returnStdout: true, script: 'cat package.json | grep version | cut -d \':\' -f2 | sed -e \'s/"//\' -e \'s/",//\'').trim()
+                container('node') {
+                    sh 'npm ci'
+                    sh 'npm t'
                 }
             }
-
         }
 
-        stage('Test') {
-          steps {
-            container('node') {
-              sh "npm ci"
+        stage('Builds image') {
+            steps {
+                container('docker') {
+                    sh "docker build --build-arg COMMIT_ID=${commit} --build-arg VERSION=${version} --network=host -f Dockerfile . -t ${gitHubImageName}:${commit}"
+                }
             }
-            container('node') {
-              sh "npm t"
-            }
-          }
         }
 
-       // publish the edge tag
-        stage('Publish Develop') {
+        stage('Publish tag to github') {
             when {
-                branch "develop"
+                branch 'main'
+            }
+            steps {
+                container('node') {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'argoGithub',
+                            passwordVariable: 'GIT_PASSWORD',
+                            usernameVariable: 'GIT_USERNAME'
+                        ),
+                    ]) {
+                        script {
+                            // we still want to run the platform deploy even if this fails, hence try-catch
+                            try {
+                                sh "git tag ${version}"
+                                sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${gitHubRepo} --tags"
+                                sh "curl \
+                                -X POST \
+                                -H 'Content-type: application/json' \
+                                    --data '{ \
+                                        \"text\":\"New ${gitHubRepo} published succesfully: v.${version}\
+                                        \n[Build ${env.BUILD_NUMBER}] (${env.BUILD_URL})\" \
+                                    }' \
+                                ${slackNotificationsUrl}"
+                            } catch (err) {
+                                echo 'There was an error while publishing packages'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Publish images') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    branch 'main'
+                    expression { return params.PUBLISH_IMAGE }
+                }
             }
             steps {
                 container('docker') {
-                    withCredentials([usernamePassword(credentialsId:'argoDockerHub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                        sh 'docker login -u $USERNAME -p $PASSWORD'
-                    }
+                    withCredentials([usernamePassword(
+                        credentialsId:'argoContainers',
+                        passwordVariable: 'PASSWORD',
+                        usernameVariable: 'USERNAME'
+                    )]) {
+                        sh "docker login ${gitHubRegistry} -u $USERNAME -p $PASSWORD"
 
-                    // the network=host needed to download dependencies using the host network (since we are inside 'docker'
-                    // container)
-                    sh "docker build --build-arg COMMIT_ID=${commit} --build-arg VERSION=${version} --network=host -f Dockerfile . -t ${dockerRepo}:edge -t ${dockerRepo}:${version}-${commit}"
-                    sh "docker push ${dockerRepo}:${version}-${commit}"
-                    sh "docker push ${dockerRepo}:edge"
-               }
+                        script {
+                            if (env.BRANCH_NAME ==~ 'main') { //push edge and commit tags
+                                sh "docker tag ${gitHubImageName}:${commit} ${gitHubImageName}:${version}"
+                                sh "docker push ${gitHubImageName}:${version}"
+
+                                sh "docker tag ${gitHubImageName}:${commit} ${gitHubImageName}:latest"
+                                sh "docker push ${gitHubImageName}:latest"
+                            } else { // push commit tag
+                                sh "docker tag ${gitHubImageName}:${commit} ${gitHubImageName}:${commit}"
+                                sh "docker push ${gitHubImageName}:${commit}"
+                            }
+
+                            if (env.BRANCH_NAME ==~ 'develop') { // push edge tag
+                                sh "docker tag ${gitHubImageName}:${commit} ${gitHubImageName}:edge"
+                                sh "docker push ${gitHubImageName}:edge"
+                            }
+                        }
+                    }
+                }
             }
         }
 
         stage('deploy to argo-dev') {
             when {
-                branch "develop"
+                anyOf {
+                    branch 'develop'
+                    expression { return params.DEPLOY_TO_DEV }
+                }
             }
             steps {
-                build(job: "/ARGO/provision/${serviceName}", parameters: [
-                     [$class: 'StringParameterValue', name: 'AP_ARGO_ENV', value: 'dev' ],
-                     [$class: 'StringParameterValue', name: 'AP_ARGS_LINE', value: "--set-string image.tag=${version}-${commit}" ]
+                build(job: '/ARGO/provision/files-service', parameters: [
+                    string(name: 'AP_ARGO_ENV', value: 'dev'),
+                    string(name: 'AP_ARGS_LINE', value: "--set-string image.tag=${commit}"),
                 ])
             }
         }
 
-        stage('Release & tag') {
-          when {
-            branch "master"
-          }
-          steps {
-              container('docker') {
-                  withCredentials([usernamePassword(credentialsId: 'argoGithub', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-                      sh "git tag ${version}"
-                      sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${repoName}/${serviceName} --tags"
-                  }
-                  withCredentials([usernamePassword(credentialsId:'argoDockerHub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                      sh 'docker login -u $USERNAME -p $PASSWORD'
-                  }
-                  sh "docker  build --build-arg COMMIT_ID=${commit} --build-arg VERSION=${version} --network=host -f Dockerfile . -t ${dockerRepo}:latest -t ${dockerRepo}:${version}"
-                  sh "docker push ${dockerRepo}:${version}"
-                  sh "docker push ${dockerRepo}:latest"
-             }
-          }
-        }
-
         stage('deploy to argo-qa') {
             when {
-                branch "master"
+                anyOf {
+                    branch 'main'
+                }
             }
             steps {
-                build(job: "/ARGO/provision/${serviceName}", parameters: [
-                      [$class: 'StringParameterValue', name: 'AP_ARGO_ENV', value: 'qa' ],
-                      [$class: 'StringParameterValue', name: 'AP_ARGS_LINE', value: "--set-string image.tag=${version}" ]
+                build(job: '/ARGO/provision/files-service', parameters: [
+                    string(name: 'AP_ARGO_ENV', value: 'qa'),
+                    string(name: 'AP_ARGS_LINE', value: "--set-string image.tag=${version}"),
                 ])
             }
         }
     }
 
     post {
-      unsuccessful {
-        // i used node container since it has curl already
-        container("node") {
-          script {
-            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop") {
-              withCredentials([string(credentialsId: 'JenkinsFailuresSlackChannelURL', variable: 'JenkinsFailuresSlackChannelURL')]) { 
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"Build Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \"}' ${JenkinsFailuresSlackChannelURL}"
-              }
+        unsuccessful {
+            // i used node   container since it has curl already
+            container('node') {
+                script {
+                    if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'develop') {
+                        sh "curl \
+                        -X POST \
+                        -H 'Content-type: application/json' \
+                        --data '{ \
+                            \"text\": \
+                            \"Build Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \" \
+                            }' \
+                        ${slackNotificationsUrl}"
+                    }
+                }
             }
-          }
         }
-      }
-      fixed {
-        container("node") {
-          script {
-            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop") {
-              withCredentials([string(credentialsId: 'JenkinsFailuresSlackChannelURL', variable: 'JenkinsFailuresSlackChannelURL')]) { 
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"Build Fixed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \"}' ${JenkinsFailuresSlackChannelURL}"
-              }
+        fixed {
+            container('node') {
+                script {
+                    if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'develop') {
+                        sh "curl \
+                        -X POST \
+                        -H 'Content-type: application/json' \
+                        --data '{ \
+                            \"text\": \
+                            \"Build Fixed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \" \
+                            }' \
+                        ${slackNotificationsUrl}"
+                    }
+                }
             }
-          }
         }
-      }
     }
 }
