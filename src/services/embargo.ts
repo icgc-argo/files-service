@@ -165,15 +165,26 @@ export function calculateEmbargoStartDate(inputs: {
 }): Date | undefined {
   const { dbFile, songAnalysis, matchedSamplePairs, clinicalDonor } = inputs;
 
-  // Check for clinical exemption and ensure required data is provided.
+  // Check for clinical exemption, if no exemption then we need valid clinical data
   const clinicalExemption: boolean = dbFile.clinicalExemption !== undefined;
-  if (!clinicalExemption && !clinicalDonor) {
-    logger.info(
-      `calculateEmbargoStartDate()`,
-      dbFile.fileId,
-      `file ${dbFile.fileId} does not have a clinical exemption and has no clinical donor data provided.`,
-    );
-    return undefined;
+  const validClinicalData: boolean = clinicalDonor?.schemaMetadata?.isValid || false;
+  if (!clinicalExemption) {
+    if (!clinicalDonor) {
+      logger.info(
+        `calculateEmbargoStartDate()`,
+        dbFile.fileId,
+        `file ${dbFile.fileId} has no clinical donor data available and has no clinical exemption.`,
+      );
+      return undefined;
+    }
+    if (!validClinicalData) {
+      logger.info(
+        `calculateEmbargoStartDate()`,
+        dbFile.fileId,
+        `file ${dbFile.fileId} has a donor with invalid clinical data and has no clinical exemption.`,
+      );
+      return undefined;
+    }
   }
 
   // 1. First Published date of this file's song analysis
