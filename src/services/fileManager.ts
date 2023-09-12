@@ -202,7 +202,7 @@ export async function updateFileEmbargoState(file: File): Promise<File> {
         // A currently public file has been calculated as needing to be restricted
         // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
         logger.debug(
-          'recalculateFileState()',
+          'updateFileEmbargoState()',
           file.fileId,
           `PUBLIC file embargo calculated to be`,
           embargoStage,

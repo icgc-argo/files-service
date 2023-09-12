@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -16,10 +16,10 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import Logger from '../logger';
 import * as fileService from '../data/files';
-import { recalculateFileState } from '../services/fileManager';
-import { getIndexer, Indexer } from '../services/indexer';
+import Logger from '../logger';
+import { updateFileFromExternalSources } from '../services/fileManager';
+import { Indexer, getIndexer } from '../services/indexer';
 const logger = Logger('Job:RecalculateFileEmbargo');
 
 async function recalculateFile(file: fileService.File, indexer: Indexer) {
@@ -32,7 +32,7 @@ async function recalculateFile(file: fileService.File, indexer: Indexer) {
       file.releaseState,
       file.embargoStart || '',
     );
-    const updatedFile = await recalculateFileState(file);
+    const updatedFile = await updateFileFromExternalSources(file);
 
     logger.debug(
       `updatedFile`,
