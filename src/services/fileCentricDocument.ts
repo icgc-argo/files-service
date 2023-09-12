@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -31,6 +31,8 @@ import { RdpcFileDocument } from '../external/analysisConverter';
 const logger = Logger('FileDocumentService');
 
 export type FileCentricDocument = RdpcFileDocument & {
+  hasClinicalData: boolean;
+
   embargoStage: EmbargoStage;
   releaseState: FileReleaseState;
   meta: {
@@ -53,21 +55,17 @@ export const buildDocument = ({
     logger.warn(
       `FilePartialDocument ${filePartialDocument.fileId} from analysis ${
         filePartialDocument.analysis.analysisId
-      } has more than 1 donor: ${filePartialDocument.donors.map(
-        (donor: { donorId: string }) => donor.donorId,
-      )}`,
+      } has more than 1 donor: ${filePartialDocument.donors.map((donor: { donorId: string }) => donor.donorId)}`,
     );
   }
   if (!filePartialDocument.donors || filePartialDocument.donors.length < 1) {
     logger.error(`File ${filePartialDocument.fileId} has no associated donors`);
-    throw new Error(
-      'FileCentricDocument has no donors, it cannot be converted to a FileCentricDocument.',
-    );
+    throw new Error('FileCentricDocument has no donors, it cannot be converted to a FileCentricDocument.');
   }
 
   // Confirm the file has a fileId
   if (!dbFile.fileId) {
-    logger.error(``);
+    logger.error('File record has no fileId, it cannot be converted to a FileCentricDocument.');
     throw new Error('File record has no fileId, it cannot be converted to a FileCentricDocument.');
   }
 
@@ -79,6 +77,7 @@ export const buildDocument = ({
     ...filePartialDocument,
     fileId: dbFile.fileId,
     fileNumber: dbFile.fileNumber,
+    hasClinicalData: !!dbFile.hasClinicalData,
     embargoStage: dbFile.embargoStage,
     releaseState: dbFile.releaseState,
     meta: {
@@ -91,5 +90,4 @@ export const buildDocument = ({
   return output;
 };
 
-export const buildDocuments = (inputs: FileCentricDocumentInputs[]): FileCentricDocument[] =>
-  inputs.map(buildDocument);
+export const buildDocuments = (inputs: FileCentricDocumentInputs[]): FileCentricDocument[] => inputs.map(buildDocument);
