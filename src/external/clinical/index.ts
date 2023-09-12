@@ -1,5 +1,5 @@
 // /*
-//  * Copyright (c) 2022 The Ontario Institute for Cancer Research. All rights reserved
+//  * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
 //  *
 //  * This program and the accompanying materials are made available under the terms of
 //  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -26,7 +26,24 @@ import _ from 'lodash';
 import { getEgoToken } from '../../external/ego';
 import Logger from '../../logger';
 import { ClinicalDonor } from './types';
+import AsyncCache from '../../utils/asyncCache';
 const logger = Logger('Clinical');
+
+// Cache results of fetching donor data from clinical service. Keep cached results for 5 minutes.
+const DONOR_FETCH_CACHE = AsyncCache(
+  (inputs: { programId: string; donorId: string }) => fetchDonor(inputs.programId, inputs.donorId),
+  { expiryTime: 5 * 60 * 1000 },
+);
+
+/**
+ * Retrieve donor information from clinical service with cached results to prevent redundant fetching
+ * @param programId
+ * @param donorId
+ * @returns
+ */
+export async function getDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
+  return DONOR_FETCH_CACHE.get({ programId, donorId });
+}
 
 /**
  * Fetch clinical data for a single donor, identified by programId and donorId
@@ -34,7 +51,7 @@ const logger = Logger('Clinical');
  * @param donorId
  * @returns
  */
-export async function fetchDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
+async function fetchDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
   const config = await getAppConfig();
   try {
     logger.debug(`fetchDonor()`, `Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
@@ -50,9 +67,14 @@ export async function fetchDonor(programId: string, donorId: string): Promise<Cl
       throw new Error(`HTTP Error Response: ${response.status} ${errorBody}`);
     }
 
-    const donor = await response.json();
-    // TODO: Validate the response is the correct type, this casting is dangerous
-    return donor as ClinicalDonor;
+    const rawDonor = await response.json();
+    const parsedDonor = ClinicalDonor.safeParse(rawDonor);
+    if (parsedDonor.success) {
+      return parsedDonor.data;
+    } else {
+      logger.error(`fetchDonor()`, `Error validating result from fetched donor`, parsedDonor.error);
+      return undefined;
+    }
   } catch (e) {
     logger.warn(`fetchDonor()`, `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`, <Error>e);
     return undefined;
@@ -85,7 +107,7 @@ export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerat
         // occasionally in testing an empty item was found in the split response so lets filter those out.
         return !_.isEmpty(chunk);
       })
-      .map((chunk, index, array) => {
+      .map(chunk => {
         try {
           return JSON.parse(chunk);
         } catch (err) {
