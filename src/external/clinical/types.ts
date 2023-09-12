@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -17,101 +17,106 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { z as zod } from 'zod';
+
+//  Record<string, string | number | boolean | undefined>;
+export const ClinicalInfo = zod.record(zod.union([zod.string(), zod.number(), zod.boolean()]).optional());
+
+export const ClinicalSample = zod.object({
+  clinicalInfo: ClinicalInfo,
+  sampleId: zod.string(),
+  submitterId: zod.string(),
+  sampleType: zod.string(),
+});
+export const ClinicalSpecimen = zod.object({
+  clinicalInfo: ClinicalInfo,
+  samples: zod.array(ClinicalSample),
+  specimenId: zod.string(),
+  submitterId: zod.string(),
+  tumourNormalDesignation: zod.string(),
+  specimenType: zod.string(),
+  specimenTissueSource: zod.string(),
+});
+// TODO: The properties we want to index from the following types should be declared.
+export const ClinicalFollowUp = zod.object({
+  clinicalInfo: ClinicalInfo,
+  followUpId: zod.string(),
+});
+export const ClinicalPrimaryDiagnosis = zod.object({
+  clinicalInfo: ClinicalInfo,
+  primaryDiagnosisId: zod.string(),
+});
+export const ClinicalTherapy = zod.object({
+  clinicalInfo: ClinicalInfo,
+  therapyId: zod.string(),
+});
+export const ClinicalTreatment = zod.object({
+  clinicalInfo: ClinicalInfo,
+  therapies: zod.array(ClinicalTherapy),
+  treatmentId: zod.string(),
+});
+export const ClinicalFamilyHistory = zod.object({
+  clinicalInfo: ClinicalInfo,
+  familyHistoryId: zod.string(),
+});
+export const ClinicalExposure = zod.object({
+  clinicalInfo: ClinicalInfo,
+  exposureId: zod.string(),
+});
+export const ClinicalComorbidity = zod.object({
+  clinicalInfo: ClinicalInfo,
+  comorbidityId: zod.string(),
+});
+export const ClinicalBiomarker = zod.object({
+  clinicalInfo: ClinicalInfo,
+  biomarkerId: zod.string(),
+});
+
 /**
  * The specific content in ClinicalDonor type is subject to change as the data-dictionary is updated,
  * so we try to only define here the bare minimum of fields that are needed to interact with and index the clinical data.
+ * For this reason, the Zod schema must allow additional properties to be present (not strict).
  *
  * Note: we receive all dates as strings. The type declaration here has them listed as strings, but if it makes sense in the future
- * we can parse them into proper Date objects when the `JSON.parse(donor)` is called.
+ * we can update the Zod schema to parse them into dates.
  */
-export type ClinicalDonor = {
-  donorId: string;
-  gender: string;
-  programId: string;
+export const ClinicalDonor = zod.object({
+  donorId: zod.string(),
+  gender: zod.string(),
+  programId: zod.string(),
 
-  submitterId: string;
-  createdAt: string;
-  updatedAt: string;
-  schemaMetadata: {
-    isValid: boolean;
-    lastValidSchemaVersion: string;
-    originalSchemaVersion: string;
-    lastMigrationId: string;
-  };
-  completionStats: {
-    coreCompletion: {
-      donor: number;
-      specimens: number;
-      primaryDiagnosis: number;
-      followUps: number;
-      treatments: number;
-    };
-    overriddenCoreCompletion: string[];
-    coreCompletionPercentage: number;
-    coreCompletionDate: string;
-  };
+  submitterId: zod.string(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  schemaMetadata: zod.object({
+    isValid: zod.boolean(),
+    lastValidSchemaVersion: zod.string(),
+    originalSchemaVersion: zod.string(),
+    lastMigrationId: zod.string(),
+  }),
+  completionStats: zod.object({
+    coreCompletion: zod.object({
+      donor: zod.number(),
+      specimens: zod.number(),
+      primaryDiagnosis: zod.number(),
+      followUps: zod.number(),
+      treatments: zod.number(),
+    }),
+    overriddenCoreCompletion: zod.array(zod.string()),
+    coreCompletionPercentage: zod.number(),
+    coreCompletionDate: zod.string(),
+  }),
 
   // core
-  specimens: ClinicalSpecimen[];
-  followUps: ClinicalFollowUp[];
-  primaryDiagnoses: ClinicalPrimaryDiagnosis[];
-  treatments: ClinicalTreatment[];
+  specimens: zod.array(ClinicalSpecimen),
+  followUps: zod.array(ClinicalFollowUp),
+  primaryDiagnoses: zod.array(ClinicalPrimaryDiagnosis),
+  treatments: zod.array(ClinicalTreatment),
 
   // expanded
-  familyHistory: ClinicalFamilyHistory[];
-  exposure: ClinicalExposure[];
-  comorbidity: ClinicalComorbidity[];
-  biomarker: ClinicalBiomarker[];
-};
-
-export type ClinicalInfo = Record<string, string | number | boolean | undefined>;
-
-export type ClinicalSpecimen = {
-  clinicalInfo: ClinicalInfo;
-  samples: ClinicalSample[];
-  specimenId: string;
-  submitterId: string;
-  tumourNormalDesignation: string;
-  specimenType: string;
-  specimenTissueSource: string;
-};
-export type ClinicalSample = {
-  clinicalInfo: ClinicalInfo;
-  sampleId: string;
-  submitterId: string;
-  sampleType: string;
-};
-// TODO: The properties we want to index from the following types should be declared.
-export type ClinicalFollowUp = {
-  clinicalInfo: ClinicalInfo;
-  followUpId: string;
-};
-export type ClinicalPrimaryDiagnosis = {
-  clinicalInfo: ClinicalInfo;
-  primaryDiagnosisId: string;
-};
-export type ClinicalTreatment = {
-  clinicalInfo: ClinicalInfo;
-  therapies: ClinicalTherapy[];
-  treatmentId: string;
-};
-export type ClinicalTherapy = {
-  clinicalInfo: ClinicalInfo;
-  therapyId: string;
-};
-export type ClinicalFamilyHistory = {
-  clinicalInfo: ClinicalInfo;
-  familyHistoryId: string;
-};
-export type ClinicalExposure = {
-  clinicalInfo: ClinicalInfo;
-  exposureId: string;
-};
-export type ClinicalComorbidity = {
-  clinicalInfo: ClinicalInfo;
-  comorbidityId: string;
-};
-export type ClinicalBiomarker = {
-  clinicalInfo: ClinicalInfo;
-  biomarkerId: string;
-};
+  familyHistory: zod.array(ClinicalFamilyHistory),
+  exposure: zod.array(ClinicalExposure),
+  comorbidity: zod.array(ClinicalComorbidity),
+  biomarker: zod.array(ClinicalBiomarker),
+});
+export type ClinicalDonor = zod.infer<typeof ClinicalDonor>;
