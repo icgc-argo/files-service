@@ -164,7 +164,10 @@ export default async (): Promise<RollCallClient> => {
       headers: { 'Content-Type': 'application/json' },
     })
       .then(_ => true)
-      .catch(_ => false);
+      .catch(err => {
+        logger.warn(`release()`, `Error returned from release index request`, resovledIndex.indexName, err);
+        return false;
+      });
   };
 
   const configureIndex = async (index: Index): Promise<void> => {
