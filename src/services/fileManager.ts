@@ -389,9 +389,3 @@ export async function fetchFileUpdatesFromDataCenter(files: File[]): Promise<Fil
 
   return output;
 }
-
-const x = ['a', 'b', 0, undefined];
-const y = x.filter(Boolean); // y is `(string | number | undefined)`
-
-const doesExist = <T>(input: T | undefined): input is T => Boolean(input);
-const z = x.filter(doesExist); // z is `(string | number)`
