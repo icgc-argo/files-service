@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -34,7 +34,7 @@ import _ from 'lodash';
 
 import * as fileService from '../data/files';
 import { File, FileInput, EmbargoStage, FileReleaseState } from '../data/files';
-import * as maestro from '../external/analysisConverter';
+import * as analysisConverter from '../external/analysisConverter';
 import { RdpcFileDocument } from '../external/analysisConverter';
 import * as clinical from '../external/clinical';
 import * as song from '../external/song';
@@ -103,10 +103,11 @@ export async function saveAndIndexFilesFromRdpcData(
     await rdpcFileDocs.map(async rdpcFile => {
       // update local records
       const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
-      const updatedFile = await updateStatusFromRdpcData(createdFile, rdpcFile);
-      const fileWithUpdatedState = await recalculateFileState(updatedFile);
+      const partialUpdate = await updateStatusFromRdpcData(createdFile, rdpcFile);
+      const updatedFile = await updateFileFromExternalSources(partialUpdate);
+
       // convert to file centric documents
-      return buildDocument({ dbFile: fileWithUpdatedState, rdpcFile });
+      return buildDocument({ dbFile: updatedFile, rdpcFile });
     }),
   );
 
@@ -151,9 +152,10 @@ export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | und
   //  - donor from clinical (to confirm the completion stats)
 
   try {
+    // TODO: The following requests need to be cached, otherwise they will be called repeatedly. Since file processing is being done in parallel and there are multiple files per donor
     const matchedSamplePairs = await dcGateway.getMatchedPairsForDonor(file.donorId);
     const songAnalysis = await song.getAnalysesById(file.repoId, file.programId, file.analysisId);
-    const clinicalDonor = await clinical.fetchDonor(file.programId, file.donorId);
+    const clinicalDonor = await clinical.getDonor(file.programId, file.donorId);
 
     const startDate = await calculateEmbargoStartDate({
       dbFile: file,
@@ -166,7 +168,7 @@ export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | und
     }
     return startDate;
   } catch (e) {
-    logger.error(`Failure fetching source data while checking file's embargo start date: ${e}`);
+    logger.error(`Failure fetching source data while checking file's embargo start date`, e);
   }
 }
 
@@ -176,7 +178,7 @@ export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | und
  * @param file
  * @returns
  */
-export async function recalculateFileState(file: File): Promise<File> {
+export async function updateFileEmbargoState(file: File): Promise<File> {
   // Check for embargoStart date, if not present  attempt to calculate it
 
   // Recalculate embargoStage
@@ -200,7 +202,7 @@ export async function recalculateFileState(file: File): Promise<File> {
         // A currently public file has been calculated as needing to be restricted
         // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
         logger.debug(
-          'recalculateFileState()',
+          'updateFileEmbargoState()',
           file.fileId,
           `PUBLIC file embargo calculated to be`,
           embargoStage,
@@ -245,6 +247,44 @@ export async function recalculateFileState(file: File): Promise<File> {
   return file;
 }
 
+/**
+ * Check with clinical service if the file has had clinical data added, update the file, save to the DB
+ * and return the file with any changes.
+ * @param file
+ * @returns
+ */
+export async function updateFileClinicalData(file: File): Promise<File> {
+  if (file.hasClinicalData) {
+    // File already known to have clinical data, no changes necessary
+    return file;
+  }
+
+  try {
+    const donorData = await clinical.getDonor(file.programId, file.donorId);
+    if (donorData?.completionStats?.coreCompletionPercentage === 1) {
+      return await fileService.updateFileHasClinicalData(file.objectId, true);
+    }
+  } catch (error) {
+    logger.warn(`Failed to update file clinical data record`, file.programId, file.donorId, error);
+  }
+  return file;
+}
+
+/**
+ * Checks external sources for updates to file embargo state and clinical data state.
+ * This applies the following set of update functions:
+ *  - updateFileEmbargoState
+ *  - updateFileClinicalData
+ *
+ * The file is updated and saved to the DB and then the updated File is returned
+ * @param file
+ */
+export async function updateFileFromExternalSources(file: File): Promise<File> {
+  // TODO: The functions called here could use a refactoring to not perform DB updates in each step. We don't need the partial updates.
+  const partialUpdate = await updateFileEmbargoState(file);
+  return await updateFileClinicalData(partialUpdate);
+}
+
 type RdpcResultPair = {
   file: File;
   rdpcFile?: RdpcFileDocument;
@@ -253,6 +293,7 @@ type SortedRdpcResults = {
   dataCenterId: string;
   results: RdpcResultPair[];
 }[];
+
 /**
  * Given a list of files, fetch the updated file data for them from song
  * This is the data fetching step for updating db files from data center
@@ -296,7 +337,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
         });
     }
     // convert analyses documents to rdpcFileDocs
-    const rdpcFiles = await maestro.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
+    const rdpcFiles = await analysisConverter.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
     // Pair up the files in this data center with the rdpcFiles returned from maestro
     const results: RdpcResultPair[] = dcFiles.map(file => {

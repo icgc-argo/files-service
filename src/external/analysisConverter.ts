@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -48,19 +48,24 @@ const logger = Logger('AnalysisConverter');
 const CONVERTER_CONCURRENT_REQUESTS = 5;
 
 const addMetricsToAlignedReadsFile = async (
-  fileDocument: { [k: string]: RdpcFileDocument[] },
+  fileDocument: RdpcFileDocument,
   objectId: string,
-): Promise<RdpcFileDocument[]> => {
-  const runId = fileDocument[objectId][0].analysis.workflow.run_id;
-  const metrics = await getAlignmentMetrics(runId);
+): Promise<RdpcFileDocument> => {
+  const runId = fileDocument.analysis.workflow?.run_id;
+  if (runId) {
+    const metrics = await getAlignmentMetrics(runId);
 
-  const fileWithMetrics = [{ ...fileDocument[objectId][0], metrics }];
-  return fileWithMetrics;
+    const fileWithMetrics = { ...fileDocument, metrics };
+    return fileWithMetrics;
+  } else {
+    return fileDocument;
+  }
 };
 
 export type RdpcFileDocument = { [k: string]: any } & {
   objectId: string;
   studyId: string;
+  dataType?: string;
   repositories: { [k: string]: string }[];
   analysis: { [k: string]: any; analysisState: string };
 };
@@ -81,16 +86,13 @@ export async function convertAnalysesToFileDocuments(
   await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
     .for(analyses)
     .process(async analysis => {
-      const files = await convertAnalysisFileDocuments(analysis, repoCode);
+      const files = await fetchAnalysisToFileConversion(analysis, repoCode);
       output.push(...files);
     });
   return output;
 }
 
-export async function convertAnalysisFileDocuments(
-  analysis: SongAnalysis,
-  repoCode: string,
-): Promise<RdpcFileDocument[]> {
+async function fetchAnalysisToFileConversion(analysis: SongAnalysis, repoCode: string): Promise<RdpcFileDocument[]> {
   const config = await getAppConfig();
   const url = config.analysisConverterUrl;
   const timeout = config.analysisConverterTimeout;
@@ -103,9 +105,7 @@ export async function convertAnalysisFileDocuments(
   });
   if (result.status != 201) {
     logger.error(`Error response from converter: ${await result.text()}`);
-    throw new Error(
-      `Failed to convert analysis ${analysis.analysisId} to files, got response ${result.status}`,
-    );
+    throw new Error(`Failed to convert analysis ${analysis.analysisId} to files, got response ${result.status}`);
   }
 
   const response: {
@@ -118,13 +118,14 @@ export async function convertAnalysisFileDocuments(
   await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
     .for(Object.keys(response))
     .process(async (objectId: string) => {
+      const responseFile = response[objectId][0];
       if (
-        response[objectId][0].dataType === 'Aligned Reads' &&
-        response[objectId][0].analysis.analysisState === 'PUBLISHED' &&
-        response[objectId][0].analysis.workflow.workflow_name === 'DNA Seq Alignment'
+        responseFile?.dataType === 'Aligned Reads' &&
+        responseFile.analysis.analysisState === 'PUBLISHED' &&
+        responseFile.analysis.workflow?.workflow_name === 'DNA Seq Alignment'
       ) {
-        const fileWithMetrics = await addMetricsToAlignedReadsFile(response, objectId);
-        files.push(...fileWithMetrics);
+        const fileWithMetrics = await addMetricsToAlignedReadsFile(responseFile, objectId);
+        files.push(fileWithMetrics);
       } else {
         files.push(...response[objectId]);
       }
