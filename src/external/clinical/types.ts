@@ -33,49 +33,12 @@ export const ClinicalSpecimen = zod.object({
   samples: zod.array(ClinicalSample),
   specimenId: zod.string(),
   submitterId: zod.string(),
-  tumourNormalDesignation: zod.string(),
-  specimenType: zod.string(),
-  specimenTissueSource: zod.string(),
-});
-// TODO: The properties we want to index from the following types should be declared.
-export const ClinicalFollowUp = zod.object({
-  clinicalInfo: ClinicalInfo,
-  followUpId: zod.string(),
-});
-export const ClinicalPrimaryDiagnosis = zod.object({
-  clinicalInfo: ClinicalInfo,
-  primaryDiagnosisId: zod.string(),
-});
-export const ClinicalTherapy = zod.object({
-  clinicalInfo: ClinicalInfo,
-  therapyId: zod.string(),
-});
-export const ClinicalTreatment = zod.object({
-  clinicalInfo: ClinicalInfo,
-  therapies: zod.array(ClinicalTherapy),
-  treatmentId: zod.string(),
-});
-export const ClinicalFamilyHistory = zod.object({
-  clinicalInfo: ClinicalInfo,
-  familyHistoryId: zod.string(),
-});
-export const ClinicalExposure = zod.object({
-  clinicalInfo: ClinicalInfo,
-  exposureId: zod.string(),
-});
-export const ClinicalComorbidity = zod.object({
-  clinicalInfo: ClinicalInfo,
-  comorbidityId: zod.string(),
-});
-export const ClinicalBiomarker = zod.object({
-  clinicalInfo: ClinicalInfo,
-  biomarkerId: zod.string(),
 });
 
 /**
- * The specific content in ClinicalDonor type is subject to change as the data-dictionary is updated,
- * so we try to only define here the bare minimum of fields that are needed to interact with and index the clinical data.
- * For this reason, the Zod schema must allow additional properties to be present (not strict).
+ * This object is an partial representation of the data returned from the clinical donor api. We are only validating the fields that
+ * are relevant to the file service's usage. When additional information from the clinical API is needed those fields should be added
+ * to this schema definition.
  *
  * Note: we receive all dates as strings. The type declaration here has them listed as strings, but if it makes sense in the future
  * we can update the Zod schema to parse them into dates.
@@ -106,17 +69,5 @@ export const ClinicalDonor = zod.object({
     coreCompletionPercentage: zod.number(),
     coreCompletionDate: zod.string(),
   }),
-
-  // core
-  specimens: zod.array(ClinicalSpecimen),
-  followUps: zod.array(ClinicalFollowUp),
-  primaryDiagnoses: zod.array(ClinicalPrimaryDiagnosis),
-  treatments: zod.array(ClinicalTreatment),
-
-  // expanded
-  familyHistory: zod.array(ClinicalFamilyHistory),
-  exposure: zod.array(ClinicalExposure),
-  comorbidity: zod.array(ClinicalComorbidity),
-  biomarker: zod.array(ClinicalBiomarker),
 });
 export type ClinicalDonor = zod.infer<typeof ClinicalDonor>;
