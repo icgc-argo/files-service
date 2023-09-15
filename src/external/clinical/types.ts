@@ -57,17 +57,19 @@ export const ClinicalDonor = zod.object({
     originalSchemaVersion: zod.string(),
     lastMigrationId: zod.string(),
   }),
-  completionStats: zod.object({
-    coreCompletion: zod.object({
-      donor: zod.number(),
-      specimens: zod.number(),
-      primaryDiagnosis: zod.number(),
-      followUps: zod.number(),
-      treatments: zod.number(),
-    }),
-    overriddenCoreCompletion: zod.array(zod.string()),
-    coreCompletionPercentage: zod.number(),
-    coreCompletionDate: zod.string(),
-  }),
+  completionStats: zod
+    .object({
+      coreCompletion: zod.object({
+        donor: zod.number(),
+        specimens: zod.number(),
+        primaryDiagnosis: zod.number(),
+        followUps: zod.number(),
+        treatments: zod.number(),
+      }),
+      overriddenCoreCompletion: zod.array(zod.string()),
+      coreCompletionPercentage: zod.number(),
+      coreCompletionDate: zod.string().nullable(),
+    })
+    .optional(),
 });
 export type ClinicalDonor = zod.infer<typeof ClinicalDonor>;
