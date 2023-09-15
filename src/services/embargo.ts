@@ -203,7 +203,7 @@ export function calculateEmbargoStartDate(inputs: {
     .slice(-1)[0];
 
   // 3. clinical core completion date
-  const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats.coreCompletionDate);
+  const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats?.coreCompletionDate || undefined);
 
   if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
     const options: Date[] = [analysisFirstPublished];
