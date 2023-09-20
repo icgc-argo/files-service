@@ -274,6 +274,8 @@ function toPojo(f: FileMongooseDocument): File {
 
     clinicalExemption: f.clinicalExemption as ClinicalExemption,
     embargoStart: f.embargoStart,
+
+    hasClinicalData: f.hasClinicalData,
   };
 }
 
