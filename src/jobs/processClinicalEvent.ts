@@ -2,10 +2,10 @@ import { getAppConfig } from '../config';
 import * as fileService from '../data/files';
 
 import PromisePool from '@supercharge/promise-pool/dist';
-import { recalculateFileState } from '../services/fileManager';
+import ClinicalUpdateEvent from '../external/kafka/messages/ClinicalUpdateEvent';
+import { updateFileFromExternalSources } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
 import { isUnreleased } from '../services/utils/fileUtils';
-import ClinicalUpdateEvent from '../external/kafka/messages/ClinicalUpdateEvent';
 
 import Logger from '../logger';
 const logger = Logger('Job:ProcessClinicalEvent');
@@ -38,7 +38,7 @@ const clinicalUpdateEvent = async (clinicalEvent: ClinicalUpdateEvent): Promise<
         logger.error(`Update Doc Error: ${e.stack}`);
       })
       .process(async file => {
-        const updatedFile = await recalculateFileState(file);
+        const updatedFile = await updateFileFromExternalSources(file);
 
         if (updatedFile.releaseState !== fileService.FileReleaseState.UNRELEASED) {
           indexer.updateRestrictedFile(updatedFile);

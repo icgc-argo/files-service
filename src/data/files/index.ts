@@ -31,6 +31,7 @@ export {
   updateFileReleaseProperties,
   updateFileAdminControls,
   updateFileSongPublishStatus,
+  updateFileHasClinicalData,
   removeLabel,
   removeClinicalExemption,
 } from './file.service';

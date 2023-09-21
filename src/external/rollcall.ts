@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -93,21 +93,18 @@ export default async (): Promise<RollCallClient> => {
   const aliasName = config.rollcall.aliasName;
   const indexEntity = config.rollcall.entity;
   const indexType = 'centric';
-  const shardPrefix = (isPublic: boolean) =>
-    isPublic ? RELEASE_STATE.PUBLIC : RELEASE_STATE.RESTRICTED;
+  const shardPrefix = (isPublic: boolean) => (isPublic ? RELEASE_STATE.PUBLIC : RELEASE_STATE.RESTRICTED);
   const releasePrefix = 're';
 
   const client = await getClient();
 
-  const fetchCurrentIndex = async (
-    programShortName: string,
-    isPublic: boolean,
-  ): Promise<Index | undefined> => {
+  const fetchCurrentIndex = async (programShortName: string, isPublic: boolean): Promise<Index | undefined> => {
     logger.debug(`Fetching current index ${programShortName} isPublic:${isPublic}`);
     const url = urljoin(rootUrl, `/indices/resolved`);
 
     const shard = formatProgramShortName(programShortName);
 
+    // TODO: Data validation
     const response = (await fetch(url).then(res => res.json())) as Index[];
 
     const latestIndex = response
@@ -120,10 +117,7 @@ export default async (): Promise<RollCallClient> => {
 
   const fetchNextIndex = async (
     programShortName: string,
-    {
-      isPublic = false,
-      cloneFromReleasedIndex = false,
-    }: { isPublic: boolean; cloneFromReleasedIndex: boolean },
+    { isPublic = false, cloneFromReleasedIndex = false }: { isPublic: boolean; cloneFromReleasedIndex: boolean },
   ): Promise<Index> => {
     logger.info(
       `Fetching from Rollcall next index for ${programShortName}. Public=${isPublic}. Cloned=${cloneFromReleasedIndex}.`,
@@ -145,6 +139,8 @@ export default async (): Promise<RollCallClient> => {
         headers: { 'Content-Type': 'application/json' },
       }).then(res => res.json())) as Index;
 
+      // TODO: Data validation
+
       // Set the mapping and update settings
       await configureIndex(newIndex);
 
@@ -157,20 +153,21 @@ export default async (): Promise<RollCallClient> => {
   };
 
   const release = async (resovledIndex: Index): Promise<boolean> => {
-    logger.info(
-      `Requesting Rollcall to release index ${resovledIndex.indexName} to alias ${aliasName}`,
-    );
+    logger.info(`Requesting Rollcall to release index ${resovledIndex.indexName} to alias ${aliasName}`);
     const url = urljoin(`${rootUrl}`, `/aliases/release`);
 
     const req = await convertResolvedIndexToIndexReleaseRequest(resovledIndex);
 
-    const acknowledged = (await fetch(url, {
+    return await fetch(url, {
       method: 'POST',
       body: JSON.stringify(req),
       headers: { 'Content-Type': 'application/json' },
-    }).then(res => res.json())) as boolean;
-
-    return acknowledged;
+    })
+      .then(_ => true)
+      .catch(err => {
+        logger.warn(`release()`, `Error returned from release index request`, resovledIndex.indexName, err);
+        return false;
+      });
   };
 
   const configureIndex = async (index: Index): Promise<void> => {
@@ -192,9 +189,7 @@ export default async (): Promise<RollCallClient> => {
     }
   };
 
-  const convertResolvedIndexToIndexReleaseRequest = async (
-    resovledIndex: Index,
-  ): Promise<IndexReleaseRequest> => {
+  const convertResolvedIndexToIndexReleaseRequest = async (resovledIndex: Index): Promise<IndexReleaseRequest> => {
     const alias = aliasName;
     const shard = resovledIndex.shardPrefix + '_' + resovledIndex.shard;
     const release = resovledIndex.releasePrefix + '_' + resovledIndex.release;

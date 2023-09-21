@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -86,6 +86,8 @@ interface DbFile {
   analysisId: string;
   firstPublished?: Date;
 
+  hasClinicalData?: boolean;
+
   embargoStart?: Date;
   embargoStage: string;
   releaseState: string;
@@ -111,6 +113,8 @@ export interface File {
   donorId: string;
   analysisId: string;
   firstPublished?: Date;
+
+  hasClinicalData?: boolean;
 
   embargoStart?: Date;
   embargoStage: EmbargoStage;
@@ -139,6 +143,8 @@ export interface FileInput {
   analysisId: string;
   firstPublished?: Date;
 
+  hasClinicalData?: boolean;
+
   embargoStart?: Date;
   embargoStage?: EmbargoStage;
   releaseState?: FileReleaseState;
@@ -161,6 +167,8 @@ const FileSchema = new mongoose.Schema(
     donorId: { type: String, required: true },
     analysisId: { type: String, required: true },
     firstPublished: { type: Date, required: true },
+
+    hasClinicalData: { type: Boolean, required: false },
 
     embargoStart: { type: Date, required: false },
     embargoStage: {
@@ -227,12 +235,15 @@ FileSchema.plugin(mongoosePaginate);
 
 export type FileMongooseDocument = mongoose.Document & DbFile;
 
-export async function countFiles(filters: FileFilter) {
-  return (await FileModel.count(convertFiltersForMongoose(filters)).exec()) as number;
+// The type casting to PaginateModel is needed, mongoose doesnt update the model type based on the mongoosePaginate plugin added to the schema
+const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<FileMongooseDocument>;
+
+export async function countFiles(filters: FileFilter): Promise<number> {
+  return await FileModel.count(convertFiltersForMongoose(filters)).exec();
 }
 
-export async function getFiles(filters: FileFilter) {
-  return (await FileModel.find(convertFiltersForMongoose(filters)).exec()) as FileMongooseDocument[];
+export async function getFiles(filters: FileFilter): Promise<FileMongooseDocument[]> {
+  return await FileModel.find(convertFiltersForMongoose(filters)).exec();
 }
 
 export async function getFilesQuery(
@@ -258,16 +269,16 @@ export async function getFileByObjId(objId: string) {
   });
 }
 
-export async function getFilesByState(filter: FileStateFilter) {
-  return (await FileModel.find(filter).exec()) as FileMongooseDocument[];
+export async function getFilesByState(filter: FileStateFilter): Promise<FileMongooseDocument[]> {
+  return await FileModel.find(filter).exec();
 }
 
 export function getFilesIterator(filter: FileFilter): AsyncGenerator<FileMongooseDocument> {
   return FileModel.find(convertFiltersForMongoose(filter));
 }
 
-export async function getPrograms(filter: FileFilter) {
-  return (await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec()) as string[];
+export async function getPrograms(filter: FileFilter): Promise<string[]> {
+  return await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec();
 }
 
 export async function create(file: FileInput) {
@@ -315,8 +326,6 @@ export async function deleteAll(ids: number[]) {
     },
   });
 }
-
-const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<FileMongooseDocument>;
 
 function buildQueryFilters(filters: FileFilterProperties, include: boolean = true) {
   const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];

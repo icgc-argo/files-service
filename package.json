@@ -1,6 +1,6 @@
 {
   "name": "files-service",
-  "version": "0.28.1",
+  "version": "0.29.0",
   "description": "",
   "scripts": {
     "start": "npm run serve",
@@ -76,7 +76,7 @@
     "sinon": "^7.3.2",
     "testcontainers": "^6.4.0",
     "tslint": "^5.20.1",
-    "typescript": "^4.0.2"
+    "typescript": "^4.9.0"
   },
   "dependencies": {
     "@elastic/elasticsearch": "7.5.0",
@@ -119,7 +119,8 @@
     "ts-node": "^8.5.4",
     "url-join": "^4.0.1",
     "winston": "^3.2.1",
-    "yamljs": "^0.3.0"
+    "yamljs": "^0.3.0",
+    "zod": "^3.22.2"
   },
   "husky": {
     "hooks": {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -144,6 +144,10 @@ export async function updateFileSongPublishStatus(objectId: string, updates: Fil
   return toPojo(await fileModel.updateByObjectId(objectId, updates, { new: true }));
 }
 
+export async function updateFileHasClinicalData(objectId: string, hasClinicalData: boolean): Promise<File> {
+  return toPojo(await fileModel.updateByObjectId(objectId, { hasClinicalData: true }, { new: true }));
+}
+
 export async function applyClinicalExemption(
   filter: FileFilter,
   clinicalExemption: ClinicalExemption,
@@ -270,6 +274,8 @@ function toPojo(f: FileMongooseDocument): File {
 
     clinicalExemption: f.clinicalExemption as ClinicalExemption,
     embargoStart: f.embargoStart,
+
+    hasClinicalData: f.hasClinicalData,
   };
 }
 

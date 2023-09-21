@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2023 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -17,16 +17,16 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Router, Request, Response, RequestHandler } from 'express';
 import PromisePool from '@supercharge/promise-pool';
-import Logger, { unknownToString } from '../logger';
-import wrapAsync from '../utils/wrapAsync';
+import { Request, RequestHandler, Response, Router } from 'express';
 import { AppConfig } from '../config';
-import validator from './common/validator';
 import * as fileService from '../data/files';
 import reindexDataCenter from '../jobs/reindexDataCenter';
-import { recalculateFileState } from '../services/fileManager';
+import Logger, { unknownToString } from '../logger';
+import { updateFileFromExternalSources } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
+import wrapAsync from '../utils/wrapAsync';
+import validator from './common/validator';
 
 const logger = Logger('Admin.Router');
 
@@ -62,7 +62,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
 
       const dataCenterId = config.datacenter.dataCenterId;
       reindexDataCenter(dataCenterId, studies);
-      res.status(200).send(`submitted`);
+      res.status(200).json({ status: 'OK', message: `request submitted to index data center: ${dataCenterId}` });
       return;
     }),
   );
@@ -93,7 +93,7 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
           });
 
           if (!updatedFiles) {
-            res.status(400).send(`No files updated.`);
+            res.status(400).json({ status: 'Failure', message: `No files updated.` });
             return;
           }
 
@@ -107,12 +107,12 @@ const createAdminRouter = (config: AppConfig, authFilter: (scopes: string[]) => 
           res.status(200).json(response);
           return;
         } catch (e) {
-          res.status(500).send(`Unexpected error updating files: ${e}`);
+          res.status(500).json({ status: 'Error', message: `Unexpected error updating files: ${e}` });
           return;
         }
       } catch (error) {
         // Catch Param Validation Errors
-        res.status(400).send({ error: unknownToString(error) });
+        res.status(400).json({ error: unknownToString(error) });
         return;
       }
     }),
@@ -285,8 +285,8 @@ async function indexUpdatedFiles(updatedFiles: fileService.File[]) {
       errors[file.objectId] = e;
     })
     .process(async file => {
-      logger.debug(`Recalculating and reindexing file: ${file.fileId}`);
-      const recalculatedFile = await recalculateFileState(file);
+      logger.debug(`Updating and reindexing file: ${file.fileId}`);
+      const recalculatedFile = await updateFileFromExternalSources(file);
       await indexer.updateRestrictedFile(recalculatedFile);
       return file;
     });
