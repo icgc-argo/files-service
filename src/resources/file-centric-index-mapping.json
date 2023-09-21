@@ -703,6 +703,9 @@
       "embargo_stage": {
         "type": "keyword"
       },
+      "has_clinical_data": {
+        "type": "boolean"
+      },
       "repositories": {
         "type": "nested",
         "properties": {
