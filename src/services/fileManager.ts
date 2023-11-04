@@ -49,43 +49,49 @@ import Logger from '../logger';
 const logger = Logger('FileManager');
 
 export async function getOrCreateFileFromRdcData(
-  rdpcFileDocument: RdpcFileDocument,
-  dataCenterId: string,
+	rdpcFileDocument: RdpcFileDocument,
+	dataCenterId: string,
 ): Promise<File> {
-  const fileToCreate: FileInput = {
-    analysisId: rdpcFileDocument.analysis.analysisId,
-    objectId: rdpcFileDocument.objectId,
-    programId: rdpcFileDocument.studyId,
-    repoId: dataCenterId,
+	const fileToCreate: FileInput = {
+		analysisId: rdpcFileDocument.analysis.analysisId,
+		objectId: rdpcFileDocument.objectId,
+		programId: rdpcFileDocument.studyId,
+		repoId: dataCenterId,
 
-    status: rdpcFileDocument.analysis.analysisState,
+		status: rdpcFileDocument.analysis.analysisState,
 
-    donorId: rdpcFileDocument.donors[0].donorId,
+		donorId: rdpcFileDocument.donors[0].donorId,
 
-    firstPublished: rdpcFileDocument.analysis.firstPublishedAt,
+		firstPublished: rdpcFileDocument.analysis.firstPublishedAt,
 
-    labels: [],
-  };
-  return await fileService.getOrCreateFileByObjId(fileToCreate);
+		labels: [],
+	};
+	return await fileService.getOrCreateFileByObjId(fileToCreate);
 }
 
-export async function updateStatusFromRdpcData(file: File, rdpcFileDocument: RdpcFileDocument): Promise<File> {
-  // Update relevant properties from RDPC
-  const status = rdpcFileDocument.analysis.analysisState;
-  if (status !== file.status) {
-    // Update the status of the object and in the DB
-    await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
-      status: rdpcFileDocument.analysis.analysisState,
-    });
-    file.status = rdpcFileDocument.analysis.analysisState;
-  }
+/**
+ * Update File record from RDPC data and commit those changes to the file repo.
+ * @param file
+ * @param rdpcFileDocument
+ * @returns
+ */
+export async function updateFileFromRdpcData(file: File, rdpcFileDocument: RdpcFileDocument): Promise<File> {
+	// Update relevant properties from RDPC
+	const status = rdpcFileDocument.analysis.analysisState;
+	if (status !== file.status) {
+		// Update the status of the object and in the DB
+		await fileService.updateFileSongPublishStatus(rdpcFileDocument.objectId, {
+			status: rdpcFileDocument.analysis.analysisState,
+		});
+		file.status = rdpcFileDocument.analysis.analysisState;
+	}
 
-  return file;
+	return file;
 }
 
 type SaveAndIndexResults = {
-  indexed: string[];
-  removed: string[];
+	indexed: string[];
+	removed: string[];
 };
 /**
  * Given RDPC File data, update file in DB and Restricted Index
@@ -95,45 +101,45 @@ type SaveAndIndexResults = {
  * @returns {SaveAndIndexResults}
  */
 export async function saveAndIndexFilesFromRdpcData(
-  rdpcFileDocs: RdpcFileDocument[],
-  dataCenterId: string,
-  indexer: Indexer,
+	rdpcFileDocs: RdpcFileDocument[],
+	dataCenterId: string,
+	indexer: Indexer,
 ): Promise<SaveAndIndexResults> {
-  const fileCentricDocuments = await Promise.all(
-    await rdpcFileDocs.map(async rdpcFile => {
-      // update local records
-      const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
-      const partialUpdate = await updateStatusFromRdpcData(createdFile, rdpcFile);
-      const updatedFile = await updateFileFromExternalSources(partialUpdate);
+	const fileCentricDocuments = await Promise.all(
+		await rdpcFileDocs.map(async rdpcFile => {
+			// update local records
+			const createdFile = await getOrCreateFileFromRdcData(rdpcFile, dataCenterId);
+			const partialUpdate = await updateFileFromRdpcData(createdFile, rdpcFile);
+			const updatedFile = await updateFileFromExternalSources(partialUpdate);
 
-      // convert to file centric documents
-      return buildDocument({ dbFile: updatedFile, rdpcFile });
-    }),
-  );
+			// convert to file centric documents
+			return buildDocument({ dbFile: updatedFile, rdpcFile });
+		}),
+	);
 
-  // Documents to add and remove from index
-  const addDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-    doc => doc.analysis?.analysisState === ANALYSIS_STATUS.PUBLISHED,
-  );
-  const removeDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-    doc => doc.analysis?.analysisState !== ANALYSIS_STATUS.PUBLISHED,
-  );
+	// Documents to add and remove from index
+	const addDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
+		doc => doc.analysis?.analysisState === ANALYSIS_STATUS.PUBLISHED,
+	);
+	const removeDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
+		doc => doc.analysis?.analysisState !== ANALYSIS_STATUS.PUBLISHED,
+	);
 
-  logger.debug(`START - Indexing/Removing files`);
-  if (addDocuments.length) {
-    await indexer.indexRestrictedFileDocs(addDocuments);
-  }
-  if (removeDocuments.length) {
-    await indexer.removeRestrictedFileDocs(removeDocuments);
-  }
+	logger.debug(`START - Indexing/Removing files`);
+	if (addDocuments.length) {
+		await indexer.indexRestrictedFileDocs(addDocuments);
+	}
+	if (removeDocuments.length) {
+		await indexer.removeRestrictedFileDocs(removeDocuments);
+	}
 
-  logger.debug(`DONE - Indexing/Removing files`);
+	logger.debug(`DONE - Indexing/Removing files`);
 
-  // Note: the indexed documents have had all property keys converted to snake case so use .object_id to ID them
-  return {
-    indexed: addDocuments.map(doc => doc.object_id),
-    removed: removeDocuments.map(doc => doc.object_id),
-  };
+	// Note: the indexed documents have had all property keys converted to snake case so use .object_id to ID them
+	return {
+		indexed: addDocuments.map(doc => doc.object_id),
+		removed: removeDocuments.map(doc => doc.object_id),
+	};
 }
 
 /**
@@ -142,34 +148,34 @@ export async function saveAndIndexFilesFromRdpcData(
  * @returns
  */
 export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | undefined> {
-  if (file.embargoStart) {
-    return file.embargoStart;
-  }
+	if (file.embargoStart) {
+		return file.embargoStart;
+	}
 
-  // File does not have a start date recorded, so we will calculate. We need to make requests to fetch:
-  //  - matchedSamplePair from data center gateway
-  //  - analysis from Song
-  //  - donor from clinical (to confirm the completion stats)
+	// File does not have a start date recorded, so we will calculate. We need to make requests to fetch:
+	//  - matchedSamplePair from data center gateway
+	//  - analysis from Song
+	//  - donor from clinical (to confirm the completion stats)
 
-  try {
-    // TODO: The following requests need to be cached, otherwise they will be called repeatedly. Since file processing is being done in parallel and there are multiple files per donor
-    const matchedSamplePairs = await dcGateway.getMatchedPairsForDonor(file.donorId);
-    const songAnalysis = await song.getAnalysesById(file.repoId, file.programId, file.analysisId);
-    const clinicalDonor = await clinical.getDonor(file.programId, file.donorId);
+	try {
+		// TODO: The following requests need to be cached, otherwise they will be called repeatedly. Since file processing is being done in parallel and there are multiple files per donor
+		const matchedSamplePairs = await dcGateway.getMatchedPairsForDonor(file.donorId);
+		const songAnalysis = await song.getAnalysesById(file.repoId, file.programId, file.analysisId);
+		const clinicalDonor = await clinical.getDonor(file.programId, file.donorId);
 
-    const startDate = await calculateEmbargoStartDate({
-      dbFile: file,
-      matchedSamplePairs,
-      songAnalysis,
-      clinicalDonor,
-    });
-    if (startDate) {
-      logger.info(`An embargoStartDate has been found for file ${file.fileId}: ${startDate}`);
-    }
-    return startDate;
-  } catch (e) {
-    logger.error(`Failure fetching source data while checking file's embargo start date`, e);
-  }
+		const startDate = await calculateEmbargoStartDate({
+			dbFile: file,
+			matchedSamplePairs,
+			songAnalysis,
+			clinicalDonor,
+		});
+		if (startDate) {
+			logger.info(`An embargoStartDate has been found for file ${file.fileId}: ${startDate}`);
+		}
+		return startDate;
+	} catch (e) {
+		logger.error(`Failure fetching source data while checking file's embargo start date`, e);
+	}
 }
 
 /**
@@ -179,72 +185,72 @@ export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | und
  * @returns
  */
 export async function updateFileEmbargoState(file: File): Promise<File> {
-  // Check for embargoStart date, if not present  attempt to calculate it
+	// Check for embargoStart date, if not present  attempt to calculate it
 
-  // Recalculate embargoStage
-  const updates: { embargoStart?: Date; embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
-  updates.embargoStart = await getOrCheckFileEmbargoStart(file);
+	// Recalculate embargoStage
+	const updates: { embargoStart?: Date; embargoStage?: EmbargoStage; releaseState?: FileReleaseState } = {};
+	updates.embargoStart = await getOrCheckFileEmbargoStart(file);
 
-  // If an unreleased file has noembargo start date, we don't need to continue. The file will remain unrealeased.
-  if (!updates.embargoStart && file.releaseState === FileReleaseState.UNRELEASED) {
-    return file;
-  }
+	// If an unreleased file has noembargo start date, we don't need to continue. The file will remain unrealeased.
+	if (!updates.embargoStart && file.releaseState === FileReleaseState.UNRELEASED) {
+		return file;
+	}
 
-  // we need to store the original start date so we can compare with the update object at the end (for saving changes to DB)
-  //  but we also need to add the embargo start date to the file object to use it when calculating the embargo stage
-  const originalEmbargoStart = file.embargoStart;
-  file.embargoStart = updates.embargoStart;
+	// we need to store the original start date so we can compare with the update object at the end (for saving changes to DB)
+	//  but we also need to add the embargo start date to the file object to use it when calculating the embargo stage
+	const originalEmbargoStart = file.embargoStart;
+	file.embargoStart = updates.embargoStart;
 
-  const embargoStage = calculateEmbargoStage(file);
-  switch (file.releaseState) {
-    case FileReleaseState.PUBLIC:
-      if (embargoStage !== EmbargoStage.PUBLIC) {
-        // A currently public file has been calculated as needing to be restricted
-        // Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
-        logger.debug(
-          'updateFileEmbargoState()',
-          file.fileId,
-          `PUBLIC file embargo calculated to be`,
-          embargoStage,
-          'Setting release state to',
-          FileReleaseState.QUEUED_TO_RESTRICT,
-        );
-        updates.releaseState = FileReleaseState.QUEUED_TO_RESTRICT;
-      }
-      break;
-    case FileReleaseState.QUEUED_TO_RESTRICT:
-      // File is queued for restricted, so if embargo stage is calculated as public we can just return this file to PUBLIC state
-      // Otherwise, it is in the right stage and there is nothing to do.
-      if (embargoStage === EmbargoStage.PUBLIC) {
-        updates.releaseState = FileReleaseState.PUBLIC;
-      }
-      break;
-    case FileReleaseState.UNRELEASED:
-    case FileReleaseState.RESTRICTED:
-    case FileReleaseState.QUEUED_TO_PUBLIC:
-      // Currently restricted files, default promotion logic
-      if (embargoStage === EmbargoStage.PUBLIC) {
-        // Cant push a file to PUBLIC except during a release, so mark as queued to public
-        updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
-        updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
-      } else if (embargoStage === EmbargoStage.UNRELEASED) {
-        updates.embargoStage = embargoStage;
-        updates.releaseState = FileReleaseState.UNRELEASED;
-      } else {
-        updates.embargoStage = embargoStage;
-        updates.releaseState = FileReleaseState.RESTRICTED;
-      }
-      break;
-  }
+	const embargoStage = calculateEmbargoStage(file);
+	switch (file.releaseState) {
+		case FileReleaseState.PUBLIC:
+			if (embargoStage !== EmbargoStage.PUBLIC) {
+				// A currently public file has been calculated as needing to be restricted
+				// Record the calculated embargoStage but the file remains correctly listed as releaseState = PUBLIC
+				logger.debug(
+					'updateFileEmbargoState()',
+					file.fileId,
+					`PUBLIC file embargo calculated to be`,
+					embargoStage,
+					'Setting release state to',
+					FileReleaseState.QUEUED_TO_RESTRICT,
+				);
+				updates.releaseState = FileReleaseState.QUEUED_TO_RESTRICT;
+			}
+			break;
+		case FileReleaseState.QUEUED_TO_RESTRICT:
+			// File is queued for restricted, so if embargo stage is calculated as public we can just return this file to PUBLIC state
+			// Otherwise, it is in the right stage and there is nothing to do.
+			if (embargoStage === EmbargoStage.PUBLIC) {
+				updates.releaseState = FileReleaseState.PUBLIC;
+			}
+			break;
+		case FileReleaseState.UNRELEASED:
+		case FileReleaseState.RESTRICTED:
+		case FileReleaseState.QUEUED_TO_PUBLIC:
+			// Currently restricted files, default promotion logic
+			if (embargoStage === EmbargoStage.PUBLIC) {
+				// Cant push a file to PUBLIC except during a release, so mark as queued to public
+				updates.embargoStage = EmbargoStage.ASSOCIATE_ACCESS;
+				updates.releaseState = FileReleaseState.QUEUED_TO_PUBLIC;
+			} else if (embargoStage === EmbargoStage.UNRELEASED) {
+				updates.embargoStage = embargoStage;
+				updates.releaseState = FileReleaseState.UNRELEASED;
+			} else {
+				updates.embargoStage = embargoStage;
+				updates.releaseState = FileReleaseState.RESTRICTED;
+			}
+			break;
+	}
 
-  if (
-    (updates.embargoStage && updates.embargoStage !== file.embargoStage) ||
-    (updates.embargoStart && updates.embargoStart !== originalEmbargoStart) ||
-    (updates.releaseState && updates.releaseState !== file.releaseState)
-  ) {
-    return await fileService.updateFileReleaseProperties(file.objectId, updates);
-  }
-  return file;
+	if (
+		(updates.embargoStage && updates.embargoStage !== file.embargoStage) ||
+		(updates.embargoStart && updates.embargoStart !== originalEmbargoStart) ||
+		(updates.releaseState && updates.releaseState !== file.releaseState)
+	) {
+		return await fileService.updateFileReleaseProperties(file.objectId, updates);
+	}
+	return file;
 }
 
 /**
@@ -254,20 +260,20 @@ export async function updateFileEmbargoState(file: File): Promise<File> {
  * @returns
  */
 export async function updateFileClinicalData(file: File): Promise<File> {
-  if (file.hasClinicalData) {
-    // File already known to have clinical data, no changes necessary
-    return file;
-  }
+	if (file.hasClinicalData) {
+		// File already known to have clinical data, no changes necessary
+		return file;
+	}
 
-  try {
-    const donorData = await clinical.getDonor(file.programId, file.donorId);
-    if (donorData?.completionStats?.coreCompletionPercentage === 1) {
-      return await fileService.updateFileHasClinicalData(file.objectId, true);
-    }
-  } catch (error) {
-    logger.warn(`Failed to update file clinical data record`, file.programId, file.donorId, error);
-  }
-  return file;
+	try {
+		const donorData = await clinical.getDonor(file.programId, file.donorId);
+		if (donorData?.completionStats?.coreCompletionPercentage === 1) {
+			return await fileService.updateFileHasClinicalData(file.objectId, true);
+		}
+	} catch (error) {
+		logger.warn(`Failed to update file clinical data record`, file.programId, file.donorId, error);
+	}
+	return file;
 }
 
 /**
@@ -280,18 +286,18 @@ export async function updateFileClinicalData(file: File): Promise<File> {
  * @param file
  */
 export async function updateFileFromExternalSources(file: File): Promise<File> {
-  // TODO: The functions called here could use a refactoring to not perform DB updates in each step. We don't need the partial updates.
-  const partialUpdate = await updateFileEmbargoState(file);
-  return await updateFileClinicalData(partialUpdate);
+	// TODO: The functions called here could use a refactoring to not perform DB updates in each step. We don't need the partial updates.
+	const partialUpdate = await updateFileEmbargoState(file);
+	return await updateFileClinicalData(partialUpdate);
 }
 
 type RdpcResultPair = {
-  file: File;
-  rdpcFile?: RdpcFileDocument;
+	file: File;
+	rdpcFile?: RdpcFileDocument;
 };
 type SortedRdpcResults = {
-  dataCenterId: string;
-  results: RdpcResultPair[];
+	dataCenterId: string;
+	results: RdpcResultPair[];
 }[];
 
 /**
@@ -303,56 +309,56 @@ type SortedRdpcResults = {
  * @returns
  */
 export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResults> {
-  logger.info(`Preparing to fetch RDPC data for ${files.length} files`);
+	logger.info(`Preparing to fetch RDPC data for ${files.length} files`);
 
-  const output: SortedRdpcResults = [];
+	const output: SortedRdpcResults = [];
 
-  // Group into DataCenters and RDPCs
-  const dataCenters = _.groupBy(files, file => file.repoId);
+	// Group into DataCenters and RDPCs
+	const dataCenters = _.groupBy(files, file => file.repoId);
 
-  // For each data center, group into programs
-  for (const dataCenterId in dataCenters) {
-    // Collect analyses payloads from this data center
-    const retrievedAnalyses: SongAnalysis[] = [];
+	// For each data center, group into programs
+	for (const dataCenterId in dataCenters) {
+		// Collect analyses payloads from this data center
+		const retrievedAnalyses: SongAnalysis[] = [];
 
-    const dcFiles = dataCenters[dataCenterId];
+		const dcFiles = dataCenters[dataCenterId];
 
-    const programs = _.groupBy(dcFiles, file => file.programId);
+		const programs = _.groupBy(dcFiles, file => file.programId);
 
-    // for each program, get the unique analysis IDs
-    for (const programId in programs) {
-      const dcProgramFiles = programs[programId];
-      const analyses = _.uniq(dcProgramFiles.map(file => file.analysisId));
+		// for each program, get the unique analysis IDs
+		for (const programId in programs) {
+			const dcProgramFiles = programs[programId];
+			const analyses = _.uniq(dcProgramFiles.map(file => file.analysisId));
 
-      logger.debug(
-        `Fetching analyses by ID -- DC: ${dataCenterId} -- program: ${programId} -- analysis count: ${analyses.length}`,
-      );
+			logger.debug(
+				`Fetching analyses by ID -- DC: ${dataCenterId} -- program: ${programId} -- analysis count: ${analyses.length}`,
+			);
 
-      // Fetch data for each anaylsis ID
-      await PromisePool.withConcurrency(10)
-        .for(analyses)
-        .process(async analysisId => {
-          const analysis = await song.getAnalysesById(dataCenterId, programId, analysisId);
-          retrievedAnalyses.push(analysis);
-        });
-    }
-    // convert analyses documents to rdpcFileDocs
-    const rdpcFiles = await analysisConverter.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
+			// Fetch data for each anaylsis ID
+			await PromisePool.withConcurrency(10)
+				.for(analyses)
+				.process(async analysisId => {
+					const analysis = await song.getAnalysesById(dataCenterId, programId, analysisId);
+					retrievedAnalyses.push(analysis);
+				});
+		}
+		// convert analyses documents to rdpcFileDocs
+		const rdpcFiles = await analysisConverter.convertAnalysesToFileDocuments(retrievedAnalyses, dataCenterId);
 
-    // Pair up the files in this data center with the rdpcFiles returned from maestro
-    const results: RdpcResultPair[] = dcFiles.map(file => {
-      const rdpcFile = rdpcFiles.find(rdpcFile => file.objectId === rdpcFile.objectId);
-      return { file, rdpcFile };
-    });
-    logger.debug(
-      `Successfully retrieved ${results.filter(result => result.rdpcFile).length} rdpc files from ${dataCenterId} for ${
-        dcFiles.length
-      } input files`,
-    );
-    output.push({ dataCenterId, results });
-  }
+		// Pair up the files in this data center with the rdpcFiles returned from maestro
+		const results: RdpcResultPair[] = dcFiles.map(file => {
+			const rdpcFile = rdpcFiles.find(rdpcFile => file.objectId === rdpcFile.objectId);
+			return { file, rdpcFile };
+		});
+		logger.debug(
+			`Successfully retrieved ${results.filter(result => result.rdpcFile).length} rdpc files from ${dataCenterId} for ${
+				dcFiles.length
+			} input files`,
+		);
+		output.push({ dataCenterId, results });
+	}
 
-  return output;
+	return output;
 }
 
 /**
@@ -366,26 +372,26 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
  * @returns
  */
 export async function fetchFileUpdatesFromDataCenter(files: File[]): Promise<FileCentricDocument[]> {
-  const rdpcSortedResults = await getRdpcDataForFiles(files);
+	const rdpcSortedResults = await getRdpcDataForFiles(files);
 
-  const output: FileCentricDocument[] = [];
+	const output: FileCentricDocument[] = [];
 
-  await PromisePool.withConcurrency(1)
-    .for(rdpcSortedResults) // For each rdpc in the files to add
-    .process(async data => {
-      const rdpcFilePairs = data.results;
-      await PromisePool.withConcurrency(1)
-        .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
-        .process(async resultPair => {
-          if (resultPair.rdpcFile) {
-            const dbFile = await updateStatusFromRdpcData(resultPair.file, resultPair.rdpcFile);
-            const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
-            output.push(fileCentricDoc);
-          } else {
-            logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
-          }
-        });
-    });
+	await PromisePool.withConcurrency(1)
+		.for(rdpcSortedResults) // For each rdpc in the files to add
+		.process(async data => {
+			const rdpcFilePairs = data.results;
+			await PromisePool.withConcurrency(1)
+				.for(rdpcFilePairs) // For each file doc retrieved from that rdpc
+				.process(async resultPair => {
+					if (resultPair.rdpcFile) {
+						const dbFile = await updateFileFromRdpcData(resultPair.file, resultPair.rdpcFile);
+						const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
+						output.push(fileCentricDoc);
+					} else {
+						logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
+					}
+				});
+		});
 
-  return output;
+	return output;
 }
