@@ -1,4 +1,4 @@
-import { getAppConfig } from '../config';
+import { envParameters, getAppConfig } from '../config';
 import * as fileService from '../data/files';
 
 import PromisePool from '@supercharge/promise-pool/dist';
@@ -31,11 +31,17 @@ const clinicalUpdateEvent = async (clinicalEvent: ClinicalUpdateEvent): Promise<
     const unreleasedFiles = files.filter(isUnreleased);
 
     // for each file check if they should be released and then reindex
-    PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(
+      // This loop fetches data for the analysis from song/clinical/rdpc-gateway, and then indexes the results
+      // so max concurrency should be the min of our concurrency limit for those actions
+      Math.min(
+        envParameters.concurrency.elasticsearch.maxDocumentUpdates,
+        envParameters.concurrency.song.maxAnalysisRequests,
+      ),
+    )
       .for(unreleasedFiles)
       .handleError((e, file) => {
-        logger.error(`Update Doc Error: ${e}`);
-        logger.error(`Update Doc Error: ${e.stack}`);
+        logger.error(`Update Doc Error for file "${file.fileId}": ${e}`);
       })
       .process(async file => {
         const updatedFile = await updateFileFromExternalSources(file);

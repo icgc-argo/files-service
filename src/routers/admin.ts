@@ -19,7 +19,7 @@
 
 import PromisePool from '@supercharge/promise-pool';
 import { Request, RequestHandler, Response, Router } from 'express';
-import { AppConfig } from '../config';
+import { AppConfig, envParameters } from '../config';
 import * as fileService from '../data/files';
 import reindexDataCenter from '../jobs/reindexDataCenter';
 import Logger, { unknownToString } from '../logger';
@@ -277,7 +277,7 @@ async function indexUpdatedFiles(updatedFiles: fileService.File[]) {
   const errors: Record<string, Error> = {};
   const indexer = await getIndexer();
   // Update file indices with changes
-  const { results } = await PromisePool.withConcurrency(20)
+  const { results } = await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxDocumentUpdates)
     .for(updatedFiles)
     .handleError((e, file) => {
       logger.error(`Update Doc Error: ${e}`);

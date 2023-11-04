@@ -46,6 +46,7 @@ import { buildDocument, FileCentricDocument } from './fileCentricDocument';
 import { Indexer } from './indexer';
 
 import Logger from '../logger';
+import { envParameters } from '../config';
 const logger = Logger('FileManager');
 
 export async function getOrCreateFileFromRdcData(
@@ -329,7 +330,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
       );
 
       // Fetch data for each anaylsis ID
-      await PromisePool.withConcurrency(10)
+      await PromisePool.withConcurrency(envParameters.concurrency.song.maxAnalysisRequests)
         .for(analyses)
         .process(async analysisId => {
           const analysis = await song.getAnalysesById(dataCenterId, programId, analysisId);
@@ -370,22 +371,24 @@ export async function fetchFileUpdatesFromDataCenter(files: File[]): Promise<Fil
 
   const output: FileCentricDocument[] = [];
 
-  await PromisePool.withConcurrency(1)
-    .for(rdpcSortedResults) // For each rdpc in the files to add
-    .process(async data => {
-      const rdpcFilePairs = data.results;
-      await PromisePool.withConcurrency(1)
-        .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
-        .process(async resultPair => {
-          if (resultPair.rdpcFile) {
-            const dbFile = await updateStatusFromRdpcData(resultPair.file, resultPair.rdpcFile);
-            const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
-            output.push(fileCentricDoc);
-          } else {
-            logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
-          }
-        });
-    });
-
+  for (const rdpcData of rdpcSortedResults) {
+    const rdpcFilePairs = rdpcData.results;
+    await PromisePool.withConcurrency(
+      Math.min(
+        envParameters.concurrency.elasticsearch.maxDocumentUpdates,
+        envParameters.concurrency.song.maxAnalysisRequests,
+      ),
+    )
+      .for(rdpcFilePairs) // For each file doc retrieved from that rdpc
+      .process(async resultPair => {
+        if (resultPair.rdpcFile) {
+          const dbFile = await updateStatusFromRdpcData(resultPair.file, resultPair.rdpcFile);
+          const fileCentricDoc = buildDocument({ dbFile, rdpcFile: resultPair.rdpcFile });
+          output.push(fileCentricDoc);
+        } else {
+          logger.warn(`Unable to retrieve RDPC data for ${resultPair.file.objectId}`);
+        }
+      });
+  }
   return output;
 }

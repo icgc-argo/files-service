@@ -35,6 +35,7 @@ import {
 import { camelCaseKeysToSnakeCase } from '../utils/objectFormatter';
 
 import Logger from '../logger';
+import { envParameters } from '../config';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
@@ -189,9 +190,8 @@ export const getIndexer = async (): Promise<Indexer> => {
       logger.info(`Preparing to release... Additional indices requested to release: ${additionalIndices}`);
     }
 
-    // TODO: config for max simultaneous release?
     // release indices tracked in nextIndices and requested in options.additionalIndices
-    await PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxDocumentUpdates)
       .for(toRelease.concat(additionalIndices.map(getIndexFromIndexName)))
       .handleError((error, index) => {
         logger.error(`Failed to release index: ${index.indexName}`);
@@ -271,7 +271,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     // Only indexing docs that are restricted and published in song
     const sortedFiles = sortFileDocsIntoPrograms(docs.filter(doc => isRestricted(doc) && isFileCentricPublished(doc)));
 
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxIndexUpdates)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
         const index = await getNextIndex(program, {
@@ -308,7 +308,7 @@ export const getIndexer = async (): Promise<Indexer> => {
     const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
     // TODO: configure concurrency for ES requests.
-    await PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxDocumentUpdates)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
         const body = files.map(file => ({ delete: { _id: file.objectId } }));
@@ -328,7 +328,7 @@ export const getIndexer = async (): Promise<Indexer> => {
 
   async function createEmptyPublicIndices(programs: string[]): Promise<string[]> {
     const publicIndices: string[] = [];
-    await PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxDocumentUpdates)
       .for(programs)
       .process(async program => {
         const index = await getNextIndex(program, { isPublic: true, clone: false });
@@ -339,7 +339,7 @@ export const getIndexer = async (): Promise<Indexer> => {
 
   async function createEmptyRestrictedIndices(programs: string[]): Promise<string[]> {
     const restrictedIndices: string[] = [];
-    await PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxIndexUpdates)
       .for(programs)
       .process(async program => {
         const index = await getNextIndex(program, { isPublic: false, clone: false });
@@ -359,7 +359,7 @@ export const getIndexer = async (): Promise<Indexer> => {
       docs.filter(doc => isPublic(doc) && doc.embargoStage === EmbargoStage.PUBLIC && isFileCentricPublished(doc)),
     );
 
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxDocumentUpdates)
       .for(sortedFiles)
       .process(async ({ program, files }) => {
         const index = await getNextIndex(program, {
@@ -394,8 +394,7 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function removeFilesFromPublic(files: File[]): Promise<void> {
     const sortedFiles = sortFilesIntoPrograms(files);
 
-    // TODO: Configure ES request concurrency
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxIndexUpdates)
       .for(sortedFiles)
       .process(async programData => {
         const body = programData.files.map(file => ({ delete: { _id: file.objectId } }));
@@ -419,8 +418,7 @@ export const getIndexer = async (): Promise<Indexer> => {
   async function removeFilesFromRestricted(files: File[]): Promise<void> {
     const sortedFiles = sortFilesIntoPrograms(files);
 
-    // TODO: Configure ES request concurrency
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.elasticsearch.maxIndexUpdates)
       .for(sortedFiles)
       .process(async programData => {
         const body = programData.files.map(file => ({ delete: { _id: file.objectId } }));

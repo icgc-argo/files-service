@@ -41,11 +41,9 @@ import fetch from 'node-fetch';
 import { SongAnalysis } from './song';
 import { getAlignmentMetrics } from './dataCenterGateway';
 
-import { getAppConfig } from '../config';
+import { envParameters, getAppConfig } from '../config';
 import Logger from '../logger';
 const logger = Logger('AnalysisConverter');
-
-const CONVERTER_CONCURRENT_REQUESTS = 5;
 
 const addMetricsToAlignedReadsFile = async (
   fileDocument: RdpcFileDocument,
@@ -83,7 +81,7 @@ export async function convertAnalysesToFileDocuments(
   const output: RdpcFileDocument[] = [];
 
   // Can't send hundreds of analyses in a single request, so this is simplified to 1 at a time to gaurantee success.
-  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+  await PromisePool.withConcurrency(envParameters.concurrency.analysisConverter.maxRequests)
     .for(analyses)
     .process(async analysis => {
       const files = await fetchAnalysisToFileConversion(analysis, repoCode);
@@ -115,7 +113,7 @@ async function fetchAnalysisToFileConversion(analysis: SongAnalysis, repoCode: s
   const files: RdpcFileDocument[] = [];
 
   // get the file docs arrays from maestro response
-  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+  await PromisePool.withConcurrency(envParameters.concurrency.analysisConverter.maxRequests)
     .for(Object.keys(response))
     .process(async (objectId: string) => {
       const responseFile = response[objectId][0];

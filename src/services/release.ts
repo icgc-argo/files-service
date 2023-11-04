@@ -34,6 +34,7 @@ import { calculateEmbargoStage } from './embargo';
 import Logger from '../logger';
 import { isFilePublished } from './utils/fileUtils';
 import PublicReleaseMessage from '../external/kafka/messages/PublicReleaseMessage';
+import { envParameters } from '../config';
 const logger = Logger('ReleaseManager');
 
 function toObjectId(file: File) {
@@ -289,7 +290,7 @@ export async function publishActiveRelease(): Promise<void> {
 
     // 4. Update DB Release State for files updated in the release
     // 4a. DB Updates for added files
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.db.maxDocumentUpdates)
       .for(release.filesAdded)
       .handleError((error, file) => {
         logger.error(`Failed to update release status in DB for ${file}`);
@@ -303,7 +304,7 @@ export async function publishActiveRelease(): Promise<void> {
     logger.debug(`File records in DB updated with new published states.`);
 
     // 4b. DB Updates for removed files
-    await PromisePool.withConcurrency(20)
+    await PromisePool.withConcurrency(envParameters.concurrency.db.maxDocumentUpdates)
       .for(updatedFilesRemoved)
       .handleError((error, file) => {
         logger.error(`Failed to update release status in DB for ${file}`);

@@ -25,6 +25,7 @@ import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
 
 import Logger from '../logger';
+import { envParameters } from '../config';
 const logger = Logger('Job:ProcessAnalysisEvent');
 
 async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) {
@@ -51,7 +52,7 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
   }
 
   logger.info(`Updating Song status to ${status} for files ${files.map(file => file.objectId)}`);
-  await PromisePool.withConcurrency(10)
+  await PromisePool.withConcurrency(envParameters.concurrency.db.maxDocumentUpdates)
     .for(files)
     .handleError((error, file) => {
       logger.error(`Failure updating file ${file.objectId} status to ${status}: ${error}`);

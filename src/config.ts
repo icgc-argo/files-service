@@ -80,9 +80,6 @@ export interface AppConfig {
   debug: {
     endpointsEnabled: boolean;
   };
-  features: {
-    clinicalDataIndexing: boolean;
-  };
 }
 
 export interface KafkaConsumerConfiguration {
@@ -133,9 +130,9 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     serverPort: process.env.PORT || '3000',
     openApiPath: process.env.OPENAPI_PATH || '/api-docs',
     mongoProperties: {
-      dbUsername: secrets.DB_USERNAME || process.env.DB_USERNAME,
-      dbPassword: secrets.DB_PASSWORD || process.env.DB_PASSWORD,
-      dbUrl: secrets.DB_URL || process.env.DB_URL || `mongodb://localhost:27027/appdb`,
+      dbUsername: secrets?.DB_USERNAME || process.env.DB_USERNAME,
+      dbPassword: secrets?.DB_PASSWORD || process.env.DB_PASSWORD,
+      dbUrl: secrets?.DB_URL || process.env.DB_URL || `mongodb://localhost:27027/appdb`,
       writeConcern: process.env.DEFAULT_WRITE_CONCERN || 'majority',
       writeAckTimeout: Number(process.env.DEFAULT_WRITE_ACK_TIMEOUT) || 5000,
     },
@@ -156,8 +153,7 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
         },
         recalculateEmbargo: {
           topic: process.env.KAFKA_RECALCULATE_EMBARGO_TOPIC || 'file-manager.recalculate-embargo',
-          group:
-            process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.group.recalculate-embargo',
+          group: process.env.KAFKA_RECALCULATE_EMBARGO_GROUP || 'file-manager.group.recalculate-embargo',
           // No need for DLQ. Failures will get corrected on next attempt if scheduled to run regularly.
         },
       },
@@ -169,8 +165,8 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     },
     elasticProperties: {
       node: process.env.ES_NODE || 'http://localhost:9200',
-      username: secrets.ES_USER || process.env.ES_USER,
-      password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
+      username: secrets?.ES_USER || process.env.ES_USER,
+      password: secrets?.ES_PASSWORD || process.env.ES_PASSWORD,
       indexName: process.env.INDEX_NAME || 'file_centric_test',
       createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
       repository: process.env.ES_SNAPSHOT_REPOSITORY,
@@ -183,17 +179,17 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
       writeScope: `${policy}.WRITE`,
       readScope: `${policy}.READ`,
       egoRootRest: process.env.EGO_ROOT_REST || 'http://localhost:8081',
-      egoClientId: secrets.EGO_CLIENT_ID || process.env.EGO_CLIENT_ID,
-      egoClientSecret: secrets.EGO_CLIENT_SECRET || process.env.EGO_CLIENT_SECRET,
+      egoClientId: secrets?.EGO_CLIENT_ID || process.env.EGO_CLIENT_ID,
+      egoClientSecret: secrets?.EGO_CLIENT_SECRET || process.env.EGO_CLIENT_SECRET,
     },
     analysisConverterUrl: process.env.ANALYSIS_CONVERTER_URL || '',
-    analysisConverterTimeout: Number(process.env.ANALYSIS_CONVERTER_TIMEOUT || 30 * 1000),
+    analysisConverterTimeout: getEnvNumberOrDefault('ANALYSIS_CONVERTER_TIMEOUT', 30 * 1000),
     datacenter: {
       registryUrl: process.env.DC_REGISTRY_URL || '',
       dataCenterId: process.env.DC_ID || '',
       url: process.env.DC_URL || '',
-      fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
-      batchSize: Number(process.env.DC_BATCH_SIZE || 50),
+      fetchTimeout: getEnvNumberOrDefault('DC_FETCH_TIMEOUT', 300 * 1000),
+      batchSize: getEnvNumberOrDefault('DC_BATCH_SIZE', 50),
       gatewayUrl: process.env.DC_GATEWAY_URL || '',
     },
     clinical: {
@@ -207,13 +203,15 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
     debug: {
       endpointsEnabled: process.env.ENABLE_DEBUG_ENDPOINTS === 'true', // false unless set to 'true'
     },
-    features: {
-      clinicalDataIndexing: process.env.FEATURE_CLINICAL_DATA_INDEXING === 'true',
-    },
   };
   return config;
 };
 
+/**
+ * Configuration of the application, including all required env parameters and all secrets read from vault.
+ * @param envFile
+ * @returns
+ */
 export const getAppConfig = async (envFile?: string): Promise<AppConfig> => {
   if (config != undefined) {
     return config;
@@ -229,7 +227,41 @@ export const getAppConfig = async (envFile?: string): Promise<AppConfig> => {
   return buildAppConfig(secrets);
 };
 
-export const FILE_PAGE_SIZE_LIMIT =
-  !Number(process.env.FILE_PAGE_SIZE_LIMIT) || Number(process.env.FILE_PAGE_SIZE_LIMIT) <= 0
-    ? 20
-    : Number(process.env.FILE_PAGE_SIZE_LIMIT);
+/**
+ * Read env variable and convert to number. If the value is not a number then use the default provided.
+ * This is used for envParameters that require a positive number so any env value that is 0 or less is also discarded and the default used.
+ * @param envKey
+ * @param
+ * @returns
+ */
+const getEnvNumberOrDefault = (envKey: string, defaultValue: number): number => {
+  const envValue = Number(process.env[envKey]);
+  return !!envValue && envValue > 0 ? envValue : defaultValue;
+};
+
+/**
+ * Simple static constants that can be overriden by the env config.
+ * None of these should be required in the environment for the app to run, but they are exposed there in case
+ * the app needs tuning in any environment.
+ */
+export const envParameters = {
+  fileModel: {
+    pageSizeLimit: getEnvNumberOrDefault('FILE_PAGE_SIZE_LIMIT', 20),
+  },
+  concurrency: {
+    analysisConverter: {
+      maxRequests: getEnvNumberOrDefault('CONCURRENCY_ANALYSISCONVERTER_REQUESTS', 5),
+    },
+    db: {
+      maxDocumentUpdates: getEnvNumberOrDefault('CONCURRENCY_DB_UPDATES', 10),
+    },
+    elasticsearch: {
+      maxDocumentUpdates: getEnvNumberOrDefault('CONCURRENCY_ES_DOC_UPDATES', 20), // limits the concurrent requests to index/update/remove es documents to a single index
+      maxIndexUpdates: getEnvNumberOrDefault('CONCURRENCY_ES_INDEX_UPDATES', 5), // limits the concurrent requests to create/delete/bulk-update es indicies
+    },
+
+    song: {
+      maxAnalysisRequests: getEnvNumberOrDefault('CONCURRENCY_SONG_ANALYSIS_REQUESTS', 10),
+    },
+  },
+};

@@ -19,7 +19,7 @@
 
 import mongoose, { PaginateModel } from 'mongoose';
 import { File } from 'winston/lib/winston/transports';
-import { FILE_PAGE_SIZE_LIMIT } from '../../config';
+import { envParameters } from '../../config';
 
 // Main reason for using this pagination plugin
 // is that it provides flexibility on pagination options such as
@@ -252,7 +252,7 @@ export async function getFilesQuery(
 ): Promise<mongoose.PaginateResult<FileMongooseDocument>> {
   const paginateOptions = {
     page: paginationFilters.page ? paginationFilters.page : 1,
-    limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
+    limit: paginationFilters.limit ? paginationFilters.limit : envParameters.fileModel.pageSizeLimit,
     sort: { fileId: 'asc' },
   };
 
