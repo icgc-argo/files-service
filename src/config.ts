@@ -22,6 +22,9 @@ import * as vault from './external/vault';
 import Logger from './logger';
 const logger = Logger('Config');
 
+// Initialize dotenv
+dotenv.config();
+
 let config: AppConfig | undefined = undefined;
 export interface AppConfig {
   serverPort: string;
@@ -217,11 +220,10 @@ export const getAppConfig = async (envFile?: string): Promise<AppConfig> => {
     return config;
   }
   if (envFile) {
+    // Allow dotenv to load from an alternate envFile
     dotenv.config({
       path: envFile,
     });
-  } else {
-    dotenv.config();
   }
   const secrets = await loadVaultSecrets();
   return buildAppConfig(secrets);
