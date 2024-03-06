@@ -23,16 +23,16 @@ import { z as zod } from 'zod';
 export const ClinicalInfo = zod.record(zod.union([zod.string(), zod.number(), zod.boolean()]).optional());
 
 export const ClinicalSample = zod.object({
-  clinicalInfo: ClinicalInfo,
-  sampleId: zod.string(),
-  submitterId: zod.string(),
-  sampleType: zod.string(),
+	clinicalInfo: ClinicalInfo,
+	sampleId: zod.string(),
+	submitterId: zod.string(),
+	sampleType: zod.string(),
 });
 export const ClinicalSpecimen = zod.object({
-  clinicalInfo: ClinicalInfo,
-  samples: zod.array(ClinicalSample),
-  specimenId: zod.string(),
-  submitterId: zod.string(),
+	clinicalInfo: ClinicalInfo,
+	samples: zod.array(ClinicalSample),
+	specimenId: zod.string(),
+	submitterId: zod.string(),
 });
 
 /**
@@ -44,32 +44,32 @@ export const ClinicalSpecimen = zod.object({
  * we can update the Zod schema to parse them into dates.
  */
 export const ClinicalDonor = zod.object({
-  donorId: zod.string(),
-  gender: zod.string(),
-  programId: zod.string(),
+	donorId: zod.string(),
+	gender: zod.string(),
+	programId: zod.string(),
 
-  submitterId: zod.string(),
-  createdAt: zod.string(),
-  updatedAt: zod.string(),
-  schemaMetadata: zod.object({
-    isValid: zod.boolean(),
-    lastValidSchemaVersion: zod.string(),
-    originalSchemaVersion: zod.string(),
-    lastMigrationId: zod.string(),
-  }),
-  completionStats: zod
-    .object({
-      coreCompletion: zod.object({
-        donor: zod.number(),
-        specimens: zod.number(),
-        primaryDiagnosis: zod.number(),
-        followUps: zod.number(),
-        treatments: zod.number(),
-      }),
-      overriddenCoreCompletion: zod.array(zod.string()),
-      coreCompletionPercentage: zod.number(),
-      coreCompletionDate: zod.string().nullable(),
-    })
-    .optional(),
+	submitterId: zod.string(),
+	createdAt: zod.string(),
+	updatedAt: zod.string(),
+	schemaMetadata: zod.object({
+		isValid: zod.boolean(),
+		lastValidSchemaVersion: zod.string(),
+		originalSchemaVersion: zod.string(),
+		lastMigrationId: zod.string(),
+	}),
+	completionStats: zod
+		.object({
+			coreCompletion: zod.object({
+				donor: zod.number(),
+				specimens: zod.number(),
+				primaryDiagnosis: zod.number(),
+				followUps: zod.number(),
+				treatments: zod.number(),
+			}),
+			coreCompletionDate: zod.string().nullable(),
+			coreCompletionPercentage: zod.number(),
+			hasMissingEntityException: zod.boolean().optional(),
+		})
+		.optional(),
 });
 export type ClinicalDonor = zod.infer<typeof ClinicalDonor>;
