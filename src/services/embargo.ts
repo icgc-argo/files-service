@@ -177,7 +177,7 @@ export function calculateEmbargoStartDate(inputs: {
 
 	// Check for clinical exemption, if no exemption then we need valid clinical data
 	const clinicalExemption: boolean = dbFile.clinicalExemption !== undefined;
-	const clinicalCoreComplete: boolean = clinicalDonor?.completionStats?.coreCompletionPercentage === 1 || false;
+	const clinicalCoreComplete: boolean = clinicalDonor?.completionStats?.coreCompletionPercentage === 1;
 	if (!clinicalExemption) {
 		if (!clinicalDonor) {
 			logger.info(
