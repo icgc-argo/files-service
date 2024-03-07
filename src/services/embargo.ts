@@ -30,11 +30,11 @@ const logger = Logger('Embargo');
  * Used to determine the order of release stages for comparison with adminPromote and adminDemote values.
  */
 const stageOrder: Record<EmbargoStage, number> = {
-  [EmbargoStage.UNRELEASED]: 0,
-  [EmbargoStage.PROGRAM_ONLY]: 1,
-  [EmbargoStage.MEMBER_ACCESS]: 2,
-  [EmbargoStage.ASSOCIATE_ACCESS]: 3,
-  [EmbargoStage.PUBLIC]: 4,
+	[EmbargoStage.UNRELEASED]: 0,
+	[EmbargoStage.PROGRAM_ONLY]: 1,
+	[EmbargoStage.MEMBER_ACCESS]: 2,
+	[EmbargoStage.ASSOCIATE_ACCESS]: 3,
+	[EmbargoStage.PUBLIC]: 4,
 };
 
 /**
@@ -49,31 +49,31 @@ const stageOrder: Record<EmbargoStage, number> = {
  * Note that for a file the embargoStart date should normally be used for this calculation.
  */
 export function getEmbargoStageForDate(startDate?: Date): EmbargoStage {
-  if (!startDate) {
-    return EmbargoStage.UNRELEASED;
-  }
-  const monthsPublished = differenceInMonths(new Date(), startDate);
+	if (!startDate) {
+		return EmbargoStage.UNRELEASED;
+	}
+	const monthsPublished = differenceInMonths(new Date(), startDate);
 
-  // Set expectedStage based on time passed since published
-  let expectedStage = EmbargoStage.PROGRAM_ONLY;
+	// Set expectedStage based on time passed since published
+	let expectedStage = EmbargoStage.PROGRAM_ONLY;
 
-  switch (true) {
-    case monthsPublished >= 24:
-      expectedStage = EmbargoStage.PUBLIC;
-      break;
-    case monthsPublished >= 18:
-      expectedStage = EmbargoStage.ASSOCIATE_ACCESS;
-      break;
-    case monthsPublished >= 12:
-      expectedStage = EmbargoStage.MEMBER_ACCESS;
-      break;
-    default:
-      // Doesn't change anything, incldued for completeness.
-      expectedStage = EmbargoStage.PROGRAM_ONLY;
-      break;
-  }
+	switch (true) {
+		case monthsPublished >= 24:
+			expectedStage = EmbargoStage.PUBLIC;
+			break;
+		case monthsPublished >= 18:
+			expectedStage = EmbargoStage.ASSOCIATE_ACCESS;
+			break;
+		case monthsPublished >= 12:
+			expectedStage = EmbargoStage.MEMBER_ACCESS;
+			break;
+		default:
+			// Doesn't change anything, incldued for completeness.
+			expectedStage = EmbargoStage.PROGRAM_ONLY;
+			break;
+	}
 
-  return expectedStage;
+	return expectedStage;
 }
 
 /**
@@ -85,64 +85,74 @@ export function getEmbargoStageForDate(startDate?: Date): EmbargoStage {
  * @param dbFile
  */
 export function calculateEmbargoStage(dbFile: File): EmbargoStage {
-  logger.debug('getEmbargoStage()', dbFile.fileId, 'Calculating embargo stage for file');
-  if (!dbFile.embargoStart) {
-    // if no embargo start, this is UNRELEASED no matter what
-    logger.info(`getEmabrgoStage()`, dbFile.fileId, 'No embargoStart value for file. Returning: UNRELEASED');
-    return EmbargoStage.UNRELEASED;
-  }
-  let calculatedStage = getEmbargoStageForDate(dbFile.embargoStart);
+	logger.debug('getEmbargoStage()', dbFile.fileId, dbFile.donorId, 'Calculating embargo stage for file');
+	if (!dbFile.embargoStart) {
+		// if no embargo start, this is UNRELEASED no matter what
+		logger.info(
+			`getEmabrgoStage()`,
+			dbFile.fileId,
+			dbFile.donorId,
+			'No embargoStart value for file. Returning: UNRELEASED',
+		);
+		return EmbargoStage.UNRELEASED;
+	}
+	let calculatedStage = getEmbargoStageForDate(dbFile.embargoStart);
 
-  // if adminHold is true then no change from the dbFile
-  if (dbFile.adminHold) {
-    logger.debug(
-      'getEmbargoStage()',
-      dbFile.fileId,
-      'File has admin hold. Returning current stage',
-      dbFile.embargoStage,
-    );
-    return dbFile.embargoStage;
-  }
+	// if adminHold is true then no change from the dbFile
+	if (dbFile.adminHold) {
+		logger.debug(
+			'getEmbargoStage()',
+			dbFile.fileId,
+			dbFile.donorId,
+			'File has admin hold. Returning current stage',
+			dbFile.embargoStage,
+		);
+		return dbFile.embargoStage;
+	}
 
-  // get the expected embarge stage from the publish date
-  logger.debug(
-    'getEmbargoStage()',
-    dbFile.fileId,
-    `Based on a published date of ${dbFile.firstPublished} the calculated embargo stage is: ${calculatedStage}`,
-  );
+	// get the expected embarge stage from the publish date
+	logger.debug(
+		'getEmbargoStage()',
+		dbFile.fileId,
+		dbFile.donorId,
+		`Based on a published date of ${dbFile.firstPublished} the calculated embargo stage is: ${calculatedStage}`,
+	);
 
-  // modify this with any promote, demote, and hold rules on the file
-  if (dbFile.adminPromote) {
-    // Assign the most permissive of adminPromote and calculatedStage
-    calculatedStage =
-      stageOrder[dbFile.adminPromote] > stageOrder[calculatedStage] ? dbFile.adminPromote : calculatedStage;
-    logger.debug(
-      'getEmbargoStage()',
-      dbFile.fileId,
-      `File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
-    );
-  }
-  if (dbFile.adminDemote) {
-    // Assign the least permissive of adminDemote and calculatedStage
-    // This is done AFTER the adminPromote check to make sure the adminDemote value overrides any promotions
-    calculatedStage =
-      stageOrder[dbFile.adminDemote] < stageOrder[calculatedStage] ? dbFile.adminDemote : calculatedStage;
-    logger.debug(
-      'getEmbargoStage()',
-      dbFile.fileId,
-      `File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
-    );
-  }
-  if (dbFile.adminHold) {
-    calculatedStage = dbFile.embargoStage;
-    logger.debug(
-      'getEmbargoStage()',
-      dbFile.fileId,
-      `File has admin hold set to true so will return the stored embargoStage ${dbFile.embargoStage}. Updating calculated stage to: ${calculatedStage}`,
-    );
-  }
-  logger.debug('getEmbargoStage()', dbFile.fileId, `Returning embargo stage: ${calculatedStage}`);
-  return calculatedStage;
+	// modify this with any promote, demote, and hold rules on the file
+	if (dbFile.adminPromote) {
+		// Assign the most permissive of adminPromote and calculatedStage
+		calculatedStage =
+			stageOrder[dbFile.adminPromote] > stageOrder[calculatedStage] ? dbFile.adminPromote : calculatedStage;
+		logger.debug(
+			'getEmbargoStage()',
+			dbFile.fileId,
+			dbFile.donorId,
+			`File has admin promote of ${dbFile.adminPromote}. Updating calculated stage to: ${calculatedStage}`,
+		);
+	}
+	if (dbFile.adminDemote) {
+		// Assign the least permissive of adminDemote and calculatedStage
+		// This is done AFTER the adminPromote check to make sure the adminDemote value overrides any promotions
+		calculatedStage =
+			stageOrder[dbFile.adminDemote] < stageOrder[calculatedStage] ? dbFile.adminDemote : calculatedStage;
+		logger.debug(
+			'getEmbargoStage()',
+			dbFile.fileId,
+			dbFile.donorId,
+			`File has admin demote of ${dbFile.adminDemote}. Updating calculated stage to: ${calculatedStage}`,
+		);
+	}
+	if (dbFile.adminHold) {
+		calculatedStage = dbFile.embargoStage;
+		logger.debug(
+			'getEmbargoStage()',
+			dbFile.fileId,
+			dbFile.donorId,
+			`File has admin hold set to true so will return the stored embargoStage ${dbFile.embargoStage}. Updating calculated stage to: ${calculatedStage}`,
+		);
+	}
+	logger.debug('getEmbargoStage()', dbFile.fileId, dbFile.donorId, `Returning embargo stage: ${calculatedStage}`);
+	return calculatedStage;
 }
 
 /**
@@ -158,83 +168,88 @@ export function calculateEmbargoStage(dbFile: File): EmbargoStage {
  *  it does not rely on the state of the file in the DB except for clincial exemption.
  */
 export function calculateEmbargoStartDate(inputs: {
-  dbFile: File;
-  songAnalysis: SongAnalysis;
-  matchedSamplePairs: MatchedSamplePair[];
-  clinicalDonor?: ClinicalDonor;
+	dbFile: File;
+	songAnalysis: SongAnalysis;
+	matchedSamplePairs: MatchedSamplePair[];
+	clinicalDonor?: ClinicalDonor;
 }): Date | undefined {
-  const { dbFile, songAnalysis, matchedSamplePairs, clinicalDonor } = inputs;
+	const { dbFile, songAnalysis, matchedSamplePairs, clinicalDonor } = inputs;
 
-  // Check for clinical exemption, if no exemption then we need valid clinical data
-  const clinicalExemption: boolean = dbFile.clinicalExemption !== undefined;
-  const validClinicalData: boolean = clinicalDonor?.schemaMetadata?.isValid || false;
-  if (!clinicalExemption) {
-    if (!clinicalDonor) {
-      logger.info(
-        `calculateEmbargoStartDate()`,
-        dbFile.fileId,
-        `file ${dbFile.fileId} has no clinical donor data available and has no clinical exemption.`,
-      );
-      return undefined;
-    }
-    if (!validClinicalData) {
-      logger.info(
-        `calculateEmbargoStartDate()`,
-        dbFile.fileId,
-        `file ${dbFile.fileId} has a donor with invalid clinical data and has no clinical exemption.`,
-      );
-      return undefined;
-    }
-  }
+	// Check for clinical exemption, if no exemption then we need valid clinical data
+	const clinicalExemption: boolean = dbFile.clinicalExemption !== undefined;
+	const clinicalCoreComplete: boolean = clinicalDonor?.completionStats?.coreCompletionPercentage === 1;
+	if (!clinicalExemption) {
+		if (!clinicalDonor) {
+			logger.info(
+				`calculateEmbargoStartDate()`,
+				dbFile.fileId,
+				dbFile.donorId,
+				`file has no clinical donor data available and has no clinical exemption.`,
+			);
+			return undefined;
+		}
 
-  // 1. First Published date of this file's song analysis
-  const analysisFirstPublished = maybeDate(songAnalysis.firstPublishedAt);
+		if (!clinicalCoreComplete) {
+			logger.info(
+				`calculateEmbargoStartDate()`,
+				dbFile.fileId,
+				dbFile.donorId,
+				`file has a donor that does not have complete clinical data (not core complete), and has no clinical exemption.`,
+			);
+			return undefined;
+		}
+	}
 
-  // 2. Most recent First Published date of all matched pairs for this donor
-  //  This checks that each sample pair has a firstPublished date (to exclude pairs that havent been published before),
-  //   and then finds the most recent date of all the published pairs
-  const matchedPairFirstPublished: Date | undefined = matchedSamplePairs
-    .flatMap(pair =>
-      pair.normalSampleAnalysis.firstPublishedAt && pair.tumourSampleAnalysis.firstPublishedAt
-        ? [maybeDate(pair.normalSampleAnalysis.firstPublishedAt), maybeDate(pair.tumourSampleAnalysis.firstPublishedAt)]
-        : [],
-    )
-    .sort()
-    .slice(-1)[0];
+	// 1. First Published date of this file's song analysis
+	const analysisFirstPublished = maybeDate(songAnalysis.firstPublishedAt);
 
-  // 3. clinical core completion date
-  const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats?.coreCompletionDate || undefined);
+	// 2. Most recent First Published date of all matched pairs for this donor
+	//  This checks that each sample pair has a firstPublished date (to exclude pairs that havent been published before),
+	//   and then finds the most recent date of all the published pairs
+	const matchedPairFirstPublished: Date | undefined = matchedSamplePairs
+		.flatMap(pair =>
+			pair.normalSampleAnalysis.firstPublishedAt && pair.tumourSampleAnalysis.firstPublishedAt
+				? [maybeDate(pair.normalSampleAnalysis.firstPublishedAt), maybeDate(pair.tumourSampleAnalysis.firstPublishedAt)]
+				: [],
+		)
+		.sort()
+		.slice(-1)[0];
 
-  if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
-    const options: Date[] = [analysisFirstPublished];
-    if (!clinicalExemption) {
-      // safe to cast to Date here based on if logic above
-      options.push(clinicalCoreCompletionDate as Date);
-      options.push(matchedPairFirstPublished as Date);
-    }
-    const output = options.sort().slice(-1)[0]; // sort dates and take last one
-    logger.info(
-      'calculateEmbargoStartDate()',
-      dbFile.fileId,
-      `Calculated embargoStart value ${output} for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
-      `first published: ${analysisFirstPublished}`,
-      clinicalExemption
-        ? `clinical exemption: ${dbFile.clinicalExemption}`
-        : `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
-    );
-    return output;
-  } else {
-    logger.info(
-      'calculateEmbargoStartDate()',
-      dbFile.fileId,
-      `Calculated that there is no start date yet for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
-      `first published: ${analysisFirstPublished}`,
-      clinicalExemption
-        ? `clinical exemption: ${dbFile.clinicalExemption}`
-        : `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
-    );
-    return undefined;
-  }
+	// 3. clinical core completion date
+	const clinicalCoreCompletionDate = maybeDate(clinicalDonor?.completionStats?.coreCompletionDate || undefined);
+
+	if (analysisFirstPublished && (clinicalExemption || (matchedPairFirstPublished && clinicalCoreCompletionDate))) {
+		const options: Date[] = [analysisFirstPublished];
+		if (!clinicalExemption) {
+			// safe to cast to Date here based on if logic above
+			options.push(clinicalCoreCompletionDate as Date);
+			options.push(matchedPairFirstPublished as Date);
+		}
+		const output = options.sort().slice(-1)[0]; // sort dates and take last one
+		logger.info(
+			'calculateEmbargoStartDate()',
+			dbFile.fileId,
+			dbFile.donorId,
+			`Calculated embargoStart value ${output} for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
+			`first published: ${analysisFirstPublished}`,
+			clinicalExemption
+				? `clinical exemption: ${dbFile.clinicalExemption}`
+				: `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
+		);
+		return output;
+	} else {
+		logger.info(
+			'calculateEmbargoStartDate()',
+			dbFile.fileId,
+			dbFile.donorId,
+			`Calculated that there is no start date yet for file ${dbFile.fileId} based on first published, matched sample pair, and core completion dates`,
+			`first published: ${analysisFirstPublished}`,
+			clinicalExemption
+				? `clinical exemption: ${dbFile.clinicalExemption}`
+				: `clinical core completed: ${clinicalCoreCompletionDate?.toISOString()} - matched pair first published: ${matchedPairFirstPublished?.toISOString()}`,
+		);
+		return undefined;
+	}
 }
 
 /**
@@ -243,19 +258,19 @@ export function calculateEmbargoStartDate(inputs: {
  * @returns
  */
 function maybeDate(value: string | number | undefined): Date | undefined {
-  try {
-    const typeCheckedValue = isNaN(Number(value)) ? value : Number(value);
-    if (typeCheckedValue) {
-      const date = new Date(typeCheckedValue);
-      if (date && isNaN(date.getTime())) {
-        logger.warn(`Value could not be parsed into date`, value, date);
-        return undefined;
-      }
-      return date;
-    }
-    return undefined;
-  } catch (err) {
-    logger.warn(`Error thrown parsing value as date`, value, err);
-    return undefined;
-  }
+	try {
+		const typeCheckedValue = isNaN(Number(value)) ? value : Number(value);
+		if (typeCheckedValue) {
+			const date = new Date(typeCheckedValue);
+			if (date && isNaN(date.getTime())) {
+				logger.warn(`Value could not be parsed into date`, value, date);
+				return undefined;
+			}
+			return date;
+		}
+		return undefined;
+	} catch (err) {
+		logger.warn(`Error thrown parsing value as date`, value, err);
+		return undefined;
+	}
 }
