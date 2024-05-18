@@ -9,7 +9,7 @@
 		"resources": "copyfiles -u 1 src/resources/*.* dist/",
 		"tslint": "tslint -c tslint.json -p tsconfig.json",
 		"build": "npm run build-ts && npm run resources && npm run tslint",
-		"debug": "nodemon --delay 1000ms --inspect --watch  'src/**/*.ts' --exec node -r ts-node/register ./src/server.ts",
+		"debug": "nodemon --delay 1000ms --inspect --watch 'src/**/*.ts' --watch .env --exec node -r ts-node/register ./src/server.ts",
 		"test": "mocha --exit --inspect --timeout 60000 -r ts-node/register src/test/**/*.spec.ts",
 		"migrate-up": "migrate-mongo up",
 		"migrate-down": "migrate-mongo down",
