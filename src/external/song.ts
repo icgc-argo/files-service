@@ -178,13 +178,14 @@ export const getAnalysesById = async (inputs: {
 }): Promise<SongAnalysis> => {
 	const { dataCenterId, studyId, analysisId } = inputs;
 	const dataCenter = await getDataCenter(dataCenterId);
+	const analysisStates = Object.values(SongAnalysisStates).join(',');
 	const analysesUrl = urljoin(
 		dataCenter.songUrl,
 		'/studies',
 		studyId,
 		'/analysis',
 		analysisId,
-		'?analysisStates=PUBLISHED,UNPUBLISHED,SUPPRESSED',
+		`?analysisStates=${analysisStates}`,
 	);
 	try {
 		const res = await fetch(analysesUrl);
