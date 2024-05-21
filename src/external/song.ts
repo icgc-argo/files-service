@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2024 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -17,100 +17,193 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import abortController from 'abort-controller';
 import fetch from 'node-fetch';
-import Batch from 'stream-json/utils/Batch';
+import querystring from 'qs';
 import urljoin from 'url-join';
-import streamArray from 'stream-json/streamers/StreamArray';
 
 import { getAppConfig } from '../config';
-
 import Logger from '../logger';
-import { getDataCenter } from './dataCenterRegistry';
+import { SongAnalysisState, SongAnalysisStates } from '../utils/constants';
+
+import { DataCenter, getDataCenter } from './dataCenterRegistry';
+
 const logger = Logger('Song');
 
-// TODO: Update kafka event parsers that use this
 export type SongAnalysis = {
-  analysisId: string;
-  analysisState: string;
-  studyId: string;
-  firstPublishedAt?: string;
-  [k: string]: any;
+	analysisId: string;
+	analysisState: string;
+	studyId: string;
+	firstPublishedAt?: string;
+	[k: string]: unknown;
+};
+
+type SongResponseAnalysesPage = {
+	analyses: SongAnalysis[];
+	totalAnalyses: number;
+	currentTotalAnalyses: number;
+};
+
+type PaginationInputs = {
+	limit: number;
+	offset: number;
+};
+
+type PaginationMetadata = PaginationInputs & {
+	responseCount: number;
+	totalCount: number;
 };
 
 export const getStudies = async (url: string) => {
-  const studiesUrl = urljoin(url, '/studies/all');
-  logger.info(`Fetching studies from: ${studiesUrl}`);
-  const res = await fetch(`${url}/studies/all`);
-  const studies = await res.json();
-  logger.info(`Retrieved ${studies.length} studies: ${studies}`);
-  return studies;
+	const studiesUrl = urljoin(url, '/studies/all');
+	logger.info(`Fetching studies from: ${studiesUrl}`);
+	const res = await fetch(`${url}/studies/all`);
+	const studies = await res.json();
+	logger.info(`Retrieved ${studies.length} studies: ${studies}`);
+	return studies;
 };
 
 /**
- * Fetch potentially very large responses from Song then return them in a batched stream.
- * @param analysesUrl
+ * Retrieve one page of analyses.
+ *
+ * @param inputs
+ * analysisStates - defaults to PUBLISHED if no value is provided or if the value provided is an empty set.
+ *
  * @returns
  */
-const fetchAnalysesInBatches = async (analysesUrl: string): Promise<Batch> => {
-  const controller = new abortController();
-  const timeoutPeriod = (await getAppConfig()).datacenter.fetchTimeout;
-  const batchSize = (await getAppConfig()).datacenter.batchSize;
-  const timeout = setTimeout(() => {
-    logger.warn(`Aborting request for analyses due to timeout after ${timeoutPeriod}`);
-    controller.abort();
-  }, timeoutPeriod);
-  try {
-    logger.info(`Fetching analyses from ${analysesUrl}`);
-    const res = await fetch(analysesUrl, {
-      signal: controller.signal,
-    });
-    const resStream = res.body;
-    const pipeline = resStream.pipe(streamArray.withParser()).pipe(new Batch({ batchSize }));
-    logger.info(`Received analyses response, returning as Batch.`);
-    return pipeline;
-  } catch (error) {
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+const fetchAnalysesPage = async (inputs: {
+	dataCenter: DataCenter;
+	studyId: string;
+	offset: number;
+	limit: number;
+	analysisStates?: Set<SongAnalysisState>;
+}): Promise<{ data: SongAnalysis[] } & PaginationMetadata> => {
+	try {
+		const {
+			dataCenter: { centerId, songUrl },
+			studyId,
+			limit,
+			offset,
+			analysisStates,
+		} = inputs;
+		const analysisStatesQueryValue =
+			analysisStates && analysisStates.size ? Array.from(analysisStates).join(',') : SongAnalysisStates.PUBLISHED;
+
+		const queryParams = {
+			analysisStates: analysisStatesQueryValue,
+			limit,
+			offset,
+		};
+
+		const query = querystring.stringify(queryParams);
+		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated`, `?${query}`);
+		const response = await fetch(analysesUrl);
+		const data = (await response.json()) as SongResponseAnalysesPage;
+		logger.debug('Successfully retrieved analyses from song', {
+			dataCenter: centerId,
+			studyId,
+			limit,
+			offset,
+			responseCount: data.currentTotalAnalyses,
+			totalCount: data.totalAnalyses,
+		});
+
+		if (!Array.isArray(data.analyses)) {
+			logger.error(`Response from Song paginated analyses endpoint does not contain the expected array of analyses!`, {
+				response: data,
+			});
+			throw new Error(
+				`Response from Song's paginated analyses endpoint does not contain the expected array of analyses`,
+			);
+		}
+
+		return {
+			data: data.analyses,
+			limit,
+			offset,
+			responseCount: data.currentTotalAnalyses,
+			totalCount: data.totalAnalyses,
+		};
+	} catch (error) {
+		logger.error(`Error fetching page of analyses from song`, error);
+		throw new Error(`Error occurred fetching analyses page from song!`);
+	}
 };
 
 /**
- * Return all analyses for a study pre-filtered to only include PUBLISHED analyses
- * @param url
- * @param studyId
- * @returns
+ * Fetch all analyses for a study. This uses song's paginated endpoint to get
+ * analyses one page at a time. The size each page is determined through the
+ * datacenter.songPageSize configuration variable.
+ *
+ * This function returns an AsyncGenerator that will yield an SongAnalyses for
+ * every page that is fetched from Song
+ *
+ * @example
+ * const analysesResponseGenerator = getAnalysesByStudy({ dataCenterId, studyId });
+ * for await (const analyses of analysesResponseGenerator) {
+ * 	// analyses contains an array of SongAnalyses objects retrieved from the specified dataCenter
+ * }
  */
-export const getAnalysesByStudy = async (url: string, studyId: string): Promise<Batch> => {
-  const analysesUrl = urljoin(url, '/studies', studyId, '/analysis?analysisStates=PUBLISHED');
-  return fetchAnalysesInBatches(analysesUrl);
-};
+export async function* getAnalysesByStudy(details: {
+	dataCenterId: string;
+	studyId: string;
+}): AsyncGenerator<SongAnalysis[]> {
+	try {
+		const dataCenter = await getDataCenter(details.dataCenterId);
 
-export const getAnalysesById = async (
-  dataCenterId: string,
-  studyId: string,
-  analysisId: string,
-): Promise<SongAnalysis> => {
-  const dataCenter = await getDataCenter(dataCenterId);
-  const analysesUrl = urljoin(
-    dataCenter.songUrl,
-    '/studies',
-    studyId,
-    '/analysis',
-    analysisId,
-    '?analysisStates=PUBLISHED,UNPUBLISHED,SUPPRESSED',
-  );
-  try {
-    const res = await fetch(analysesUrl);
-    if (res.status === 200) {
-      return (await res.json()) as SongAnalysis;
-    } else {
-      logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
-      throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
-    }
-  } catch (e) {
-    logger.error(`Error fetching analysis ${analysisId} for ${studyId} from ${analysesUrl}: ${e}`);
-    throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
-  }
+		const {
+			datacenter: { songPageSize },
+		} = await getAppConfig();
+
+		let allPagesFetched = false;
+		let offset = 0;
+		while (!allPagesFetched) {
+			const response = await fetchAnalysesPage({
+				dataCenter,
+				studyId: details.studyId,
+				offset,
+				limit: songPageSize,
+			});
+
+			yield response.data;
+
+			if (response.responseCount === 0 || response.responseCount < songPageSize) {
+				allPagesFetched = true;
+			} else {
+				offset += songPageSize;
+			}
+		}
+	} catch (e) {
+		logger.error('Error while fetching analyses for study');
+		logger.error(e);
+	}
+}
+
+export const getAnalysesById = async (inputs: {
+	dataCenterId: string;
+	studyId: string;
+	analysisId: string;
+}): Promise<SongAnalysis> => {
+	const { dataCenterId, studyId, analysisId } = inputs;
+	const dataCenter = await getDataCenter(dataCenterId);
+	const analysisStates = Object.values(SongAnalysisStates).join(',');
+	const analysesUrl = urljoin(
+		dataCenter.songUrl,
+		'/studies',
+		studyId,
+		'/analysis',
+		analysisId,
+		`?analysisStates=${analysisStates}`,
+	);
+	try {
+		const res = await fetch(analysesUrl);
+		if (res.status === 200) {
+			return (await res.json()) as SongAnalysis;
+		} else {
+			logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
+			throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
+		}
+	} catch (e) {
+		logger.error(`Error fetching analysis ${analysisId} for ${studyId} from ${analysesUrl}: ${e}`);
+		throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
+	}
 };
