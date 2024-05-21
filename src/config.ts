@@ -66,7 +66,6 @@ export interface AppConfig {
 		dataCenterId: string;
 		url: string;
 		fetchTimeout: number;
-		batchSize: number;
 		gatewayUrl: string;
 		songPageSize: number;
 	};
@@ -193,7 +192,6 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
 			dataCenterId: process.env.DC_ID || '',
 			url: process.env.DC_URL || '',
 			fetchTimeout: Number(process.env.DC_FETCH_TIMEOUT || 300 * 1000),
-			batchSize: Number(process.env.DC_BATCH_SIZE || 50),
 			gatewayUrl: process.env.DC_GATEWAY_URL || '',
 			songPageSize: Number(process.env.DC_ANALYSES_PAGESIZE || 50),
 		},
