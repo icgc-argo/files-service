@@ -39,7 +39,7 @@ import { RdpcFileDocument } from '../external/analysisConverter';
 import * as clinical from '../external/clinical';
 import * as song from '../external/song';
 import { SongAnalysis } from '../external/song';
-import { ANALYSIS_STATUS } from '../utils/constants';
+import { SongAnalysisStates } from '../utils/constants';
 import * as dcGateway from '../external/dataCenterGateway';
 import { calculateEmbargoStage, calculateEmbargoStartDate } from './embargo';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
@@ -119,10 +119,10 @@ export async function saveAndIndexFilesFromRdpcData(
 
 	// Documents to add and remove from index
 	const addDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-		doc => doc.analysis?.analysisState === ANALYSIS_STATUS.PUBLISHED,
+		doc => doc.analysis?.analysisState === SongAnalysisStates.PUBLISHED,
 	);
 	const removeDocuments: FileCentricDocument[] = fileCentricDocuments.filter(
-		doc => doc.analysis?.analysisState !== ANALYSIS_STATUS.PUBLISHED,
+		doc => doc.analysis?.analysisState !== SongAnalysisStates.PUBLISHED,
 	);
 
 	logger.debug(`START - Indexing/Removing files`);
@@ -160,7 +160,11 @@ export async function getOrCheckFileEmbargoStart(file: File): Promise<Date | und
 	try {
 		// TODO: The following requests need to be cached, otherwise they will be called repeatedly. Since file processing is being done in parallel and there are multiple files per donor
 		const matchedSamplePairs = await dcGateway.getMatchedPairsForDonor(file.donorId);
-		const songAnalysis = await song.getAnalysesById(file.repoId, file.programId, file.analysisId);
+		const songAnalysis = await song.getAnalysesById({
+			dataCenterId: file.repoId,
+			studyId: file.programId,
+			analysisId: file.analysisId,
+		});
 		const clinicalDonor = await clinical.getDonor(file.programId, file.donorId);
 
 		const startDate = await calculateEmbargoStartDate({
@@ -338,7 +342,7 @@ export async function getRdpcDataForFiles(files: File[]): Promise<SortedRdpcResu
 			await PromisePool.withConcurrency(10)
 				.for(analyses)
 				.process(async analysisId => {
-					const analysis = await song.getAnalysesById(dataCenterId, programId, analysisId);
+					const analysis = await song.getAnalysesById({ dataCenterId, studyId: programId, analysisId });
 					retrievedAnalyses.push(analysis);
 				});
 		}

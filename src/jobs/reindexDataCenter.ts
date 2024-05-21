@@ -21,7 +21,6 @@ import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
 import { getStudies, getAnalysesByStudy } from '../external/song';
-import { streamToAsyncGenerator } from '../utils/streamToAsync';
 import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
 import { getIndexer } from '../services/indexer';
 const logger = Logger('Job:ReindexDataCenter');
@@ -35,47 +34,42 @@ const logger = Logger('Job:ReindexDataCenter');
  * @param studyFilter
  */
 async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
-  try {
-    logger.info(`Start: reindex data center ${dataCenterId}`);
-    const { songUrl } = await getDataCenter(dataCenterId);
-    logger.info(`Datacenter URL: ${songUrl}`);
-    const studies: string[] = await getStudies(songUrl);
-    const filteredStudies: string[] =
-      studyFilter.length > 0 ? studies.filter(study => studyFilter.includes(study)) : studies;
+	try {
+		logger.info(`Start: reindex data center ${dataCenterId}`);
+		const { songUrl } = await getDataCenter(dataCenterId);
+		logger.info(`Datacenter URL: ${songUrl}`);
+		const studies: string[] = await getStudies(songUrl);
+		const filteredStudies: string[] =
+			studyFilter.length > 0 ? studies.filter(study => studyFilter.includes(study)) : studies;
 
-    const indexer = await getIndexer();
-    await indexer.createEmptyRestrictedIndices(filteredStudies);
+		const indexer = await getIndexer();
+		await indexer.createEmptyRestrictedIndices(filteredStudies);
 
-    for (const study of filteredStudies) {
-      logger.info(`Indexing study: ${study}`);
-      try {
-        const analysesStream = await generateStudyAnalyses(songUrl, study);
-        for await (const analysesData of analysesStream) {
-          const analyses = analysesData.map((a: { value: any }) => a.value);
-          const analysisIds = analyses.map((a: { analysisId: string }) => a.analysisId);
-          logger.info(`Retrieved analyses from song: ${analysisIds}`);
+		for (const studyId of filteredStudies) {
+			logger.info(`Indexing study: ${studyId}`);
 
-          const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
-          await saveAndIndexFilesFromRdpcData(files, dataCenterId, indexer);
-        }
-        logger.info(`Done indexing study: ${study}`);
-      } catch (err) {
-        logger.error(`Failed to index study ${study}, ${err}`, err);
-      }
-    }
+			try {
+				const analysesResponseGenerator = getAnalysesByStudy({ dataCenterId, studyId });
+				for await (const analyses of analysesResponseGenerator) {
+					const analysisIds = analyses.map(analysis => analysis.analysisId);
+					logger.info(`Retrieved analyses from song: ${analysisIds}`);
 
-    // Release all file updates.
-    await indexer.release();
-    logger.info(`Done re-indexing data center`);
-  } catch (err) {
-    logger.error(`Error while indexing repository ${dataCenterId}`);
-    throw err;
-  }
+					const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
+					await saveAndIndexFilesFromRdpcData(files, dataCenterId, indexer);
+				}
+				logger.info(`Done indexing study: ${studyId}`);
+			} catch (err) {
+				logger.error(`Failed to index study ${studyId}, ${err}`, err);
+			}
+		}
+
+		// Release all file updates.
+		await indexer.release();
+		logger.info(`Done re-indexing data center`);
+	} catch (err) {
+		logger.error(`Error while indexing repository ${dataCenterId}`);
+		throw err;
+	}
 }
 
-async function generateStudyAnalyses(url: string, studyId: string) {
-  const pipeline = await getAnalysesByStudy(url, studyId);
-  // read one batch entry at a time
-  return streamToAsyncGenerator<any>(pipeline, 1);
-}
 export default reindexDataCenter;

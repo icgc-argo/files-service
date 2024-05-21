@@ -31,17 +31,17 @@ import Logger from '../logger';
 const logger = Logger('DataCenterRegistry');
 
 export interface DataCenter {
-  centerId: string;
-  songUrl: string;
+	centerId: string;
+	songUrl: string;
 }
 
 function isDataCenter(input: any): input is DataCenter {
-  return isObjectLike(input) && isString(input.centerId) && isString(input.songUrl);
+	return isObjectLike(input) && isString(input.centerId) && isString(input.songUrl);
 }
 
 const getPlaceholder = async () => ({
-  centerId: 'collab',
-  songUrl: (await getAppConfig()).datacenter.url,
+	centerId: 'collab',
+	songUrl: (await getAppConfig()).datacenter.url,
 });
 
 /**
@@ -50,24 +50,27 @@ const getPlaceholder = async () => ({
  * @returns
  */
 export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> => {
-  const config = await getAppConfig();
-  try {
-    const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers', dataCenterId);
+	const config = await getAppConfig();
+	try {
+		const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers', dataCenterId);
 
-    const response = await fetch(requestUrl);
-    const data = await response.json();
+		logger.debug('Fetching data center', dataCenterId, requestUrl);
+		const response = await fetch(requestUrl);
+		const data = await response.json();
 
-    if (isDataCenter(data)) {
-      return data;
-    }
+		if (isDataCenter(data)) {
+			return data;
+		}
 
-    throw new Error(
-      `Response object returned for Data Center is badly formed or missing a required field. Response data: ${data}`,
-    );
-  } catch (e) {
-    logger.error(`Failed to fetch Data Centers ${dataCenterId}: ${e}`);
-    throw e;
-  }
+		throw new Error(
+			`Response object returned for Data Center is badly formed or missing a required field. Response data: ${JSON.stringify(
+				data,
+			)}`,
+		);
+	} catch (e) {
+		logger.error(`Failed to fetch Data Centers ${dataCenterId}: ${e}`);
+		throw e;
+	}
 };
 
 /**
@@ -75,20 +78,20 @@ export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> =
  * Note: This will filter out any objects in the response array that are missing required properties for the DataCenter type
  */
 export const getAllDataCenters = async (): Promise<DataCenter[]> => {
-  const config = await getAppConfig();
+	const config = await getAppConfig();
 
-  try {
-    const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers');
+	try {
+		const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers');
 
-    const response = await fetch(requestUrl);
-    const data = await response.json();
+		const response = await fetch(requestUrl);
+		const data = await response.json();
 
-    if (isArray(data)) {
-      return data.filter(isDataCenter) as DataCenter[];
-    }
-    throw new Error(`Response object returned for Data Centers is badly formed (Not an array). Response data: ${data}`);
-  } catch (e) {
-    logger.error(`Failed to fetch all Data Centers: ${e}`);
-    throw e;
-  }
+		if (isArray(data)) {
+			return data.filter(isDataCenter) as DataCenter[];
+		}
+		throw new Error(`Response object returned for Data Centers is badly formed (Not an array). Response data: ${data}`);
+	} catch (e) {
+		logger.error(`Failed to fetch all Data Centers: ${e}`);
+		throw e;
+	}
 };
