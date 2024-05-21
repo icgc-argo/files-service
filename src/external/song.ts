@@ -19,7 +19,7 @@
 
 import { isArray } from 'lodash';
 import fetch from 'node-fetch';
-import qs from 'qs';
+import querystring from 'qs';
 import urljoin from 'url-join';
 
 import { getAppConfig } from '../config';
@@ -88,8 +88,8 @@ const fetchAnalysesPage = async (inputs: {
 			offset,
 		};
 
-		const queryString = qs.stringify(queryParams);
-		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated?${queryString}`);
+		const query = querystring.stringify(queryParams);
+		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated?${query}`);
 		const response = await fetch(analysesUrl);
 		const data = (await response.json()) as SongResponseAnalysesPage;
 		logger.debug('Successfully retrieved analyses from song', {
