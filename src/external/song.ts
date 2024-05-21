@@ -88,7 +88,7 @@ const fetchAnalysesPage = async (inputs: {
 		};
 
 		const query = querystring.stringify(queryParams);
-		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated?${query}`);
+		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated`, `?${query}`);
 		const response = await fetch(analysesUrl);
 		const data = (await response.json()) as SongResponseAnalysesPage;
 		logger.debug('Successfully retrieved analyses from song', {
