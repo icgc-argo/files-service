@@ -128,8 +128,8 @@ const fetchAnalysesPage = async (inputs: {
 			responseCount: data.currentTotalAnalyses,
 			totalCount: data.totalAnalyses,
 		};
-	} catch (e) {
-		logger.error(`Error fetching page of analyses from song`, e);
+	} catch (error) {
+		logger.error(`Error fetching page of analyses from song`, error);
 		throw new Error(`Error occurred fetching analyses page from song!`);
 	}
 };
