@@ -17,7 +17,6 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { isArray } from 'lodash';
 import fetch from 'node-fetch';
 import querystring from 'qs';
 import urljoin from 'url-join';
@@ -101,7 +100,7 @@ const fetchAnalysesPage = async (inputs: {
 			totalCount: data.totalAnalyses,
 		});
 
-		if (!isArray(data.analyses)) {
+		if (!Array.isArray(data.analyses)) {
 			logger.error(`Response from Song paginated analyses endpoint does not contain the expected array of analyses!`, {
 				response: data,
 			});
