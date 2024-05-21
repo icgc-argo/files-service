@@ -63,11 +63,6 @@ export const getStudies = async (url: string) => {
 };
 
 /**
- 
- * 
- */
-
-/**
  * Retrieve one page of analyses.
  *
  * @param inputs
