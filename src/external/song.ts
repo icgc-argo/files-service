@@ -62,6 +62,19 @@ export const getStudies = async (url: string) => {
 	return studies;
 };
 
+/**
+ 
+ * 
+ */
+
+/**
+ * Retrieve one page of analyses.
+ *
+ * @param inputs
+ * analysisStates - defaults to PUBLISHED if no value is provided or if the value provided is an empty set.
+ *
+ * @returns
+ */
 const fetchAnalysesPage = async (inputs: {
 	dataCenter: DataCenter;
 	studyId: string;
@@ -77,9 +90,8 @@ const fetchAnalysesPage = async (inputs: {
 			offset,
 			analysisStates,
 		} = inputs;
-		const analysisStatesQueryValue = analysisStates
-			? Array.from(analysisStates).join(',')
-			: SongAnalysisStates.PUBLISHED || SongAnalysisStates.PUBLISHED;
+		const analysisStatesQueryValue =
+			analysisStates && analysisStates.size ? Array.from(analysisStates).join(',') : SongAnalysisStates.PUBLISHED;
 
 		const queryParams = {
 			analysisStates: analysisStatesQueryValue,
