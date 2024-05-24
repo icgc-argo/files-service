@@ -47,6 +47,7 @@ export interface AppConfig {
 		indexName: string;
 		createSampleIndex: boolean;
 		repository?: string;
+		limits: { maxConcurrentWrites: number; maxFileBulkWriteDocuments: number };
 	};
 	auth: {
 		enabled: boolean;
@@ -172,6 +173,10 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
 			indexName: process.env.INDEX_NAME || 'file_centric_test',
 			createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
 			repository: process.env.ES_SNAPSHOT_REPOSITORY,
+			limits: {
+				maxConcurrentWrites: Number(process.env.ES_MAX_WRITE_CONCURRENCY) || 5,
+				maxFileBulkWriteDocuments: Number(process.env.ES_MAX_FILE_BULK_WRITE_LENGTH) || 5000,
+			},
 		},
 		auth: {
 			enabled: process.env.AUTH_ENABLED !== 'false', // true unless set to 'false'
