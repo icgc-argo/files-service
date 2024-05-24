@@ -67,7 +67,7 @@ export const getIndexer = async () => {
 	async function indexFiles(index: string, files: FileCentricDocument[]): Promise<void> {
 		const fileChunks = _.chunk(files, MAX_FILE_BULK_WRITE_LENGTH);
 
-		for (let fileChunk of fileChunks) {
+		for (const fileChunk of fileChunks) {
 			const camelcasedFiles = fileChunk.map(camelCaseKeysToSnakeCase);
 			const body = camelcasedFiles.flatMap(file => [
 				{ update: { _id: file.object_id } },
