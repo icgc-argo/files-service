@@ -36,22 +36,13 @@ import {
 	sortFileDocsIntoPrograms,
 	sortFilesIntoPrograms,
 } from './utils/fileUtils';
+import { getAppConfig } from '../config';
 const logger = Logger('Indexer');
 
 type ReleaseOptions = {
 	publicRelease?: boolean;
 	indices?: string[];
 };
-
-const MAX_ES_WRITE_CONCURRENCY = 5;
-
-/**
- * NOTE re: MAX_FILE_BULK_WRITE_LENGTH
- * document length is not the best metric to restrict the bulk write operation since each document
- * can have a different size. It is a reasonable proxy however since ES has been very comfortable
- * writing indexes with up to 15k file documents.
- *  */
-const MAX_FILE_BULK_WRITE_LENGTH = 5000;
 
 /**
  * Indexer has separate methods for interacting with restricted and public indices in an attempt to prevent
@@ -63,9 +54,18 @@ const MAX_FILE_BULK_WRITE_LENGTH = 5000;
 export const getIndexer = async () => {
 	const rollcall = await getRollcall();
 	const client = await getClient();
+	const config = await getAppConfig();
+
+	const MAX_ES_WRITE_CONCURRENCY = config.elasticProperties.limits.maxConcurrentWrites;
 
 	async function indexFiles(index: string, files: FileCentricDocument[]): Promise<void> {
-		const fileChunks = _.chunk(files, MAX_FILE_BULK_WRITE_LENGTH);
+		/**
+		 * NOTE re: ES_MAX_FILE_BULK_WRITE_LENGTH
+		 * document length is not the best metric to restrict the bulk write operation since each document
+		 * can have a different size. It is a reasonable proxy however since ES has been very comfortable
+		 * writing indexes with up to 15k file documents.
+		 */
+		const fileChunks = _.chunk(files, config.elasticProperties.limits.maxFileBulkWriteDocuments);
 
 		for (const fileChunk of fileChunks) {
 			const camelcasedFiles = fileChunk.map(camelCaseKeysToSnakeCase);
@@ -212,7 +212,6 @@ export const getIndexer = async () => {
 			logger.info(`Preparing to release... Additional indices requested to release: ${additionalIndices}`);
 		}
 
-		// TODO: config for max simultaneous release?
 		// release indices tracked in nextIndices and requested in options.additionalIndices
 		await PromisePool.withConcurrency(MAX_ES_WRITE_CONCURRENCY)
 			.for(toRelease.concat(additionalIndices.map(getIndexFromIndexName)))
@@ -314,7 +313,6 @@ export const getIndexer = async () => {
 		// Only removing files that are not public
 		const sortedFiles = sortFileDocsIntoPrograms(docs.filter(isRestricted));
 
-		// TODO: configure concurrency for ES requests.
 		await PromisePool.withConcurrency(MAX_ES_WRITE_CONCURRENCY)
 			.for(sortedFiles)
 			.process(async ({ program, files }) => {
@@ -385,7 +383,6 @@ export const getIndexer = async () => {
 	async function removeFilesFromPublic(files: File[]): Promise<void> {
 		const sortedFiles = sortFilesIntoPrograms(files);
 
-		// TODO: Configure ES request concurrency
 		await PromisePool.withConcurrency(MAX_ES_WRITE_CONCURRENCY)
 			.for(sortedFiles)
 			.process(async programData => {
@@ -410,7 +407,6 @@ export const getIndexer = async () => {
 	async function removeFilesFromRestricted(files: File[]): Promise<void> {
 		const sortedFiles = sortFilesIntoPrograms(files);
 
-		// TODO: Configure ES request concurrency
 		await PromisePool.withConcurrency(MAX_ES_WRITE_CONCURRENCY)
 			.for(sortedFiles)
 			.process(async programData => {
