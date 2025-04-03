@@ -1,0 +1,127 @@
+{
+	"donor_id": "DO251215",
+	"gender": "Female",
+	"study_id": "TEST-CA",
+	"analyses": [
+		{
+			"analysis_id": "ecd9a6f4-dc67-4c00-99a6-f4dc672c0058",
+			"files": [
+				{
+					"file_id": "FL4294",
+					"analysis_tools": ["BWA-MEM", "biobambam2:bammarkduplicates2"],
+					"data_category": "Sequencing Reads",
+					"object_id": "48300836-2bd3-5d5b-a288-e90b837bfe0c",
+					"file_name": "DATA-CA.DO251215.SA612411.wgs.20230710.aln.cram",
+					"file_size": 98416,
+					"file_type": "CRAM",
+					"md5sum": "1231017a77dfd0b615983db5bdcf0d14",
+					"data_type": "Aligned Reads"
+				}
+			],
+			"repositories": [
+				{
+					"code": "argo.dev",
+					"country": "Canada",
+					"name": "ARGO Dev",
+					"organization": "OICR",
+					"url": "https://api.rdpc-dev.cumulus.genomeinformatics.org/graphql"
+				}
+			],
+			"analysis_state": "PUBLISHED",
+			"analysis_type": "sequencing_alignment",
+			"analysis_version": 6,
+			"experiment": {
+				"platform": "ILLUMINA",
+				"platform_model": "Illumina HiSeq X",
+				"sequencing_date": "2022-12-12",
+				"sequencing_center": "ARGO",
+				"experimental_strategy": "WGS",
+				"submitter_sequencing_experiment_id": "ujolwwdsmgN2"
+			},
+			"file_access": "controlled",
+			"first_published_at": "2024-01-19T14:58:09.830639",
+			"workflow": {
+				"inputs": [
+					{ "analysis_type": "sequencing_experiment", "input_analysis_id": "aa8a05d9-ca93-463b-8a05-d9ca93763b58" }
+				],
+				"run_id": "wes-899ba5c83229418eb032a0bbe91f35f9",
+				"session_id": "5e9ea525-5fd0-49e1-8633-ad284b126b07",
+				"genome_build": "GRCh38_hla_decoy_ebv",
+				"workflow_name": "DNA Seq Alignment",
+				"workflow_version": "1.9.2"
+			},
+			"read_groups": [
+				{
+					"file_r1": "TEST_SUBMITTER_SPECIMEN_ID_ujolwwdsmgN2.0.R1.fastq.gz",
+					"file_r2": null,
+					"insert_size": null,
+					"library_name": "WGS:ujolwwdsmgN2",
+					"is_paired_end": false,
+					"platform_unit": "ujolwwdsmgN2_0",
+					"read_length_r1": 150,
+					"read_length_r2": null,
+					"sample_barcode": "NNNNNN",
+					"read_group_id_in_bam": null,
+					"submitter_read_group_id": "ujolwwdsmgN2_0"
+				}
+			],
+			"read_group_count": 1
+		}
+	],
+	"specimens": [
+		{
+			"samples": [
+				{ "sample_type": "Total DNA", "submitter_sample_id": "SL835", "sample_id": "SA626580" },
+				{ "sample_type": "Total DNA", "submitter_sample_id": "BL201", "sample_id": "SA626590" }
+			],
+			"program_id": "TEST-CA",
+			"submitter_donor_id": "donor-155",
+			"submitter_specimen_id": "BL97",
+			"submitter_primary_diagnosis_id": "PD300",
+			"specimen_acquisition_interval": 23,
+			"specimen_anatomic_location": "C49.4",
+			"specimen_laterality": "Left",
+			"specimen_processing": "Fresh",
+			"specimen_storage": "Frozen in liquid nitrogen",
+			"specimen_tissue_source": "Blood derived",
+			"tumour_normal_designation": "Normal",
+			"specimen_type": "Normal",
+			"specimen_id": "SP226561"
+		},
+		{
+			"samples": [{ "sample_id": "SA626579", "sample_type": "Total DNA", "submitter_sample_id": "SL896" }],
+			"program_id": "TEST-CA",
+			"submitter_donor_id": "donor-155",
+			"submitter_specimen_id": "TU245",
+			"submitter_primary_diagnosis_id": "PD300",
+			"pathological_tumour_staging_system": "AJCC 8th edition",
+			"pathological_t_category": "T3",
+			"pathological_n_category": "N0",
+			"pathological_m_category": "Not applicable",
+			"pathological_stage_group": "Stage I",
+			"specimen_acquisition_interval": 31,
+			"tumour_histological_type": "9064/2",
+			"specimen_anatomic_location": "C49.4",
+			"specimen_laterality": "Left",
+			"specimen_storage": "Frozen in liquid nitrogen",
+			"reference_pathology_confirmed": "Yes",
+			"tumour_grading_system": "Three-tier grading system",
+			"tumour_grade": "G3",
+			"percent_tumour_cells_measurement_method": "Genomics",
+			"percent_tumour_cells": 0.65,
+			"specimen_tissue_source": "Solid tissue",
+			"tumour_normal_designation": "Tumour",
+			"specimen_type": "Primary tumour",
+			"specimen_id": "SP226562"
+		}
+	],
+	"submitter_donor_id": "donor-155",
+	"vital_status": "Deceased",
+	"cause_of_death": "Died of cancer",
+	"survival_time": 1556,
+	"primary_site": ["Breast"],
+	"genetic_disorders": ["Lynch Syndrome"],
+	"menopause_status": "Postmenopausal",
+	"number_of_pregnancies": 2,
+	"number_of_children": 2
+}
