@@ -57,6 +57,21 @@
 			"height": {
 				"type": "integer"
 			},
+			"hrt_type": {
+				"type": "keyword"
+			},
+			"hrt_duration": {
+				"type": "integer"
+			},
+			"contraception_type": {
+				"type": "keyword"
+			},
+			"contraception_duration": {
+				"type": "integer"
+			},
+			"genetic_disorders": {
+				"type": "keyword"
+			},
 			"menopause_status": {
 				"type": "keyword"
 			},
@@ -65,6 +80,9 @@
 			},
 			"number_of_pregnancies": {
 				"type": "integer"
+			},
+			"primary_site": {
+				"type": "keyword"
 			},
 			"survival_time": {
 				"type": "integer"
@@ -123,6 +141,9 @@
 							},
 							"file_number": {
 								"type": "integer"
+							},
+							"file_name": {
+								"type": "keyword"
 							},
 							"file_type": {
 								"type": "keyword"
@@ -269,6 +290,9 @@
 						"type": "float"
 					},
 					"percent_tumour_cells": {
+						"type": "float"
+					},
+					"percent_tumour_cells_measurement_method": {
 						"type": "float"
 					},
 					"primary_diagnosis_id": {
@@ -491,7 +515,7 @@
 					"hematological_toxicity": {
 						"type": "keyword"
 					},
-					"non-hematological_toxicity": {
+					"non_hematological_toxicity": {
 						"type": "keyword"
 					},
 					"hormone_drug_dosage_units": {
@@ -527,11 +551,22 @@
 					"response_to_treatment": {
 						"type": "keyword"
 					},
+					"response_to_treatment_criteria_method": {
+						"type": "keyword"
+					},
 					"submitter_primary_diagnosis_id": {
 						"type": "keyword"
 					},
 					"submitter_treatment_id": {
 						"type": "keyword"
+					},
+					"therapies": {
+						"type": "nested",
+						"properties": {
+							"therapy_type": {
+								"type": "keyword"
+							}
+						}
 					},
 					"toxicity_type": {
 						"type": "keyword"
@@ -552,6 +587,81 @@
 						"type": "integer"
 					},
 					"treatment_type": {
+						"type": "keyword"
+					}
+				}
+			},
+			"family_history": {
+				"type": "nested",
+				"properties": {
+					"family_relative_id": {
+						"type": "keyword"
+					},
+					"relative_with_cancer_history": {
+						"type": "keyword"
+					},
+					"relationship_type": {
+						"type": "keyword"
+					},
+					"gender_of_relative": {
+						"type": "keyword"
+					},
+					"age_of_relative_at_diagnosis": {
+						"type": "integer"
+					},
+					"cancer_type_code_of_relative": {
+						"type": "keyword"
+					},
+					"relative_vital_status": {
+						"type": "keyword"
+					},
+					"cause_of_death_of_relative": {
+						"type": "keyword"
+					},
+					"relative_survival_time": {
+						"type": "integer"
+					}
+				}
+			},
+			"exposure": {
+				"properties": {
+					"tobacco_smoking_status": {
+						"type": "keyword"
+					},
+					"tobacco_smoking_tobacco_typestatus": {
+						"type": "keyword"
+					},
+					"pack_years_smoked": {
+						"type": "integer"
+					},
+					"alcohol_history": {
+						"type": "keyword"
+					},
+					"alcohol_consumption_category": {
+						"type": "keyword"
+					},
+					"alcohol_type": {
+						"type": "keyword"
+					},
+					"opiate_use": {
+						"type": "keyword"
+					},
+					"hot_drinks_consumption": {
+						"type": "keyword"
+					},
+					"red_meat_frequency": {
+						"type": "keyword"
+					},
+					"processed_meat_frequency": {
+						"type": "keyword"
+					},
+					"soft_drinks_frequency": {
+						"type": "keyword"
+					},
+					"exercise_frequency": {
+						"type": "keyword"
+					},
+					"exercise_intensity": {
 						"type": "keyword"
 					}
 				}
