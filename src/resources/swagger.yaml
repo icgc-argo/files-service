@@ -397,6 +397,55 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  /donor-centric/program/{programId}/donor/{donorId}:
+    post:
+      description: Index a single donor into the donor-centric index. This will fail if the donor is not core complete.
+      tags:
+        - Donor Centric
+      parameters:
+        - name: programId
+          description: Program Id that the donor we want to index belongs to
+          in: path
+          required: true
+          schema:
+            type: string
+            example: TEST-CA
+        - name: donorId
+          description: ID of the donor to query
+          in: path
+          required: true
+          schema:
+            type: string
+            example: DO1234
+      responses:
+        '200':
+          description: Submitted, will run in background
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /donor-centric/program/{programId}:
+    post:
+      description: Index all core complete donors for a program into the donor-centric index.
+      tags:
+        - Donor Centric
+      parameters:
+        - name: programId
+          description: Program Id that the donor we want to index belongs to
+          in: path
+          required: true
+          schema:
+            type: string
+            example: TEST-CA
+      responses:
+        '200':
+          description: Submitted, will run in background
+          content:
+            application/json:
+              schema:
+                type: string
+
   /admin/index/{datacenter}:
     post:
       tags:
