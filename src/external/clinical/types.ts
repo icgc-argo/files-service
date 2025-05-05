@@ -40,36 +40,89 @@ export const ClinicalSpecimen = zod.object({
  * are relevant to the file service's usage. When additional information from the clinical API is needed those fields should be added
  * to this schema definition.
  *
+ * Many of these objects contain a clinicalInfo object that has no defined properties but instead enables passthrough for
+ * any and all properties. This is because the clinicalInfo properties are defined by the latest data dictionary. Here we are only
+ * validating the shape of the response, not the contents of the data dictionary, which will change over time.
+ *
  * Note: we receive all dates as strings. The type declaration here has them listed as strings, but if it makes sense in the future
  * we can update the Zod schema to parse them into dates.
  */
-export const ClinicalDonor = zod.object({
-	donorId: zod.string(),
-	gender: zod.string(),
-	programId: zod.string(),
+export const ClinicalDonor = zod
+	.object({
+		donorId: zod.string(),
+		gender: zod.string(),
+		programId: zod.string(),
 
-	submitterId: zod.string(),
-	createdAt: zod.string(),
-	updatedAt: zod.string(),
-	schemaMetadata: zod.object({
-		isValid: zod.boolean(),
-		lastValidSchemaVersion: zod.string(),
-		originalSchemaVersion: zod.string(),
-		lastMigrationId: zod.string(),
-	}),
-	completionStats: zod
-		.object({
-			coreCompletion: zod.object({
-				donor: zod.number(),
-				specimens: zod.number(),
-				primaryDiagnosis: zod.number(),
-				followUps: zod.number(),
-				treatments: zod.number(),
-			}),
-			coreCompletionDate: zod.string().nullable(),
-			coreCompletionPercentage: zod.number(),
-			hasMissingEntityException: zod.boolean().optional(),
-		})
-		.optional(),
-});
+		submitterId: zod.string(),
+		createdAt: zod.string(),
+		updatedAt: zod.string(),
+		schemaMetadata: zod.object({
+			isValid: zod.boolean(),
+			lastValidSchemaVersion: zod.string(),
+			originalSchemaVersion: zod.string(),
+			lastMigrationId: zod.string(),
+		}),
+		specimens: zod
+			.array(
+				zod.object({
+					clinicalInfo: zod.object({}).passthrough(),
+					samples: zod.array(
+						zod.object({
+							sampleType: zod.string(),
+							submitterId: zod.string(),
+							sampleId: zod.string(),
+						}),
+					),
+					specimenTissueSource: zod.string(),
+					tumourNormalDesignation: zod.string(),
+					specimenType: zod.string(),
+					submitterId: zod.string(),
+					specimenId: zod.string(),
+				}),
+			)
+			.optional(),
+		exposure: zod.array(zod.object({ clinicalInfo: zod.object({}).passthrough() })).optional(),
+		familyHistory: zod.array(zod.object({ clinicalInfo: zod.object({}).passthrough() })).optional(),
+		followUps: zod
+			.array(
+				zod.object({
+					followUpId: zod.number(),
+					clinicalInfo: zod.object({}).passthrough(),
+				}),
+			)
+			.optional(),
+		primaryDiagnoses: zod
+			.array(
+				zod.object({
+					primaryDiagnosisId: zod.number(),
+					clinicalInfo: zod.object({}).passthrough(),
+				}),
+			)
+			.optional(),
+		treatments: zod
+			.array(
+				zod.object({
+					treatmentId: zod.number(),
+					therapies: zod.array(zod.object({ clinicalInfo: zod.object({}).passthrough(), therapyType: zod.string() })),
+					clinicalInfo: zod.object({}).passthrough(),
+				}),
+			)
+			.optional(),
+
+		completionStats: zod
+			.object({
+				coreCompletion: zod.object({
+					donor: zod.number(),
+					specimens: zod.number(),
+					primaryDiagnosis: zod.number(),
+					followUps: zod.number(),
+					treatments: zod.number(),
+				}),
+				coreCompletionDate: zod.string().nullable(),
+				coreCompletionPercentage: zod.number(),
+				hasMissingEntityException: zod.boolean().optional(),
+			})
+			.optional(),
+	})
+	.passthrough();
 export type ClinicalDonor = zod.infer<typeof ClinicalDonor>;

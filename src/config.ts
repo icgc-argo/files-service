@@ -44,7 +44,8 @@ export interface AppConfig {
 		node: string;
 		username: string;
 		password: string;
-		indexName: string;
+		fileCentricIndexName: string;
+		donorCentricIndexName: string;
 		createSampleIndex: boolean;
 		repository?: string;
 		limits: { maxConcurrentWrites: number; maxFileBulkWriteDocuments: number };
@@ -170,7 +171,8 @@ const buildAppConfig = async (secrets: any): Promise<AppConfig> => {
 			node: process.env.ES_NODE || 'http://localhost:9200',
 			username: secrets.ES_USER || process.env.ES_USER,
 			password: secrets.ES_PASSWORD || process.env.ES_PASSWORD,
-			indexName: process.env.INDEX_NAME || 'file_centric_test',
+			fileCentricIndexName: process.env.INDEX_NAME || 'file_centric_test', // TODO: This isn't used. The alias is being manually added to ES
+			donorCentricIndexName: process.env.DONOR_CENTRIC_INDEX_NAME || 'donor_centric_test',
 			createSampleIndex: process.env.CREATE_SAMPLE_INDEX === 'true', // false unless set to 'true'
 			repository: process.env.ES_SNAPSHOT_REPOSITORY,
 			limits: {
