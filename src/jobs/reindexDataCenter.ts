@@ -17,12 +17,12 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import Logger from '../logger';
 import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
 import { getDataCenter } from '../external/dataCenterRegistry';
-import { getStudies, getAnalysesByStudy } from '../external/song';
+import { getAnalysesByStudy, getStudies } from '../external/song';
+import Logger from '../logger';
+import { getFileCentricIndexer } from '../services/fileCentricIndexer';
 import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
-import { getIndexer } from '../services/indexer';
 const logger = Logger('Job:ReindexDataCenter');
 
 /**
@@ -42,7 +42,7 @@ async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
 		const filteredStudies: string[] =
 			studyFilter.length > 0 ? studies.filter(study => studyFilter.includes(study)) : studies;
 
-		const indexer = await getIndexer();
+		const indexer = await getFileCentricIndexer();
 		await indexer.createEmptyRestrictedIndices(filteredStudies);
 
 		for (const studyId of filteredStudies) {
@@ -52,7 +52,7 @@ async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
 				const analysesResponseGenerator = getAnalysesByStudy({ dataCenterId, studyId });
 				for await (const analyses of analysesResponseGenerator) {
 					const analysisIds = analyses.map(analysis => analysis.analysisId);
-					logger.info(`Retrieved analyses from song: ${analysisIds}`);
+					logger.debug(`Retrieved analyses from song: ${analysisIds}`);
 
 					const files = await convertAnalysesToFileDocuments(analyses, dataCenterId);
 					await saveAndIndexFilesFromRdpcData(files, dataCenterId, indexer);

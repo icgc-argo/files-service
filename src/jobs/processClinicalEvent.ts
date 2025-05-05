@@ -4,7 +4,7 @@ import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool/dist';
 import ClinicalUpdateEvent from '../external/kafka/messages/ClinicalUpdateEvent';
 import { updateFileFromExternalSources } from '../services/fileManager';
-import { getIndexer } from '../services/indexer';
+import { getFileCentricIndexer } from '../services/fileCentricIndexer';
 import { isUnreleased } from '../services/utils/fileUtils';
 
 import Logger from '../logger';
@@ -23,7 +23,7 @@ const clinicalUpdateEvent = async (clinicalEvent: ClinicalUpdateEvent): Promise<
         0} donors`,
     );
 
-    const indexer = await getIndexer();
+		const indexer = await getFileCentricIndexer();
 
     // get files for donors
     const files = await fileService.getFiles({ include: { donors: donorIds } });

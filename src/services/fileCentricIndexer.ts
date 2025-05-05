@@ -51,7 +51,7 @@ type ReleaseOptions = {
  *
  * Note that the indexer tracks the next index to create
  */
-export const getIndexer = async () => {
+export const getFileCentricIndexer = async () => {
 	const rollcall = await getRollcall();
 	const client = await getClient();
 	const config = await getAppConfig();
@@ -478,4 +478,4 @@ export const getIndexer = async () => {
 	};
 };
 
-export type Indexer = Awaited<ReturnType<typeof getIndexer>>;
+export type Indexer = Awaited<ReturnType<typeof getFileCentricIndexer>>;
