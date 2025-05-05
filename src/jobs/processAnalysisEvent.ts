@@ -16,15 +16,20 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
-import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
-import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
-import { isRestricted } from '../services/utils/fileUtils';
-import { getFileCentricIndexer } from '../services/fileCentricIndexer';
-import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
+import * as fileService from '../data/files';
+import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
+import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
+import { getFileCentricIndexer } from '../services/fileCentricIndexer';
+import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
+import { updateFileFromExternalSources } from '../services/fileManager';
+import { isRestricted } from '../services/utils/fileUtils';
 
 import Logger from '../logger';
+import {
+	indexDonorCentricDocument,
+	prepareDonorCentricDocumentById,
+} from '../services/donorCentric/donorCentricService';
 const logger = Logger('Job:ProcessAnalysisEvent');
 
 async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) {
@@ -74,18 +79,37 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
  * @param analysisEvent
  */
 const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
-	const { analysis, analysisId, state, songServerId } = analysisEvent;
+	const { analysis, analysisId, state, songServerId, studyId } = analysisEvent;
 
 	try {
 		logger.info(
 			`START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
 		);
 
+		// ====================================================================
+		//   1. Update files centric documents belonging to the listed donors
+		// ====================================================================
 		if (state === 'PUBLISHED') {
 			await handleSongPublishedAnalysis(analysis, songServerId);
 		} else {
 			// Unpublish or Suppress
 			await handleSongUnpublishedAnalysis(analysisId, state);
+		}
+
+		// ====================================================================
+		//   2. Update donor centric documents for each listed donors
+		// ====================================================================
+
+		const donorId = analysis.samples[0]?.donor?.donorId;
+		if (donorId) {
+			logger.info(`Updating donor centric document for donor "${donorId}."`);
+			const result = await prepareDonorCentricDocumentById(studyId, donorId);
+
+			if (result.success) {
+				await indexDonorCentricDocument(result.data, studyId);
+			}
+		} else {
+			logger.warn(`Failed to retrieve donorId from analysis event. Cannot update donor centric index for this event.`);
 		}
 
 		logger.info(
