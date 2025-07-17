@@ -49,7 +49,8 @@ export async function indexProgramDonorCentricDocuments(dataCenterId: string, pr
 		logger.error(`Failed to index donors for study.`, error);
 	}
 	logger.info(
-		`Program had ${incompleteCount + completeCount} donors, ${completeCount} were core complete and were indexed.`,
+		`Program had ${incompleteCount +
+			completeCount} donors, ${completeCount} donors are complete with released files and were indexed.`,
 	);
 	logger.info(`Job done for program ${programId}.`);
 }

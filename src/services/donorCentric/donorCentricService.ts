@@ -50,10 +50,9 @@ export async function prepareDonorCentricDocumentById(
 		if (donor) {
 			return prepareDonorCentricDocument(donor);
 		}
-		return failure(
-			'MISSING_CLINICAL_DATA',
-			`No clinical data was found for donor '${donorId}' from program '${programId}'.`,
-		);
+		const errorMessage = `No clinical data was found for donor '${donorId}' from program '${programId}'.`;
+		logger.info(`Unable to create donor centric document for ${donorId}.`, errorMessage);
+		return failure('MISSING_CLINICAL_DATA', errorMessage);
 	} catch (error) {
 		logger.error(error);
 		return failure('SYSTEM_ERROR', 'An unexpected error occurred while fetching data for the donor.');
@@ -76,10 +75,9 @@ export async function prepareDonorCentricDocument(
 		const programId = donor.programId;
 		// 1b. if donor is core complete, we can continue
 		if (donor?.completionStats?.coreCompletionPercentage !== 1) {
-			return failure(
-				'MISSING_CLINICAL_DATA',
-				`Donor ${donorId} does not meet the minimum clinical data submission requirements.`,
-			);
+			const errorMessage = `Donor ${donorId} does not meet the minimum clinical data submission requirements.`;
+			logger.info(`Unable to create donor centric document for Donor ${donorId}.`, errorMessage);
+			return failure('MISSING_CLINICAL_DATA', errorMessage);
 		}
 
 		// 2. fetch files for donor from db
@@ -143,6 +141,7 @@ export async function indexDonorCentricDocument(document: DonorCentricDocument, 
 		? document.donor_id
 		: undefined;
 	await esClient.index({ index: donorCentricIndexName, id, body: document });
+	logger.info(`Successfully indexed donor centric document for Donor ${id}`);
 }
 
 // TODO: Bulk write operation (accept an array of DonorCentric documents)

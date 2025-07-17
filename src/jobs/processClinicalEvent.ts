@@ -22,7 +22,7 @@ async function updateDonorCentricIndexForDonor(donorId: string, programId: strin
 			await indexDonorCentricDocument(result.data, programId);
 		}
 	} catch (error) {
-		logger.warn(`Failed to update donor centric index for donor '${donorId}' in program '${programId}'.`);
+		logger.warn(`Failed to update donor centric index for donor '${donorId}' in program '${programId}'.`, error);
 	}
 }
 
