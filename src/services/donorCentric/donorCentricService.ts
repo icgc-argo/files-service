@@ -43,17 +43,16 @@ const logger = Logger('DonorCentricService');
 export async function prepareDonorCentricDocumentById(
 	programId: string,
 	donorId: string,
-): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR'> {
+): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR' | 'NO_RELEASED_FILES'> {
 	try {
 		// 1. fetch clinical data for donor
 		const donor = await clinical.getDonor(programId, donorId);
 		if (donor) {
 			return prepareDonorCentricDocument(donor);
 		}
-		return failure(
-			'MISSING_CLINICAL_DATA',
-			`No clinical data was found for donor '${donorId}' from program '${programId}'.`,
-		);
+		const errorMessage = `No clinical data was found for donor '${donorId}' from program '${programId}'.`;
+		logger.info(`Unable to create donor centric document for ${donorId}.`, errorMessage);
+		return failure('MISSING_CLINICAL_DATA', errorMessage);
 	} catch (error) {
 		logger.error(error);
 		return failure('SYSTEM_ERROR', 'An unexpected error occurred while fetching data for the donor.');
@@ -70,16 +69,15 @@ export async function prepareDonorCentricDocumentById(
  */
 export async function prepareDonorCentricDocument(
 	donor: ClinicalDonor,
-): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR'> {
+): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR' | 'NO_RELEASED_FILES'> {
 	try {
 		const donorId = donor.donorId;
 		const programId = donor.programId;
 		// 1b. if donor is core complete, we can continue
 		if (donor?.completionStats?.coreCompletionPercentage !== 1) {
-			return failure(
-				'MISSING_CLINICAL_DATA',
-				`Donor ${donorId} does not meet the minimum clinical data submission requirements.`,
-			);
+			const errorMessage = `Donor ${donorId} does not meet the minimum clinical data submission requirements.`;
+			logger.info(`Unable to create donor centric document for Donor ${donorId}.`, errorMessage);
+			return failure('MISSING_CLINICAL_DATA', errorMessage);
 		}
 
 		// 2. fetch files for donor from db
@@ -89,6 +87,13 @@ export async function prepareDonorCentricDocument(
 			files.push(...dbFiles);
 		} catch (error) {
 			logger.warn(`Unable to fetch files from DB for donor '${donorId}'.`, error);
+		}
+
+		// Ensure at least one file for this donor is released
+		if (!files.some(file => file.releaseState === fileService.FileReleaseState.PUBLIC)) {
+			const errorMessage = 'Donor does not have any pubicly released files.';
+			logger.info(`Unable to create donor centric document for Donor ${donorId}.`, errorMessage);
+			return failure('NO_RELEASED_FILES', errorMessage);
 		}
 
 		// 3. fetch analyses for donor from
@@ -143,6 +148,7 @@ export async function indexDonorCentricDocument(document: DonorCentricDocument, 
 		? document.donor_id
 		: undefined;
 	await esClient.index({ index: donorCentricIndexName, id, body: document });
+	logger.info(`Successfully indexed donor centric document for Donor ${id}`);
 }
 
 // TODO: Bulk write operation (accept an array of DonorCentric documents)
