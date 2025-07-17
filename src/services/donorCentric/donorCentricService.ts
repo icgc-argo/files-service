@@ -43,7 +43,7 @@ const logger = Logger('DonorCentricService');
 export async function prepareDonorCentricDocumentById(
 	programId: string,
 	donorId: string,
-): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR'> {
+): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR' | 'NO_RELEASED_FILES'> {
 	try {
 		// 1. fetch clinical data for donor
 		const donor = await clinical.getDonor(programId, donorId);
@@ -69,7 +69,7 @@ export async function prepareDonorCentricDocumentById(
  */
 export async function prepareDonorCentricDocument(
 	donor: ClinicalDonor,
-): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR'> {
+): AsyncResult<DonorCentricDocument, 'MISSING_CLINICAL_DATA' | 'SYSTEM_ERROR' | 'NO_RELEASED_FILES'> {
 	try {
 		const donorId = donor.donorId;
 		const programId = donor.programId;
@@ -87,6 +87,13 @@ export async function prepareDonorCentricDocument(
 			files.push(...dbFiles);
 		} catch (error) {
 			logger.warn(`Unable to fetch files from DB for donor '${donorId}'.`, error);
+		}
+
+		// Ensure at least one file for this donor is released
+		if (!files.some(file => file.releaseState === fileService.FileReleaseState.PUBLIC)) {
+			const errorMessage = 'Donor does not have any pubicly released files.';
+			logger.info(`Unable to create donor centric document for Donor ${donorId}.`, errorMessage);
+			return failure('NO_RELEASED_FILES', errorMessage);
 		}
 
 		// 3. fetch analyses for donor from
