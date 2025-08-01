@@ -27,7 +27,7 @@ import * as releaseService from '../data/releases';
 import { createSnapshot } from '../external/elasticsearch';
 import { sendPublicReleaseMessage, Program } from '../external/kafka/publicReleaseProducer';
 
-import { getIndexer } from './indexer';
+import { getFileCentricIndexer } from './fileCentricIndexer';
 import * as fileManager from './fileManager';
 import { calculateEmbargoStage } from './embargo';
 
@@ -146,7 +146,7 @@ export async function buildActiveRelease(label: string): Promise<void> {
 		});
 
 		// 2. Create public indices for each program (no clone!)
-		const indexer = await getIndexer();
+		const indexer = await getFileCentricIndexer();
 
 		// 2.a If the release already has public indices, remove those so we can build from the existing indices.
 		await indexer.deleteIndices(release.indices);
@@ -261,7 +261,7 @@ export async function publishActiveRelease(): Promise<void> {
 		const filesAdded: File[] = await fileService.getFilesByObjectIds(release.filesAdded);
 		const filesRemoved: File[] = await fileService.getFilesByObjectIds(release.filesRemoved);
 
-		const indexer = await getIndexer();
+		const indexer = await getFileCentricIndexer();
 
 		// 1. Added files - Remove from restricted index
 		await indexer.removeFilesFromRestricted(filesAdded);

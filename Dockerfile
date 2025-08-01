@@ -17,7 +17,7 @@
 #  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #  */
 
-FROM node:12.5.0-alpine as builder
+FROM node:22.12-alpine AS builder
 # Create app directory
 WORKDIR /app
 RUN chown -R node:node /app
@@ -30,7 +30,7 @@ COPY . ./
 RUN npm run build
 
 # Runtime image
-FROM node:12.5.0-alpine
+FROM node:22.12-alpine
 ENV APP_UID=9999
 ENV APP_GID=9999
 RUN apk --no-cache add shadow

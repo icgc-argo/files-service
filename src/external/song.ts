@@ -26,22 +26,84 @@ import Logger from '../logger';
 import { SongAnalysisState, SongAnalysisStates } from '../utils/constants';
 
 import { DataCenter, getDataCenter } from './dataCenterRegistry';
+import { z as zod } from 'zod';
 
 const logger = Logger('Song');
 
-export type SongAnalysis = {
-	analysisId: string;
-	analysisState: string;
-	studyId: string;
-	firstPublishedAt?: string;
-	[k: string]: unknown;
-};
+const songDonorSchema = zod
+	.object({
+		donorId: zod.string(),
+		gender: zod.string(),
+		submitterDonorId: zod.string(),
+	})
+	.passthrough();
+const songSpecimenSchema = zod
+	.object({
+		specimenId: zod.string(),
+		donorId: zod.string(),
+		submitterSpecimenId: zod.string(),
+		tumourNormalDesignation: zod.string(),
+		specimenTissueSource: zod.string(),
+		specimenType: zod.string(),
+	})
+	.passthrough();
+const songSampleSchema = zod
+	.object({
+		sampleId: zod.string(),
+		submitterSampleId: zod.string(),
+		matchedNormalSubmitterSampleId: zod.string().nullable(),
+		sampleType: zod.string(),
+		specimen: songSpecimenSchema,
+		donor: songDonorSchema,
+	})
+	.passthrough();
+const songFileSchema = zod
+	.object({
+		objectId: zod.string(),
+		fileName: zod.string(),
+		fileSize: zod.number(),
+		fileType: zod.string(),
+		fileMd5sum: zod.string(),
+		fileAccess: zod.string(),
+		dataType: zod.string(),
+		info: zod
+			.object({})
+			.passthrough()
+			.optional(),
+	})
+	.passthrough();
 
-type SongResponseAnalysesPage = {
-	analyses: SongAnalysis[];
-	totalAnalyses: number;
-	currentTotalAnalyses: number;
-};
+const songAnalysisSchema = zod
+	.object({
+		analysisId: zod.string(),
+		studyId: zod.string(),
+		analysisState: zod.string(),
+		createdAt: zod.string(),
+		updatedAt: zod.string(),
+		firstPublishedAt: zod.string(),
+		samples: songSampleSchema.array(),
+		files: songFileSchema.array(),
+		analysisType: zod.object({
+			name: zod.string(),
+			version: zod.number(),
+		}),
+		experiment: zod
+			.object({})
+			.passthrough()
+			.optional(),
+	})
+	.passthrough();
+
+export type SongAnalysis = zod.infer<typeof songAnalysisSchema>;
+
+const songResponseAnalysesPageSchema = zod
+	.object({
+		analyses: songAnalysisSchema.array(),
+		totalAnalyses: zod.number(),
+		currentTotalAnalyses: zod.number(),
+	})
+	.passthrough();
+export type SongResponseAnalysesPage = zod.infer<typeof songResponseAnalysesPageSchema>;
 
 type PaginationInputs = {
 	limit: number;
@@ -97,7 +159,7 @@ const fetchAnalysesPage = async (inputs: {
 		const query = querystring.stringify(queryParams);
 		const analysesUrl = urljoin(songUrl, '/studies', studyId, 'analysis', `paginated`, `?${query}`);
 		const response = await fetch(analysesUrl);
-		const data = (await response.json()) as SongResponseAnalysesPage;
+		const data = songResponseAnalysesPageSchema.parse(await response.json());
 		logger.debug('Successfully retrieved analyses from song', {
 			dataCenter: centerId,
 			studyId,
@@ -197,7 +259,7 @@ export const getAnalysesById = async (inputs: {
 	try {
 		const res = await fetch(analysesUrl);
 		if (res.status === 200) {
-			return (await res.json()) as SongAnalysis;
+			return songAnalysisSchema.parse(await res.json());
 		} else {
 			logger.error(`Failure to fetch analysis ${analysisId} for ${studyId} from ${analysesUrl}`);
 			throw new Error(`Unable to retrieve analysis ${analysisId} for ${studyId} from ${analysesUrl}`);

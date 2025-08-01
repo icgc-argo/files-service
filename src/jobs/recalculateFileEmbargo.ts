@@ -19,61 +19,61 @@
 import * as fileService from '../data/files';
 import Logger from '../logger';
 import { updateFileFromExternalSources } from '../services/fileManager';
-import { Indexer, getIndexer } from '../services/indexer';
+import { Indexer, getFileCentricIndexer } from '../services/fileCentricIndexer';
 const logger = Logger('Job:RecalculateFileEmbargo');
 
 async function recalculateFile(file: fileService.File, indexer: Indexer) {
-  try {
-    logger.debug(
-      `checking file`,
-      file.programId,
-      file.fileId,
-      file.embargoStage,
-      file.releaseState,
-      file.embargoStart || '',
-    );
-    const updatedFile = await updateFileFromExternalSources(file);
+	try {
+		logger.debug(
+			`checking file`,
+			file.programId,
+			file.fileId,
+			file.embargoStage,
+			file.releaseState,
+			file.embargoStart || '',
+		);
+		const updatedFile = await updateFileFromExternalSources(file);
 
-    logger.debug(
-      `updatedFile`,
-      file.programId,
-      file.fileId,
-      file.embargoStage,
-      file.releaseState,
-      file.embargoStart || '',
-    );
-    if (updatedFile.embargoStage !== file.embargoStage || updatedFile.releaseState !== file.releaseState) {
-      logger.debug(`file has changed, updating!`);
-      await indexer.updateRestrictedFile(updatedFile);
-    }
-  } catch (err) {
-    logger.error(`Error while recalculating embargo stage for file`, file.fileId, err);
-  }
+		logger.debug(
+			`updatedFile`,
+			file.programId,
+			file.fileId,
+			file.embargoStage,
+			file.releaseState,
+			file.embargoStart || '',
+		);
+		if (updatedFile.embargoStage !== file.embargoStage || updatedFile.releaseState !== file.releaseState) {
+			logger.debug(`file has changed, updating!`);
+			await indexer.updateRestrictedFile(updatedFile);
+		}
+	} catch (err) {
+		logger.error(`Error while recalculating embargo stage for file`, file.fileId, err);
+	}
 }
 
 const recalculateFileEmbargo = async () => {
-  try {
-    logger.info(`Starting!`);
+	try {
+		logger.info(`Starting!`);
 
-    const indexer = await getIndexer();
+		const indexer = await getFileCentricIndexer();
 
-    const fileCount = await fileService.countFiles({});
-    logger.debug(`total files: ${fileCount}`);
+		const fileCount = await fileService.countFiles({});
+		logger.debug(`total files: ${fileCount}`);
 
-    for await (const file of fileService.getAllFiles()) {
-      await recalculateFile(file, indexer);
-    }
+		for await (const file of fileService.getAllFiles()) {
+			await recalculateFile(file, indexer);
+		}
 
-    logger.info(`Indexing updated restricted files`);
-    indexer.release();
+		logger.info(`Indexing updated restricted files`);
+		indexer.release();
 
-    logger.info(`Finished!`);
-  } catch (e) {
-    if (e instanceof Error) {
-      logger.error(`Recalculate file embargo job threw error:`, e.message, e.stack);
-    } else {
-      logger.error(`Recalculate file embargo job failed:`, e);
-    }
-  }
+		logger.info(`Finished!`);
+	} catch (e) {
+		if (e instanceof Error) {
+			logger.error(`Recalculate file embargo job threw error:`, e.message, e.stack);
+		} else {
+			logger.error(`Recalculate file embargo job failed:`, e);
+		}
+	}
 };
 export default recalculateFileEmbargo;

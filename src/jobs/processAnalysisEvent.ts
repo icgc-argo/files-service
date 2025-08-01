@@ -16,22 +16,27 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
-import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
-import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
-import { isRestricted } from '../services/utils/fileUtils';
-import { getIndexer } from '../services/indexer';
-import * as fileService from '../data/files';
 import PromisePool from '@supercharge/promise-pool';
+import * as fileService from '../data/files';
+import { convertAnalysesToFileDocuments } from '../external/analysisConverter';
+import AnalysisUpdateEvent from '../external/kafka/messages/AnalysisUpdateEvent';
+import { getFileCentricIndexer } from '../services/fileCentricIndexer';
+import { saveAndIndexFilesFromRdpcData } from '../services/fileManager';
+import { updateFileFromExternalSources } from '../services/fileManager';
+import { isRestricted } from '../services/utils/fileUtils';
 
 import Logger from '../logger';
+import {
+	indexDonorCentricDocument,
+	prepareDonorCentricDocumentById,
+} from '../services/donorCentric/donorCentricService';
 const logger = Logger('Job:ProcessAnalysisEvent');
 
 async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) {
-  const rdpcFileDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
-  const indexer = await getIndexer();
-  await saveAndIndexFilesFromRdpcData(rdpcFileDocuments, dataCenterId, indexer);
-  await indexer.release();
+	const rdpcFileDocuments = await convertAnalysesToFileDocuments([analysis], dataCenterId);
+	const indexer = await getFileCentricIndexer();
+	await saveAndIndexFilesFromRdpcData(rdpcFileDocuments, dataCenterId, indexer);
+	await indexer.release();
 }
 
 /**
@@ -42,31 +47,31 @@ async function handleSongPublishedAnalysis(analysis: any, dataCenterId: string) 
  * @param status
  */
 async function handleSongUnpublishedAnalysis(analysisId: string, status: string): Promise<void> {
-  // Get files based on analysis ID
-  // TODO: This should create the file if we don't have it yet
-  const files = await fileService.getFilesByAnalysisId(analysisId);
-  if (files.length === 0) {
-    logger.info(`No stored files for analysis ${analysisId}. No processing to do.`);
-    return;
-  }
+	// Get files based on analysis ID
+	// TODO: This should create the file if we don't have it yet
+	const files = await fileService.getFilesByAnalysisId(analysisId);
+	if (files.length === 0) {
+		logger.info(`No stored files for analysis ${analysisId}. No processing to do.`);
+		return;
+	}
 
-  logger.info(`Updating Song status to ${status} for files ${files.map(file => file.objectId)}`);
-  await PromisePool.withConcurrency(10)
-    .for(files)
-    .handleError((error, file) => {
-      logger.error(`Failure updating file ${file.objectId} status to ${status}: ${error}`);
-    })
-    .process(async file => {
-      await fileService.updateFileSongPublishStatus(file.objectId, { status });
-    });
+	logger.info(`Updating Song status to ${status} for files ${files.map(file => file.objectId)}`);
+	await PromisePool.withConcurrency(10)
+		.for(files)
+		.handleError((error, file) => {
+			logger.error(`Failure updating file ${file.objectId} status to ${status}: ${error}`);
+		})
+		.process(async file => {
+			await fileService.updateFileSongPublishStatus(file.objectId, { status });
+		});
 
-  // Remove these files from the restricted indices
-  const restrictedFiles = files.filter(isRestricted);
-  if (restrictedFiles.length) {
-    const indexer = await getIndexer();
-    await indexer.removeFilesFromRestricted(files);
-    await indexer.release();
-  }
+	// Remove these files from the restricted indices
+	const restrictedFiles = files.filter(isRestricted);
+	if (restrictedFiles.length) {
+		const indexer = await getFileCentricIndexer();
+		await indexer.removeFilesFromRestricted(files);
+		await indexer.release();
+	}
 }
 
 /**
@@ -74,25 +79,44 @@ async function handleSongUnpublishedAnalysis(analysisId: string, status: string)
  * @param analysisEvent
  */
 const processAnalysisEvent = async (analysisEvent: AnalysisUpdateEvent): Promise<void> => {
-  const { analysis, analysisId, state, songServerId } = analysisEvent;
+	const { analysis, analysisId, state, songServerId, studyId } = analysisEvent;
 
-  try {
-    logger.info(
-      `START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
-    );
+	try {
+		logger.info(
+			`START - processing song analysis event from data-center ${songServerId} for analysisId ${analysisId} with state ${state}`,
+		);
 
-    if (state === 'PUBLISHED') {
-      await handleSongPublishedAnalysis(analysis, songServerId);
-    } else {
-      // Unpublish or Suppress
-      await handleSongUnpublishedAnalysis(analysisId, state);
-    }
+		// ====================================================================
+		//   1. Update files centric documents belonging to the listed donors
+		// ====================================================================
+		if (state === 'PUBLISHED') {
+			await handleSongPublishedAnalysis(analysis, songServerId);
+		} else {
+			// Unpublish or Suppress
+			await handleSongUnpublishedAnalysis(analysisId, state);
+		}
 
-    logger.info(
-      `DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
-    );
-  } catch (e) {
-    logger.error(`FAILURE - processing analysis event failed`, e);
-  }
+		// ====================================================================
+		//   2. Update donor centric documents for each listed donors
+		// ====================================================================
+
+		const donorId = analysis.samples[0]?.donor?.donorId;
+		if (donorId) {
+			logger.info(`Updating donor centric document for donor "${donorId}."`);
+			const result = await prepareDonorCentricDocumentById(studyId, donorId);
+
+			if (result.success) {
+				await indexDonorCentricDocument(result.data, studyId);
+			}
+		} else {
+			logger.warn(`Failed to retrieve donorId from analysis event. Cannot update donor centric index for this event.`);
+		}
+
+		logger.info(
+			`DONE - processing song analysis event from data-center ${songServerId} for analysisId ${analysis.analysisId}`,
+		);
+	} catch (e) {
+		logger.error(`FAILURE - processing analysis event failed`, e);
+	}
 };
 export default processAnalysisEvent;

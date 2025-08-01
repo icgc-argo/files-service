@@ -1,0 +1,112 @@
+
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table donors {
+  donor_id keyword [pk, not null]
+  submitter_donor_id keyword
+
+  program_id keyword [not null]
+  gender keyword
+
+  vital_status keyword
+  cause_of_death keyword
+  survival_time number
+  primary_site keyword[]
+  height number
+  weight number
+  bmi number
+  generic_disorders keyword[]
+  menopause_status keyword
+  age_at_menarche number
+  number_of_pregnancies number
+  number_of_children number
+  hrt_type keyword
+  contraception_type keyword
+  lost_to_followup_after_clinical_event_id keyword
+  country_of_residence_at_enrollment keyword
+  
+  updated_at date [not null]
+}
+
+Table specimens {
+  specimen_id keyword [pk, not null]
+  submitter_specimen_id keyword
+  donor_id keyword [ref: > donors.donor_id, not null]
+  
+  specimen_tissue_source keyword
+  tumour_normal_designation keyword
+  specimen_type keyword
+
+  pathological_tumour_staging_system keyword
+  pathological_t_category keyword
+  pathological_n_category keyword
+  pathological_m_category keyword
+  pathological_stage_group keyword
+  specimen_acquisition_interval integer
+  tumour_histological_type keyword
+  specimen_anatomic_location keyword
+  specimen_laterality keyword
+  specimen_processing keyword
+  specimen_storage keyword
+  reference_pathology_confirmed keyword
+  tumour_grading_system keyword
+  tumour_grade keyword
+  percent_tumour_cells float
+  percent_tumour_cells_measurement_method keyword
+  percent_proliferating_cells float
+  percent_inflammatory_tissue float
+  percent_stromal_cells float
+  percent_necrosis float
+}
+
+Table samples {
+  sample_id keyword [pk, not null]
+  submitter_sample_id keyword
+  specimen_id keyword [ref: > specimens.specimen_id, not null]
+
+  sample_type keyword
+  matched_normal_submitter_sample_id keyword
+ }
+
+Table analyses {
+  analysis_id keyword [pk, not null]
+  donor_id keyword [ref: > donors.donor_id, not null]
+
+  analysis_type keyword
+  analysis_version integer
+  repo_id keyword
+  first_published Date
+  embargo_stage keyword
+
+  experiment__experimental_strategy keyword
+  platform__experimental_strategy keyword
+  workflow__workflow_name keyword
+  workflow__workflow_version keyword
+  analysis_tools keyword
+
+
+  data_category keyword
+  data_subtype keyword[]
+  description text
+}
+
+Table files {
+  file_id keyword [pk, not null]
+  file_number integer
+  analysis_id keyword [ref: > analyses.analysis_id, not null]
+  
+  file_type keyword
+  object_id keyword
+  name text
+  md5_sum keyword
+  size long
+  files_in_tgz text[]
+
+  index_file__file_type keyword
+  index_file__object_id keyword
+  index_file__name text
+  index_file__md5_sum keyword
+  index_file__size long
+  
+}

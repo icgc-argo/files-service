@@ -43,7 +43,7 @@ import { SongAnalysisStates } from '../utils/constants';
 import * as dcGateway from '../external/dataCenterGateway';
 import { calculateEmbargoStage, calculateEmbargoStartDate } from './embargo';
 import { buildDocument, FileCentricDocument } from './fileCentricDocument';
-import { Indexer } from './indexer';
+import { Indexer } from './fileCentricIndexer';
 
 import Logger from '../logger';
 const logger = Logger('FileManager');
