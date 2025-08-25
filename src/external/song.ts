@@ -210,7 +210,11 @@ export async function* getAnalysesByStudy(details: {
 	studyId: string;
 }): AsyncGenerator<SongAnalysis[]> {
 	try {
-		const dataCenter = await getDataCenter(details.dataCenterId);
+		const dataCenterResult = await getDataCenter(details.dataCenterId);
+		if (!dataCenterResult.success) {
+			throw new Error(dataCenterResult.message);
+		}
+		const dataCenter = dataCenterResult.data;
 
 		const {
 			datacenter: { songPageSize },
@@ -246,7 +250,11 @@ export const getAnalysesById = async (inputs: {
 	analysisId: string;
 }): Promise<SongAnalysis> => {
 	const { dataCenterId, studyId, analysisId } = inputs;
-	const dataCenter = await getDataCenter(dataCenterId);
+	const dataCenterResult = await getDataCenter(dataCenterId);
+	if (!dataCenterResult.success) {
+		throw new Error(dataCenterResult.message);
+	}
+	const dataCenter = dataCenterResult.data;
 	const analysisStates = Object.values(SongAnalysisStates).join(',');
 	const analysesUrl = urljoin(
 		dataCenter.songUrl,

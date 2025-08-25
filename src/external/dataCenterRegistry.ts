@@ -28,6 +28,8 @@ import { isArray, isObjectLike, isString } from 'lodash';
 import urljoin from 'url-join';
 import { getAppConfig } from '../config';
 import Logger from '../logger';
+import AsyncCache from '../utils/asyncCache';
+import { failure, success, AsyncResult } from '../types/Result';
 const logger = Logger('DataCenterRegistry');
 
 export interface DataCenter {
@@ -44,12 +46,27 @@ const getPlaceholder = async () => ({
 	songUrl: (await getAppConfig()).datacenter.url,
 });
 
+// Cache results of fetching donor data from clinical service. Keep cached results for 5 minutes.
+const DATACENTER_FETCH_CACHE = AsyncCache((inputs: { dataCenterId: string }) => fetchDataCenter(inputs.dataCenterId), {
+	expiryTime: 5 * 60 * 1000,
+});
+
+/**
+ * Retrieve donor information from clinical service with cached results to prevent redundant fetching
+ * @param programId
+ * @param donorId
+ * @returns
+ */
+export async function getDataCenter(dataCenterId: string): AsyncResult<DataCenter> {
+	return DATACENTER_FETCH_CACHE.get({ dataCenterId });
+}
+
 /**
  * Retrieves connection details for a data center by ID
  * @param dataCenterId
  * @returns
  */
-export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> => {
+const fetchDataCenter = async (dataCenterId: string): AsyncResult<DataCenter> => {
 	const config = await getAppConfig();
 	try {
 		const requestUrl = urljoin(config.datacenter.registryUrl, 'data-centers', dataCenterId);
@@ -59,17 +76,19 @@ export const getDataCenter = async (dataCenterId: string): Promise<DataCenter> =
 		const data = await response.json();
 
 		if (isDataCenter(data)) {
-			return data;
+			return success(data);
 		}
 
-		throw new Error(
+		logger.error(`Failed to fetch Data Centers ${dataCenterId}. Received: ${JSON.stringify(data)}`);
+		return failure(
+			'NOT_FOUND',
 			`Response object returned for Data Center is badly formed or missing a required field. Response data: ${JSON.stringify(
 				data,
 			)}`,
 		);
 	} catch (e) {
 		logger.error(`Failed to fetch Data Centers ${dataCenterId}: ${e}`);
-		throw e;
+		return failure('NETWORK_ERROR', `${e}`);
 	}
 };
 

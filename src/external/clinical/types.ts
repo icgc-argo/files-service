@@ -52,6 +52,7 @@ export const ClinicalDonor = zod
 		donorId: zod.string(),
 		gender: zod.string(),
 		programId: zod.string(),
+		clinicalInfo: zod.object({}).passthrough(),
 
 		submitterId: zod.string(),
 		createdAt: zod.string(),

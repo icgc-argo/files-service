@@ -36,7 +36,11 @@ const logger = Logger('Job:ReindexDataCenter');
 async function reindexDataCenter(dataCenterId: string, studyFilter: string[]) {
 	try {
 		logger.info(`Start: reindex data center ${dataCenterId}`);
-		const { songUrl } = await getDataCenter(dataCenterId);
+		const dataCenterResult = await getDataCenter(dataCenterId);
+		if (!dataCenterResult.success) {
+			throw new Error(dataCenterResult.message);
+		}
+		const { songUrl } = dataCenterResult.data;
 		logger.info(`Datacenter URL: ${songUrl}`);
 		const studies: string[] = await getStudies(songUrl);
 		const filteredStudies: string[] =

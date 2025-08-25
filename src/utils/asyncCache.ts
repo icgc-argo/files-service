@@ -18,20 +18,20 @@
  */
 
 export type AsyncCache<Data, Inputs> = {
-  clear: (inputs: Inputs) => void;
-  get: (inputs: Inputs) => Promise<Data>;
+	clear: (inputs: Inputs) => void;
+	get: (inputs: Inputs) => Promise<Data>;
 };
 
 export type FetchCache<T> =
-  | {
-      active: false;
-      data: T;
-      expiry: number;
-    }
-  | {
-      active: true;
-      promise: Promise<T>;
-    };
+	| {
+			active: false;
+			data: T;
+			expiry: number;
+	  }
+	| {
+			active: true;
+			promise: Promise<T>;
+	  };
 
 /**
  * Create an AsyncCache.
@@ -52,53 +52,53 @@ export type FetchCache<T> =
  * @param action (inputs: Inputs) => Promise<Data>
  * @param options {hashFunction?: (inputs: Inputs) => string; expiryTime?: number}
  */
-const AsyncCache = <Data, Inputs>(
-  action: (inputs: Inputs) => Promise<Data>,
-  options?: { hashFunction?: (inputs: Inputs) => string; expiryTime?: number },
+const AsyncCache = <Data, Inputs extends object>(
+	action: (inputs: Inputs) => Promise<Data>,
+	options?: { hashFunction?: (inputs: Inputs) => string; expiryTime?: number },
 ): AsyncCache<Data, Inputs> => {
-  // apply defaults for undefined options
-  const _hashFunction = options?.hashFunction !== undefined ? options.hashFunction : (i: Inputs) => JSON.stringify(i);
-  const _expiryTime = options?.expiryTime !== undefined ? options.expiryTime : 60 * 1000 * 60; // One hour default expiry time
+	// apply defaults for undefined options
+	const _hashFunction = options?.hashFunction !== undefined ? options.hashFunction : (i: Inputs) => JSON.stringify(i);
+	const _expiryTime = options?.expiryTime !== undefined ? options.expiryTime : 60 * 1000 * 60; // One hour default expiry time
 
-  // initialize in memory cache
-  const CACHE: Record<string, FetchCache<Data>> = {};
+	// initialize in memory cache
+	const CACHE: Record<string, FetchCache<Data>> = {};
 
-  // clear - remove cached value
-  const clear = (inputs: Inputs): void => {
-    const hash = _hashFunction(inputs);
-    delete CACHE['hash'];
-    return;
-  };
+	// clear - remove cached value
+	const clear = (inputs: Inputs): void => {
+		const hash = _hashFunction(inputs);
+		delete CACHE['hash'];
+		return;
+	};
 
-  // get - cached action resolver
-  const get = async (inputs: Inputs): Promise<Data> => {
-    const hash = _hashFunction(inputs);
+	// get - cached action resolver
+	const get = async (inputs: Inputs): Promise<Data> => {
+		const hash = _hashFunction(inputs);
 
-    const actionWithCaching = async () => {
-      const promise = new Promise<Data>(async (resolve, _) => {
-        const response = await action(inputs);
-        CACHE[hash] = { active: false, data: response, expiry: Date.now() + _expiryTime };
-        resolve(response);
-      });
-      CACHE[hash] = { active: true, promise };
-      return promise;
-    };
+		const actionWithCaching = async () => {
+			const promise = new Promise<Data>(async (resolve, _) => {
+				const response = await action(inputs);
+				CACHE[hash] = { active: false, data: response, expiry: Date.now() + _expiryTime };
+				resolve(response);
+			});
+			CACHE[hash] = { active: true, promise };
+			return promise;
+		};
 
-    const cacheHit = CACHE[hash] || undefined;
+		const cacheHit = CACHE[hash] || undefined;
 
-    if (cacheHit) {
-      if (cacheHit.active) {
-        return cacheHit.promise;
-      } else if (cacheHit.expiry < Date.now()) {
-        return actionWithCaching();
-      } else {
-        return cacheHit.data;
-      }
-    } else {
-      return actionWithCaching();
-    }
-  };
+		if (cacheHit) {
+			if (cacheHit.active) {
+				return cacheHit.promise;
+			} else if (cacheHit.expiry < Date.now()) {
+				return actionWithCaching();
+			} else {
+				return cacheHit.data;
+			}
+		} else {
+			return actionWithCaching();
+		}
+	};
 
-  return { clear, get };
+	return { clear, get };
 };
 export default AsyncCache;
