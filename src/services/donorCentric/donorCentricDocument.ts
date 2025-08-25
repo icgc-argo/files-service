@@ -531,7 +531,7 @@ export function buildDonorCentricDocument({
 		submitter_donor_id: donor.submitterId,
 		study_id: donor.programId,
 		updated_at: donor.updatedAt,
-		...donor.clinicalData,
+		...donor.clinicalInfo,
 
 		exposure: extractDonorExposureData(donor),
 		family_history: extractDonorFamilyHistoryData(donor),
