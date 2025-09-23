@@ -67,7 +67,17 @@ const songFileSchema = zod
 		fileAccess: zod.string(),
 		dataType: zod.string(),
 		info: zod
-			.object({})
+			.object({
+				data_category: zod.string().optional(),
+				analysis_tools: zod
+					.string()
+					.array()
+					.optional(),
+			})
+			.passthrough()
+			.optional(),
+		workflow: zod
+			.object({ workflow_name: zod.string().optional(), workflow_version: zod.string().optional() })
 			.passthrough()
 			.optional(),
 	})

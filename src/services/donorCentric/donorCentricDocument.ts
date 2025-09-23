@@ -48,6 +48,10 @@ const fileSchema = z.object({
 	md5sum: esKeyword,
 	name: esKeyword,
 	object_id: esKeyword,
+	workflow: z
+		.object({ workflow_name: esKeyword, workflow_version: esKeyword })
+		.partial()
+		.nullish(),
 	size: esNumber,
 });
 
@@ -286,7 +290,6 @@ type SpecimenData = z.infer<typeof sampleSchema>;
 
 const specimenSchema = z.object({
 	specimen_id: esKeyword,
-	samples: sampleSchema.array().nullish(),
 	submitter_specimen_id: esKeyword,
 	pathological_m_category: esKeyword,
 	pathological_n_category: esKeyword,
@@ -462,10 +465,15 @@ function extractDonorSpecimenData(donor: ClinicalDonor): DonorCentricDocument['s
 			};
 		});
 		// parse with schema to strip out unknown properties. will fail if values are the wrong types, but not if they are missing.
-		const parseResult = treatmentSchema.safeParse(specimenObj.clinicalInfo);
+		const parseResults = treatmentSchema.safeParse(specimenObj.clinicalInfo);
 		return {
-			...(parseResult.success ? parseResult.data : {}),
+			...(parseResults.success ? parseResults.data : {}),
+			samples,
+			specimen_tissue_source: specimenObj.specimenTissueSource,
+			submitter_specimen_id: specimenObj.specimenId,
 			specimen_id: specimenObj.specimenId,
+			tumour_normal_designation: specimenObj.tumourNormalDesignation,
+			specimen_type: specimenObj.specimenType,
 		};
 	});
 
@@ -487,7 +495,7 @@ export function buildDonorCentricDocument({
 		const analysisId = analysis.analysisId;
 		// const filesRecords = groupedFiles[analysisId] || [];
 		const fileData: FileData[] = analysis.files
-			.map<FileData | undefined>(file => {
+			.map<FileData | undefined>(analysisFile => {
 				const matchingFileRecord = files.find(fileRecord => fileRecord.analysisId === analysisId);
 				if (!matchingFileRecord) {
 					return undefined;
@@ -496,11 +504,19 @@ export function buildDonorCentricDocument({
 				return {
 					file_id: matchingFileRecord.fileId,
 					file_number: matchingFileRecord.fileNumber,
-					object_id: file.objectId,
-					md5sum: file.fileMd5sum,
-					file_type: file.fileType,
-					name: file.fileName,
-					size: file.fileSize,
+
+					analysis_tools: analysisFile.info?.analysis_tools,
+					data_category: analysisFile.info?.data_category,
+					file_access: analysisFile.fileAccess,
+					file_type: analysisFile.fileType,
+					md5sum: analysisFile.fileMd5sum,
+					name: analysisFile.fileName,
+					object_id: analysisFile.objectId,
+					size: analysisFile.fileSize,
+					workflow: {
+						workflow_name: analysisFile.workflow?.workflow_name,
+						workflow_version: analysisFile.workflow?.workflow_version,
+					},
 				};
 			})
 			.filter(element => !!element);

@@ -349,7 +349,7 @@
 			"follow_ups": {
 				"type": "nested",
 				"properties": {
-					"anatomic_site_progression_or_recurrences": {
+					"anatomic_site_progression_or_recurrence": {
 						"type": "keyword"
 					},
 					"disease_status_at_followup": {
