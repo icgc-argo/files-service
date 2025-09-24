@@ -91,7 +91,7 @@ export async function prepareDonorCentricDocument(
 
 		// Ensure at least one file for this donor is released
 		if (!files.some(file => file.releaseState === fileService.FileReleaseState.PUBLIC)) {
-			const errorMessage = 'Donor does not have any pubicly released files.';
+			const errorMessage = 'Donor does not have any publicly released files.';
 			logger.info(`Unable to create donor centric document for Donor ${donorId}.`, errorMessage);
 			return failure('NO_RELEASED_FILES', errorMessage);
 		}
