@@ -48,10 +48,6 @@ const fileSchema = z.object({
 	md5sum: esKeyword,
 	name: esKeyword,
 	object_id: esKeyword,
-	workflow: z
-		.object({ workflow_name: esKeyword, workflow_version: esKeyword })
-		.partial()
-		.nullish(),
 	size: esNumber,
 });
 
@@ -465,7 +461,7 @@ function extractDonorSpecimenData(donor: ClinicalDonor): DonorCentricDocument['s
 			};
 		});
 		// parse with schema to strip out unknown properties. will fail if values are the wrong types, but not if they are missing.
-		const parseResults = treatmentSchema.safeParse(specimenObj.clinicalInfo);
+		const parseResults = specimenSchema.safeParse(specimenObj.clinicalInfo);
 		return {
 			...(parseResults.success ? parseResults.data : {}),
 			samples,
@@ -513,10 +509,6 @@ export function buildDonorCentricDocument({
 					name: analysisFile.fileName,
 					object_id: analysisFile.objectId,
 					size: analysisFile.fileSize,
-					workflow: {
-						workflow_name: analysisFile.workflow?.workflow_name,
-						workflow_version: analysisFile.workflow?.workflow_version,
-					},
 				};
 			})
 			.filter(element => !!element);
@@ -536,6 +528,11 @@ export function buildDonorCentricDocument({
 
 			// TODO: add repository information to the function input
 			repositories: [],
+
+			workflow: {
+				workflow_name: analysis.workflow?.workflow_name,
+				workflow_version: analysis.workflow?.workflow_version,
+			},
 		};
 	});
 

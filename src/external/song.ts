@@ -76,10 +76,6 @@ const songFileSchema = zod
 			})
 			.passthrough()
 			.optional(),
-		workflow: zod
-			.object({ workflow_name: zod.string().optional(), workflow_version: zod.string().optional() })
-			.passthrough()
-			.optional(),
 	})
 	.passthrough();
 
@@ -99,6 +95,10 @@ const songAnalysisSchema = zod
 		}),
 		experiment: zod
 			.object({})
+			.passthrough()
+			.optional(),
+		workflow: zod
+			.object({ workflow_name: zod.string().optional(), workflow_version: zod.string().optional() })
 			.passthrough()
 			.optional(),
 	})
