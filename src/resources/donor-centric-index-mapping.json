@@ -293,7 +293,7 @@
 						"type": "float"
 					},
 					"percent_tumour_cells_measurement_method": {
-						"type": "float"
+						"type": "keyword"
 					},
 					"primary_diagnosis_id": {
 						"type": "keyword"
