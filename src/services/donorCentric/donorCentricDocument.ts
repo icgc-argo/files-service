@@ -461,7 +461,7 @@ function extractDonorSpecimenData(donor: ClinicalDonor): DonorCentricDocument['s
 			};
 		});
 		// parse with schema to strip out unknown properties. will fail if values are the wrong types, but not if they are missing.
-		const parseResults = specimenSchema.safeParse(specimenObj.clinicalInfo);
+		const parseResults = specimenSchema.safeParse(stripNulls(specimenObj.clinicalInfo));
 		return {
 			...(parseResults.success ? parseResults.data : {}),
 			samples,
