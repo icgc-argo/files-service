@@ -529,10 +529,10 @@ export function buildDonorCentricDocument({
 			// TODO: add repository information to the function input
 			repositories: [],
 
-			workflow: {
+			workflow: stripNulls({
 				workflow_name: analysis.workflow?.workflow_name,
 				workflow_version: analysis.workflow?.workflow_version,
-			},
+			}),
 		};
 	});
 
