@@ -98,7 +98,10 @@ const songAnalysisSchema = zod
 			.passthrough()
 			.optional(),
 		workflow: zod
-			.object({ workflow_name: zod.string().optional(), workflow_version: zod.string().optional() })
+			.object({
+				workflow_name: zod.string().nullish(),
+				workflow_version: zod.string().nullish(),
+			})
 			.passthrough()
 			.optional(),
 	})
