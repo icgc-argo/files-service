@@ -513,8 +513,8 @@ export function buildDonorCentricDocument({
 			})
 			.filter(element => !!element);
 
-		const experiment = analysis.experiment ? { ...analysis.experiment } : {};
-		const metrics = analysis.metrics ? { ...analysis.metrics } : {};
+		const experiment = analysis.experiment ? stripNulls({ ...analysis.experiment }) : {};
+		const metrics = analysis.metrics ? stripNulls({ ...analysis.metrics }) : {};
 
 		return {
 			analysis_id: analysis.analysisId,
