@@ -31,10 +31,16 @@ const esKeyword = z
 	.string()
 	.or(z.string().array())
 	.nullish();
-const esNumber = z
-	.number()
-	.or(z.number().array())
-	.nullish();
+
+// Due to clinical exceptions, some numeric fields will be stored as empty strings when no numberic value is available
+// In order to handle this, we pre-process the values to transform empty string values into null.
+const esNumber = z.preprocess(
+	value => (value === '' ? null : value),
+	z
+		.number()
+		.or(z.number().array())
+		.nullish(),
+);
 
 const fileSchema = z.object({
 	file_id: esKeyword,
@@ -513,8 +519,8 @@ export function buildDonorCentricDocument({
 			})
 			.filter(element => !!element);
 
-		const experiment = analysis.experiment ? { ...analysis.experiment } : {};
-		const metrics = analysis.metrics ? { ...analysis.metrics } : {};
+		const experiment = analysis.experiment ? stripNulls({ ...analysis.experiment }) : {};
+		const metrics = analysis.metrics ? stripNulls({ ...analysis.metrics }) : {};
 
 		return {
 			analysis_id: analysis.analysisId,
