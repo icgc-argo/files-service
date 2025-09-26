@@ -33,9 +33,9 @@ const esKeyword = z
 	.nullish();
 
 // Due to clinical exceptions, some numeric fields will be stored as empty strings when no numberic value is available
-// In order to handle this, we pre-process the values to transform empty string values into null.
+// In order to handle this, we pre-process the values to make empty string values undefined.
 const esNumber = z.preprocess(
-	value => (value === '' ? null : value),
+	value => (value === '' ? undefined : value),
 	z
 		.number()
 		.or(z.number().array())
