@@ -33,10 +33,12 @@ export async function indexProgramDonorCentricDocuments(dataCenterId: string, pr
 	logger.info(`Beginning job for program ${programId}.`);
 	let incompleteCount = 0;
 	let completeCount = 0;
+	let totalDonors = 0;
 	try {
-		const donorGenerator = clinical.fetchAllDonorsForProgram(programId);
+		const donors = await clinical.fetchAllDonorsForProgram(programId);
+		totalDonors = donors.length;
 
-		for await (const donor of donorGenerator) {
+		for await (const donor of donors) {
 			const documentResult = await prepareDonorCentricDocument(donor);
 			if (documentResult.success) {
 				completeCount++;
@@ -48,9 +50,6 @@ export async function indexProgramDonorCentricDocuments(dataCenterId: string, pr
 	} catch (error) {
 		logger.error(`Failed to index donors for study.`, error);
 	}
-	logger.info(
-		`Program had ${incompleteCount +
-			completeCount} donors, ${completeCount} donors are complete with released files and were indexed.`,
-	);
+	logger.info(`Program had ${totalDonors} donors, ${completeCount} donors were indexed succesfully.`);
 	logger.info(`Job done for program ${programId}.`);
 }
