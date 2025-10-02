@@ -20,7 +20,7 @@
 import { z as zod } from 'zod';
 
 //  Record<string, string | number | boolean | undefined>;
-export const ClinicalInfo = zod.record(zod.union([zod.string(), zod.number(), zod.boolean()]).optional());
+export const ClinicalInfo = zod.record(zod.union([zod.string(), zod.number(), zod.boolean()]).optional()).optional();
 
 export const ClinicalSample = zod.object({
 	clinicalInfo: ClinicalInfo,

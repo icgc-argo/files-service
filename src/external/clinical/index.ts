@@ -31,8 +31,8 @@ const logger = Logger('Clinical');
 
 // Cache results of fetching donor data from clinical service. Keep cached results for 5 minutes.
 const DONOR_FETCH_CACHE = AsyncCache(
-  (inputs: { programId: string; donorId: string }) => fetchDonor(inputs.programId, inputs.donorId),
-  { expiryTime: 5 * 60 * 1000 },
+	(inputs: { programId: string; donorId: string }) => fetchDonor(inputs.programId, inputs.donorId),
+	{ expiryTime: 5 * 60 * 1000 },
 );
 
 /**
@@ -42,7 +42,7 @@ const DONOR_FETCH_CACHE = AsyncCache(
  * @returns
  */
 export async function getDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
-  return DONOR_FETCH_CACHE.get({ programId, donorId });
+	return DONOR_FETCH_CACHE.get({ programId, donorId });
 }
 
 /**
@@ -52,94 +52,166 @@ export async function getDonor(programId: string, donorId: string): Promise<Clin
  * @returns
  */
 async function fetchDonor(programId: string, donorId: string): Promise<ClinicalDonor | undefined> {
-  const config = await getAppConfig();
-  try {
-    logger.debug(`fetchDonor()`, `Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
-    const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donor', donorId);
-    const response = await fetch(requestUrl, {
-      headers: {
-        Authorization: `Bearer ${await getEgoToken()}`,
-      },
-    });
+	const config = await getAppConfig();
+	try {
+		logger.debug(`fetchDonor()`, `Fetcing clinical data for ${JSON.stringify({ programId, donorId })}`);
+		const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donor', donorId);
+		const response = await fetch(requestUrl, {
+			headers: {
+				Authorization: `Bearer ${await getEgoToken()}`,
+			},
+		});
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`HTTP Error Response: ${response.status} ${errorBody}`);
-    }
+		if (!response.ok) {
+			const errorBody = await response.text();
+			throw new Error(`HTTP Error Response: ${response.status} ${errorBody}`);
+		}
 
-    const rawDonor = await response.json();
-    const parsedDonor = ClinicalDonor.safeParse(rawDonor);
-    if (parsedDonor.success) {
-      return parsedDonor.data;
-    } else {
-      logger.error(`fetchDonor()`, `Error validating result from fetched donor`, parsedDonor.error);
-      return undefined;
-    }
-  } catch (e) {
-    logger.warn(`fetchDonor()`, `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`, <Error>e);
-    return undefined;
-  }
+		const rawDonor = await response.json();
+		const parsedDonor = ClinicalDonor.safeParse(rawDonor);
+		if (parsedDonor.success) {
+			return parsedDonor.data;
+		} else {
+			logger.error(`fetchDonor()`, `Error validating result from fetched donor`, parsedDonor.error);
+			return undefined;
+		}
+	} catch (e) {
+		logger.warn(`fetchDonor()`, `Error fetching clinical data for ${JSON.stringify({ programId, donorId })}`, <Error>e);
+		return undefined;
+	}
 }
 
-export async function* fetchAllDonorsForProgram(programId: string): AsyncGenerator<ClinicalDonor> {
-  const config = await getAppConfig();
+export async function fetchAllDonorsForProgram(programId: string): Promise<ClinicalDonor[]> {
+	const config = await getAppConfig();
 
-  logger.debug(`fetchAllDonorsForProgram()`, `Begining fetch of all donors for program: ${programId}`);
+	logger.debug(`fetchAllDonorsForProgram()`, `Begining fetch of all donors for program: ${programId}`);
 
-  const logFrequency = 100;
+	const logFrequency = 100;
 
-  const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donors');
-  const response = await fetch(requestUrl, {
-    headers: {
-      Authorization: `Bearer ${await getEgoToken()}`,
-    },
-  });
-  // Expected response is json-lines: new line delimited JSON documents that will be streamed in chunks
-  // The next section turns the body response stream into an async iterator
-  let donorCount = 0;
-  let unprocessedResponse = '';
-  for await (const chunk of response.body) {
-    let leftovers = '';
-    unprocessedResponse += chunk;
-    const splitResponse = unprocessedResponse.split('\n');
-    const donors = splitResponse
-      .filter(chunk => {
-        // occasionally in testing an empty item was found in the split response so lets filter those out.
-        return !_.isEmpty(chunk);
-      })
-      .map(chunk => {
-        try {
-          return JSON.parse(chunk);
-        } catch (err) {
-          if (err instanceof SyntaxError) {
-            // In practice, the response stream can include partial messages, likely because the packet size is smaller than the donors
-            // So we will capture the partial response and combine it with the next message.
-            leftovers += chunk;
-            return undefined;
-          } else {
-            // Should not see this, only Syntax Errors from JSON parsing incomplete objects. Adding this just to capture any strange results.
-            logger.error(
-              `fetchAllDonorsForProgram()`,
-              `Unexpected error parsing data returned by Clinical API. ${err}`,
-            );
-            throw err;
-          }
-        }
-      })
-      .filter(content => content !== undefined);
-    for (const donor of donors) {
-      yield donor;
-      donorCount++;
-      if (donorCount % logFrequency === 0) {
-        logger.debug(`Received clinical data for ${donorCount} donors for program: ${programId}`);
-      }
-    }
-    unprocessedResponse = leftovers;
-  }
+	const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donors');
+	const response = await fetch(requestUrl, {
+		headers: {
+			Authorization: `Bearer ${await getEgoToken()}`,
+		},
+	});
+	// Expected response is json-lines: new line delimited JSON documents that will be streamed in chunks
+	// The next section turns the body response stream into an async iterator
+	let donorCount = 0;
+	let unprocessedResponse = '';
 
-  logger.debug(`fetchAllDonorsForProgram()`, `Retrieved ${donorCount} donors for program: ${programId}`);
-  if (!_.isEmpty(unprocessedResponse)) {
-    logger.warn(`fetchAllDonorsForProgram()`, `Part of the API message was unprocessed! - ${unprocessedResponse}`);
-  }
-  return;
+	const logEvent = (name: string) => (...args: any[]) => {
+		console.log('body event', name, ...args);
+	};
+
+	// Capture all donors in this array
+	const output: ClinicalDonor[] = [];
+
+	for await (const chunk of response.body) {
+		let leftovers = '';
+		unprocessedResponse += chunk;
+		const splitResponse = unprocessedResponse.split('\n');
+		const donors = splitResponse
+			.filter(line => {
+				// occasionally in testing an empty item was found in the split response so lets filter those out.
+				return !_.isEmpty(line);
+			})
+			.map(line => {
+				try {
+					return JSON.parse(line);
+				} catch (err) {
+					if (err instanceof SyntaxError) {
+						// In practice, the response stream can include partial messages, likely because the packet size is smaller than the donors
+						// So we will capture the partial response and combine it with the next message.
+						leftovers += line;
+						return undefined;
+					} else {
+						// Should not see this, only Syntax Errors from JSON parsing incomplete objects. Adding this just to capture any strange results.
+						logger.error(
+							`fetchAllDonorsForProgram()`,
+							`Unexpected error parsing data returned by Clinical API. ${err}`,
+						);
+						throw err;
+					}
+				}
+			})
+			.filter(content => content !== undefined);
+		for (const donor of donors) {
+			// add donor to our output
+			output.push(donor);
+			donorCount++;
+			if (donorCount % logFrequency === 0) {
+				logger.debug(`Received clinical data for ${donorCount} donors for program: ${programId}`);
+			}
+		}
+		unprocessedResponse = leftovers;
+	}
+
+	logger.debug(`fetchAllDonorsForProgram()`, `Retrieved ${donorCount} donors for program: ${programId}`);
+	if (!_.isEmpty(unprocessedResponse)) {
+		logger.warn(`fetchAllDonorsForProgram()`, `Part of the API message was unprocessed! - ${unprocessedResponse}`);
+	}
+	return output;
+}
+
+export async function* streamAllDonorsForProgram(programId: string): AsyncGenerator<ClinicalDonor> {
+	const config = await getAppConfig();
+
+	logger.debug(`fetchAllDonorsForProgram()`, `Begining fetch of all donors for program: ${programId}`);
+
+	const logFrequency = 100;
+
+	const requestUrl = urljoin(config.clinical.url, 'clinical/program', programId, 'donors');
+	const response = await fetch(requestUrl, {
+		headers: {
+			Authorization: `Bearer ${await getEgoToken()}`,
+		},
+	});
+	// Expected response is json-lines: new line delimited JSON documents that will be streamed in chunks
+	// The next section turns the body response stream into an async iterator
+	let donorCount = 0;
+	let unprocessedResponse = '';
+	for await (const chunk of response.body) {
+		let leftovers = '';
+		unprocessedResponse += chunk;
+		const splitResponse = unprocessedResponse.split('\n');
+		const donors = splitResponse
+			.filter(line => {
+				// occasionally in testing an empty item was found in the split response so lets filter those out.
+				return !_.isEmpty(line);
+			})
+			.map(line => {
+				try {
+					return JSON.parse(line);
+				} catch (err) {
+					if (err instanceof SyntaxError) {
+						// In practice, the response stream can include partial messages, likely because the packet size is smaller than the donors
+						// So we will capture the partial response and combine it with the next message.
+						leftovers += line;
+						return undefined;
+					} else {
+						// Should not see this, only Syntax Errors from JSON parsing incomplete objects. Adding this just to capture any strange results.
+						logger.error(
+							`fetchAllDonorsForProgram()`,
+							`Unexpected error parsing data returned by Clinical API. ${err}`,
+						);
+						throw err;
+					}
+				}
+			})
+			.filter(content => content !== undefined);
+		for (const donor of donors) {
+			yield donor;
+			donorCount++;
+			if (donorCount % logFrequency === 0) {
+				logger.debug(`Received clinical data for ${donorCount} donors for program: ${programId}`);
+			}
+		}
+		unprocessedResponse = leftovers;
+	}
+
+	logger.debug(`fetchAllDonorsForProgram()`, `Retrieved ${donorCount} donors for program: ${programId}`);
+	if (!_.isEmpty(unprocessedResponse)) {
+		logger.warn(`fetchAllDonorsForProgram()`, `Part of the API message was unprocessed! - ${unprocessedResponse}`);
+	}
+	return;
 }
