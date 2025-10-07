@@ -497,24 +497,24 @@ export function buildDonorCentricDocument({
 		const analysisId = analysis.analysisId;
 		// const filesRecords = groupedFiles[analysisId] || [];
 		const fileData: FileData[] = analysis.files
-			.map<FileData | undefined>(analysisFile => {
-				const matchingFileRecord = files.find(fileRecord => fileRecord.analysisId === analysisId);
-				if (!matchingFileRecord) {
+			.map<FileData | undefined>(songAnalysisFile => {
+				const matchingDbFileRecord = files.find(fileRecord => fileRecord.objectId === songAnalysisFile.objectId);
+				if (!matchingDbFileRecord) {
 					return undefined;
 				}
 
 				return {
-					file_id: matchingFileRecord.fileId,
-					file_number: matchingFileRecord.fileNumber,
+					file_id: matchingDbFileRecord.fileId,
+					file_number: matchingDbFileRecord.fileNumber,
 
-					analysis_tools: analysisFile.info?.analysis_tools,
-					data_category: analysisFile.info?.data_category,
-					file_access: analysisFile.fileAccess,
-					file_type: analysisFile.fileType,
-					md5sum: analysisFile.fileMd5sum,
-					name: analysisFile.fileName,
-					object_id: analysisFile.objectId,
-					size: analysisFile.fileSize,
+					analysis_tools: songAnalysisFile.info?.analysis_tools,
+					data_category: songAnalysisFile.info?.data_category,
+					file_access: songAnalysisFile.fileAccess,
+					file_type: songAnalysisFile.fileType,
+					md5sum: songAnalysisFile.fileMd5sum,
+					name: songAnalysisFile.fileName,
+					object_id: songAnalysisFile.objectId,
+					size: songAnalysisFile.fileSize,
 				};
 			})
 			.filter(element => !!element);
