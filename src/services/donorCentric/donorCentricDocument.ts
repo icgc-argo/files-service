@@ -503,6 +503,11 @@ export function buildDonorCentricDocument({
 					return undefined;
 				}
 
+				// Only PUBLIC released files
+				if (matchingDbFileRecord.releaseState !== 'PUBLIC') {
+					return undefined;
+				}
+
 				return {
 					file_id: matchingDbFileRecord.fileId,
 					file_number: matchingDbFileRecord.fileNumber,
