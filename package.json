@@ -1,6 +1,6 @@
 {
 	"name": "files-service",
-	"version": "0.31.8",
+	"version": "0.31.9",
 	"description": "",
 	"scripts": {
 		"start": "npm run serve",
