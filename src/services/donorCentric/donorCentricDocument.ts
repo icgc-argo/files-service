@@ -494,8 +494,6 @@ export function buildDonorCentricDocument({
 	// const groupedFiles = _.groupBy(files, 'analysisId');
 
 	const outputAnalyses: DonorCentricDocument['analyses'] = analyses.map(analysis => {
-		const analysisId = analysis.analysisId;
-		// const filesRecords = groupedFiles[analysisId] || [];
 		const fileData: FileData[] = analysis.files
 			.map<FileData | undefined>(songAnalysisFile => {
 				const matchingDbFileRecord = files.find(fileRecord => fileRecord.objectId === songAnalysisFile.objectId);
