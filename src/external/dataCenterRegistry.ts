@@ -41,11 +41,6 @@ function isDataCenter(input: any): input is DataCenter {
 	return isObjectLike(input) && isString(input.centerId) && isString(input.songUrl);
 }
 
-const getPlaceholder = async () => ({
-	centerId: 'collab',
-	songUrl: (await getAppConfig()).datacenter.url,
-});
-
 // Cache results of fetching donor data from clinical service. Keep cached results for 5 minutes.
 const DATACENTER_FETCH_CACHE = AsyncCache((inputs: { dataCenterId: string }) => fetchDataCenter(inputs.dataCenterId), {
 	expiryTime: 5 * 60 * 1000,

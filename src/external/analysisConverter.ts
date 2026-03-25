@@ -48,26 +48,26 @@ const logger = Logger('AnalysisConverter');
 const CONVERTER_CONCURRENT_REQUESTS = 5;
 
 const addMetricsToAlignedReadsFile = async (
-  fileDocument: RdpcFileDocument,
-  objectId: string,
+	fileDocument: RdpcFileDocument,
+	objectId: string,
 ): Promise<RdpcFileDocument> => {
-  const runId = fileDocument.analysis.workflow?.run_id;
-  if (runId) {
-    const metrics = await getAlignmentMetrics(runId);
+	const runId = fileDocument.analysis.workflow?.run_id;
+	if (runId) {
+		const metrics = await getAlignmentMetrics(runId);
 
-    const fileWithMetrics = { ...fileDocument, metrics };
-    return fileWithMetrics;
-  } else {
-    return fileDocument;
-  }
+		const fileWithMetrics = { ...fileDocument, metrics };
+		return fileWithMetrics;
+	} else {
+		return fileDocument;
+	}
 };
 
 export type RdpcFileDocument = { [k: string]: any } & {
-  objectId: string;
-  studyId: string;
-  dataType?: string;
-  repositories: { [k: string]: string }[];
-  analysis: { [k: string]: any; analysisState: string };
+	objectId: string;
+	studyId: string;
+	dataType?: string;
+	repositories: { [k: string]: string }[];
+	analysis: { [k: string]: any; analysisState: string };
 };
 
 /**
@@ -77,59 +77,57 @@ export type RdpcFileDocument = { [k: string]: any } & {
  * @returns
  */
 export async function convertAnalysesToFileDocuments(
-  analyses: SongAnalysis[],
-  repoCode: string,
+	analyses: SongAnalysis[],
+	repoCode: string,
 ): Promise<RdpcFileDocument[]> {
-  const output: RdpcFileDocument[] = [];
+	const output: RdpcFileDocument[] = [];
 
-  // Can't send hundreds of analyses in a single request, so this is simplified to 1 at a time to gaurantee success.
-  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
-    .for(analyses)
-    .process(async analysis => {
-      const files = await fetchAnalysisToFileConversion(analysis, repoCode);
-      output.push(...files);
-    });
-  return output;
+	// Can't send hundreds of analyses in a single request, so this is simplified to 1 at a time to gaurantee success.
+	await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+		.for(analyses)
+		.process(async analysis => {
+			const files = await fetchAnalysisToFileConversion(analysis, repoCode);
+			output.push(...files);
+		});
+	return output;
 }
 
 async function fetchAnalysisToFileConversion(analysis: SongAnalysis, repoCode: string): Promise<RdpcFileDocument[]> {
-  const config = await getAppConfig();
-  const url = config.analysisConverterUrl;
-  const timeout = config.analysisConverterTimeout;
+	const config = await getAppConfig();
+	const url = config.analysisConverterUrl;
+	const timeout = config.analysisConverterTimeout;
 
-  const result = await fetch(url, {
-    body: JSON.stringify({ analyses: [analysis], repoCode }),
-    method: 'POST',
-    timeout: timeout,
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (result.status != 201) {
-    logger.error(`Error response from converter: ${await result.text()}`);
-    throw new Error(`Failed to convert analysis ${analysis.analysisId} to files, got response ${result.status}`);
-  }
+	const result = await fetch(url, {
+		body: JSON.stringify({ analyses: [analysis], repoCode }),
+		method: 'POST',
+		timeout: timeout,
+		headers: { 'Content-Type': 'application/json' },
+	});
+	if (result.status != 201) {
+		logger.error(`Error response from converter: ${await result.text()}`);
+		throw new Error(`Failed to convert analysis ${analysis.analysisId} to files, got response ${result.status}`);
+	}
 
-  const response: {
-    [k: string]: RdpcFileDocument[];
-  } = await result.json();
-  // Convert the Analysis response (Map of FileCentricDocuments)
-  const files: RdpcFileDocument[] = [];
+	const response: Record<string, RdpcFileDocument[]> = await result.json();
+	// Convert the Analysis response (Map of FileCentricDocuments)
+	const files: RdpcFileDocument[] = [];
 
-  // get the file docs arrays from maestro response
-  await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
-    .for(Object.keys(response))
-    .process(async (objectId: string) => {
-      const responseFile = response[objectId][0];
-      if (
-        responseFile?.dataType === 'Aligned Reads' &&
-        responseFile.analysis.analysisState === 'PUBLISHED' &&
-        responseFile.analysis.workflow?.workflow_name === 'DNA Seq Alignment'
-      ) {
-        const fileWithMetrics = await addMetricsToAlignedReadsFile(responseFile, objectId);
-        files.push(fileWithMetrics);
-      } else {
-        files.push(...response[objectId]);
-      }
-    });
+	// get the file docs arrays from maestro response
+	await PromisePool.withConcurrency(CONVERTER_CONCURRENT_REQUESTS)
+		.for(Object.keys(response))
+		.process(async (objectId: string) => {
+			const responseFile = response[objectId][0];
+			if (
+				responseFile?.dataType === 'Aligned Reads' &&
+				responseFile.analysis.analysisState === 'PUBLISHED' &&
+				responseFile.analysis.workflow?.workflow_name === 'DNA Seq Alignment'
+			) {
+				const fileWithMetrics = await addMetricsToAlignedReadsFile(responseFile, objectId);
+				files.push(fileWithMetrics);
+			} else {
+				files.push(...response[objectId]);
+			}
+		});
 
-  return files;
+	return files;
 }

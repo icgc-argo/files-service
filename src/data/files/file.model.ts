@@ -20,6 +20,7 @@
 import mongoose, { PaginateModel } from 'mongoose';
 import { File } from 'winston/lib/winston/transports';
 import { FILE_PAGE_SIZE_LIMIT } from '../../config';
+import { fileIdToNumber } from '../../utils/fileId';
 
 // Main reason for using this pagination plugin
 // is that it provides flexibility on pagination options such as
@@ -31,11 +32,11 @@ import { isEmpty } from 'lodash';
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
 export enum EmbargoStage {
-  UNRELEASED = 'UNRELEASED',
-  PROGRAM_ONLY = 'PROGRAM_ONLY',
-  MEMBER_ACCESS = 'MEMBER_ACCESS',
-  ASSOCIATE_ACCESS = 'ASSOCIATE_ACCESS',
-  PUBLIC = 'PUBLIC',
+	UNRELEASED = 'UNRELEASED',
+	PROGRAM_ONLY = 'PROGRAM_ONLY',
+	MEMBER_ACCESS = 'MEMBER_ACCESS',
+	ASSOCIATE_ACCESS = 'ASSOCIATE_ACCESS',
+	PUBLIC = 'PUBLIC',
 }
 
 /**
@@ -46,189 +47,189 @@ export enum EmbargoStage {
  * - ADMIN: DCC Admin has made the decision to make this file publicly available without requiring clinical data.
  */
 export enum ClinicalExemption {
-  LEGACY = 'LEGACY',
-  EARLY_RELEASE = 'EARLY_RELEASE',
-  ADMIN = 'ADMIN',
+	LEGACY = 'LEGACY',
+	EARLY_RELEASE = 'EARLY_RELEASE',
+	ADMIN = 'ADMIN',
 }
 
 export enum FileReleaseState {
-  UNRELEASED = 'UNRELEASED',
-  RESTRICTED = 'RESTRICTED',
-  QUEUED_TO_PUBLIC = 'QUEUED',
-  PUBLIC = 'PUBLIC',
-  QUEUED_TO_RESTRICT = 'QUEUED_TO_RESTRICT',
+	UNRELEASED = 'UNRELEASED',
+	RESTRICTED = 'RESTRICTED',
+	QUEUED_TO_PUBLIC = 'QUEUED',
+	PUBLIC = 'PUBLIC',
+	QUEUED_TO_RESTRICT = 'QUEUED_TO_RESTRICT',
 }
 
 export type FileLabel = {
-  key: string;
-  value: string[];
+	key: string;
+	value: string[];
 };
 
 const LabelSchema = new mongoose.Schema(
-  {
-    key: { type: String, required: true },
-    value: { type: [String], required: false },
-  },
-  {
-    _id: false,
-  },
+	{
+		key: { type: String, required: true },
+		value: { type: [String], required: false },
+	},
+	{
+		_id: false,
+	},
 );
 
 // DbFile has the types we get back out of the DB (before casting strings to enums)
 interface DbFile {
-  objectId: string;
-  fileId: number;
-  repoId: string;
-  status: string;
+	objectId: string;
+	fileId: number;
+	repoId: string;
+	status: string;
 
-  programId: string;
-  donorId: string;
-  analysisId: string;
-  firstPublished?: Date;
+	programId: string;
+	donorId: string;
+	analysisId: string;
+	firstPublished?: Date;
 
-  hasClinicalData?: boolean;
+	hasClinicalData?: boolean;
 
-  embargoStart?: Date;
-  embargoStage: string;
-  releaseState: string;
+	embargoStart?: Date;
+	embargoStage: string;
+	releaseState: string;
 
-  adminHold?: boolean;
-  adminPromote?: string;
-  adminDemote?: string;
+	adminHold?: boolean;
+	adminPromote?: string;
+	adminDemote?: string;
 
-  clinicalExemption?: string;
+	clinicalExemption?: string;
 
-  labels: FileLabel[];
+	labels: FileLabel[];
 }
 
 // File is the POJO with proper types for a document read from the DB
 export interface File {
-  fileId: string;
-  fileNumber: number;
-  objectId: string;
-  repoId: string;
-  status: string;
+	fileId: string;
+	fileNumber: number;
+	objectId: string;
+	repoId: string;
+	status: string;
 
-  programId: string;
-  donorId: string;
-  analysisId: string;
-  firstPublished?: Date;
+	programId: string;
+	donorId: string;
+	analysisId: string;
+	firstPublished?: Date;
 
-  hasClinicalData?: boolean;
+	hasClinicalData?: boolean;
 
-  embargoStart?: Date;
-  embargoStage: EmbargoStage;
-  releaseState: FileReleaseState;
+	embargoStart?: Date;
+	embargoStage: EmbargoStage;
+	releaseState: FileReleaseState;
 
-  adminHold?: boolean;
-  adminPromote?: EmbargoStage;
-  adminDemote?: EmbargoStage;
+	adminHold?: boolean;
+	adminPromote?: EmbargoStage;
+	adminDemote?: EmbargoStage;
 
-  clinicalExemption?: ClinicalExemption;
+	clinicalExemption?: ClinicalExemption;
 
-  labels: FileLabel[];
+	labels: FileLabel[];
 }
 
 // FileInput matches the File object, but with optional fields where
 //  values may not want to be provided when doing an update or creating
 //  a new File and plannign to use the default values
 export interface FileInput {
-  fileId?: string;
-  objectId: string;
-  repoId: string;
-  status: string;
+	fileId?: string;
+	objectId: string;
+	repoId: string;
+	status: string;
 
-  programId: string;
-  donorId: string;
-  analysisId: string;
-  firstPublished?: Date;
+	programId: string;
+	donorId: string;
+	analysisId: string;
+	firstPublished?: Date;
 
-  hasClinicalData?: boolean;
+	hasClinicalData?: boolean;
 
-  embargoStart?: Date;
-  embargoStage?: EmbargoStage;
-  releaseState?: FileReleaseState;
+	embargoStart?: Date;
+	embargoStage?: EmbargoStage;
+	releaseState?: FileReleaseState;
 
-  adminHold?: boolean;
-  adminPromote?: EmbargoStage;
-  adminDemote?: EmbargoStage;
+	adminHold?: boolean;
+	adminPromote?: EmbargoStage;
+	adminDemote?: EmbargoStage;
 
-  labels: FileLabel[];
+	labels: FileLabel[];
 }
 
 const FileSchema = new mongoose.Schema(
-  {
-    fileId: { type: Number, index: true, unique: true },
-    objectId: { type: String, required: true, unique: true },
-    repoId: { type: String, required: true },
-    status: { type: String, required: true },
+	{
+		fileId: { type: Number, index: true, unique: true },
+		objectId: { type: String, required: true, unique: true },
+		repoId: { type: String, required: true },
+		status: { type: String, required: true },
 
-    programId: { type: String, required: true },
-    donorId: { type: String, required: true },
-    analysisId: { type: String, required: true },
-    firstPublished: { type: Date, required: true },
+		programId: { type: String, required: true },
+		donorId: { type: String, required: true },
+		analysisId: { type: String, required: true },
+		firstPublished: { type: Date, required: true },
 
-    hasClinicalData: { type: Boolean, required: false },
+		hasClinicalData: { type: Boolean, required: false },
 
-    embargoStart: { type: Date, required: false },
-    embargoStage: {
-      type: String,
-      required: true,
-      enum: Object.values(EmbargoStage),
-      default: EmbargoStage.UNRELEASED,
-    },
-    releaseState: {
-      type: String,
-      required: true,
-      enum: Object.values(FileReleaseState),
-      default: FileReleaseState.UNRELEASED,
-    },
+		embargoStart: { type: Date, required: false },
+		embargoStage: {
+			type: String,
+			required: true,
+			enum: Object.values(EmbargoStage),
+			default: EmbargoStage.UNRELEASED,
+		},
+		releaseState: {
+			type: String,
+			required: true,
+			enum: Object.values(FileReleaseState),
+			default: FileReleaseState.UNRELEASED,
+		},
 
-    adminPromote: {
-      type: String,
-      required: false,
-      enum: Object.values(EmbargoStage),
-    },
-    adminDemote: {
-      type: String,
-      required: false,
-      enum: Object.values(EmbargoStage),
-    },
-    adminHold: { type: Boolean, required: false },
+		adminPromote: {
+			type: String,
+			required: false,
+			enum: Object.values(EmbargoStage),
+		},
+		adminDemote: {
+			type: String,
+			required: false,
+			enum: Object.values(EmbargoStage),
+		},
+		adminHold: { type: Boolean, required: false },
 
-    clinicalExemption: { type: String, required: false, enum: Object.values(ClinicalExemption) },
+		clinicalExemption: { type: String, required: false, enum: Object.values(ClinicalExemption) },
 
-    labels: [LabelSchema],
-  },
-  { timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
+		labels: [LabelSchema],
+	},
+	{ timestamps: true, minimize: false, optimisticConcurrency: true } as any, // optimistic concurrency is not defined in the types yet
 );
 
 export type PaginationFilter = {
-  page?: number;
-  limit?: number;
+	page?: number;
+	limit?: number;
 };
 
 /**
  * As described in swagger schema: #/components/schemas/FileFilter
  */
 export interface FileFilterProperties {
-  analyses?: string[];
-  donors?: string[];
-  programs?: string[];
-  objectIds?: string[];
-  fileIds?: string[];
+	analyses?: string[];
+	donors?: string[];
+	programs?: string[];
+	objectIds?: string[];
+	fileIds?: string[];
 }
 export interface FileFilter {
-  include?: FileFilterProperties;
-  exclude?: FileFilterProperties;
+	include?: FileFilterProperties;
+	exclude?: FileFilterProperties;
 }
 export interface FileStateFilter {
-  embargoStage?: EmbargoStage;
-  releaseState?: FileReleaseState;
+	embargoStage?: EmbargoStage;
+	releaseState?: FileReleaseState;
 }
 
 FileSchema.plugin(AutoIncrement, {
-  inc_field: 'fileId',
+	inc_field: 'fileId',
 });
 
 FileSchema.plugin(mongoosePaginate);
@@ -239,145 +240,142 @@ export type FileMongooseDocument = mongoose.Document & DbFile;
 const FileModel = mongoose.model<FileMongooseDocument>('File', FileSchema) as PaginateModel<FileMongooseDocument>;
 
 export async function countFiles(filters: FileFilter): Promise<number> {
-  return await FileModel.count(convertFiltersForMongoose(filters)).exec();
+	return await FileModel.count(convertFiltersForMongoose(filters)).exec();
 }
 
 export async function getFiles(filters: FileFilter): Promise<FileMongooseDocument[]> {
-  return await FileModel.find(convertFiltersForMongoose(filters)).exec();
+	return await FileModel.find(convertFiltersForMongoose(filters)).exec();
 }
 
 export async function getFilesQuery(
-  paginationFilters: PaginationFilter,
-  filters: FileFilterProperties,
+	paginationFilters: PaginationFilter,
+	filters: FileFilterProperties,
 ): Promise<mongoose.PaginateResult<FileMongooseDocument>> {
-  const paginateOptions = {
-    page: paginationFilters.page ? paginationFilters.page : 1,
-    limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
-    sort: { fileId: 'asc' },
-  };
+	const paginateOptions = {
+		page: paginationFilters.page ? paginationFilters.page : 1,
+		limit: paginationFilters.limit ? paginationFilters.limit : FILE_PAGE_SIZE_LIMIT,
+		sort: { fileId: 'asc' },
+	};
 
-  return await FileModel.paginate(buildQueryFilters(filters), paginateOptions);
+	return await FileModel.paginate(buildQueryFilters(filters), paginateOptions);
 }
 
 export async function getFileById(id: number) {
-  return await FileModel.findOne({ fileId: id });
+	return await FileModel.findOne({ fileId: id });
 }
 
 export async function getFileByObjId(objId: string) {
-  return await FileModel.findOne({
-    objectId: objId,
-  });
+	return await FileModel.findOne({
+		objectId: objId,
+	});
 }
 
 export async function getFilesByState(filter: FileStateFilter): Promise<FileMongooseDocument[]> {
-  return await FileModel.find(filter).exec();
+	return await FileModel.find(filter).exec();
 }
 
 export function getFilesIterator(filter: FileFilter): AsyncGenerator<FileMongooseDocument> {
-  return FileModel.find(convertFiltersForMongoose(filter));
+	return FileModel.find(convertFiltersForMongoose(filter));
 }
 
 export async function getPrograms(filter: FileFilter): Promise<string[]> {
-  return await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec();
+	return await FileModel.distinct('programId', convertFiltersForMongoose(filter)).exec();
 }
 
 export async function create(file: FileInput) {
-  const newFile = new FileModel(file);
-  return await newFile.save();
+	const newFile = new FileModel(file);
+	return await newFile.save();
 }
 
 export async function save(toUpdate: FileMongooseDocument) {
-  const updatedFile = await toUpdate.save();
-  return updatedFile;
+	const updatedFile = await toUpdate.save();
+	return updatedFile;
 }
 
 export async function updateByObjectId(
-  objectId: string,
-  updates: mongoose.UpdateQuery<FileMongooseDocument>,
-  options: any,
+	objectId: string,
+	updates: mongoose.UpdateQuery<FileMongooseDocument>,
+	options: any,
 ) {
-  return await FileModel.findOneAndUpdate({ objectId }, updates, {
-    ...options,
-    useFindAndModify: false,
-  });
+	return await FileModel.findOneAndUpdate({ objectId }, updates, {
+		...options,
+		useFindAndModify: false,
+	});
 }
 
 export async function updateBulk(
-  filter: FileFilter,
-  updates: mongoose.UpdateQuery<FileMongooseDocument>,
-  options?: { returnDocuments: boolean },
+	filter: FileFilter,
+	updates: mongoose.UpdateQuery<FileMongooseDocument>,
+	options?: { returnDocuments: boolean },
 ) {
-  const mongooseFilter = convertFiltersForMongoose(filter);
-  await FileModel.updateMany(mongooseFilter, updates);
-  if (options?.returnDocuments) {
-    return FileModel.find(mongooseFilter);
-  }
+	const mongooseFilter = convertFiltersForMongoose(filter);
+	await FileModel.updateMany(mongooseFilter, updates);
+	if (options?.returnDocuments) {
+		return FileModel.find(mongooseFilter);
+	}
 }
 
 export async function deleteAll(ids: number[]) {
-  if (!ids || ids.length == 0) {
-    await FileModel.deleteMany({});
-    return;
-  }
+	if (!ids || ids.length == 0) {
+		await FileModel.deleteMany({});
+		return;
+	}
 
-  await FileModel.deleteMany({
-    fileId: {
-      $in: ids,
-    },
-  });
+	await FileModel.deleteMany({
+		fileId: {
+			$in: ids,
+		},
+	});
 }
 
 function buildQueryFilters(filters: FileFilterProperties, include: boolean = true) {
-  const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];
-  const filterOperation = include ? '$in' : '$nin';
-  if (filters.analyses && filters.analyses.length > 0) {
-    conditions.push({
-      analysisId: {
-        [filterOperation]: filters.analyses,
-      },
-    });
-  }
-  if (filters.programs && filters.programs.length > 0) {
-    conditions.push({
-      programId: {
-        [filterOperation]: filters.programs,
-      },
-    });
-  }
-  if (filters.objectIds && filters.objectIds.length > 0) {
-    conditions.push({
-      objectId: {
-        [filterOperation]: filters.objectIds,
-      },
-    });
-  }
-  if (filters.donors && filters.donors.length > 0) {
-    conditions.push({
-      donorId: {
-        [filterOperation]: filters.donors,
-      },
-    });
-  }
-  if (filters.fileIds && filters.fileIds.length > 0) {
-    conditions.push({
-      fileId: {
-        [filterOperation]: filters.fileIds.map(fileIdFromString),
-      },
-    });
-  }
-  return conditions.length > 0 ? { $and: conditions } : {};
+	const conditions: mongoose.MongooseFilterQuery<FileMongooseDocument>[] = [];
+	const filterOperation = include ? '$in' : '$nin';
+	if (filters.analyses && filters.analyses.length > 0) {
+		conditions.push({
+			analysisId: {
+				[filterOperation]: filters.analyses,
+			},
+		});
+	}
+	if (filters.programs && filters.programs.length > 0) {
+		conditions.push({
+			programId: {
+				[filterOperation]: filters.programs,
+			},
+		});
+	}
+	if (filters.objectIds && filters.objectIds.length > 0) {
+		conditions.push({
+			objectId: {
+				[filterOperation]: filters.objectIds,
+			},
+		});
+	}
+	if (filters.donors && filters.donors.length > 0) {
+		conditions.push({
+			donorId: {
+				[filterOperation]: filters.donors,
+			},
+		});
+	}
+	if (filters.fileIds && filters.fileIds.length > 0) {
+		conditions.push({
+			fileId: {
+				[filterOperation]: filters.fileIds.map(fileIdToNumber),
+			},
+		});
+	}
+	return conditions.length > 0 ? { $and: conditions } : {};
 }
-const fileIdFromString = (fileId: string): number => {
-  return parseInt(fileId.replace(/^FL/, ''));
-};
 
 function convertFiltersForMongoose(filters: FileFilter) {
-  const includeConditions = filters.include ? buildQueryFilters(filters.include) : {};
-  const excludeConditions = filters.exclude ? buildQueryFilters(filters.exclude, false) : {};
-  const combinedConditions = [includeConditions, excludeConditions].filter(x => !isEmpty(x));
-  const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(combinedConditions)
-    ? {}
-    : { $and: combinedConditions };
+	const includeConditions = filters.include ? buildQueryFilters(filters.include) : {};
+	const excludeConditions = filters.exclude ? buildQueryFilters(filters.exclude, false) : {};
+	const combinedConditions = [includeConditions, excludeConditions].filter(x => !isEmpty(x));
+	const queryFilters: mongoose.MongooseFilterQuery<FileMongooseDocument> = isEmpty(combinedConditions)
+		? {}
+		: { $and: combinedConditions };
 
-  return queryFilters;
+	return queryFilters;
 }

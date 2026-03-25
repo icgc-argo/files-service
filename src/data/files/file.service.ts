@@ -18,6 +18,8 @@
  */
 
 import Logger from '../../logger';
+import { Errors } from '../../utils/errors';
+import { fileIdToNumber, fileIdToString } from '../../utils/fileId';
 import * as fileModel from './file.model';
 import {
 	EmbargoStage,
@@ -83,7 +85,7 @@ export async function getFiles(filter: FileFilter): Promise<File[]> {
 	return (await fileModel.getFiles(filter)).map(toPojo);
 }
 export async function getFileById(fileId: string): Promise<File> {
-	const file = await getFileAsDoc(toNumericId(fileId));
+	const file = await getFileAsDoc(fileIdToNumber(fileId));
 	return toPojo(file);
 }
 export async function getFilesByAnalysisId(analysisId: string): Promise<File[]> {
@@ -194,14 +196,14 @@ export async function adminDemote(
 }
 
 export async function deleteByIds(ids: string[]): Promise<void> {
-	await fileModel.deleteAll(ids.map(toNumericId));
+	await fileModel.deleteAll(ids.map(fileIdToNumber));
 }
 
 /**
  * LABEL MANAGEMENT
  */
 export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[]) {
-	const file = await getFileAsDoc(toNumericId(fileId));
+	const file = await getFileAsDoc(fileIdToNumber(fileId));
 	validateLabels(newLabels);
 	newLabels.forEach(label => {
 		const newLabelKey = normalizeLabel(label.key);
@@ -221,21 +223,10 @@ export async function addOrUpdateFileLabel(fileId: string, newLabels: FileLabel[
 }
 
 export async function removeLabel(fileId: string, keys: string[]): Promise<File> {
-	const file = await getFileAsDoc(toNumericId(fileId));
+	const file = await getFileAsDoc(fileIdToNumber(fileId));
 	file.labels = file.labels.filter(l => !keys.includes(l.key));
 	const updated = await fileModel.save(file);
 	return toPojo(updated);
-}
-
-function toNumericId(id: string) {
-	if (!id.startsWith('FL')) {
-		throw new Errors.InvalidArgument('File ID should start with FL, example: FL1234');
-	}
-	const numId = Number(id.substr(2, id.length - 2));
-	if (!numId || numId == Number.NaN) {
-		throw new Errors.InvalidArgument(`ID ${id} is not a valid`);
-	}
-	return numId;
 }
 
 async function getFileAsDoc(id: number): Promise<fileModel.FileMongooseDocument> {
@@ -251,7 +242,7 @@ function toPojo(f: FileMongooseDocument): File {
 		throw new Error('cannot convert undefined');
 	}
 	return {
-		fileId: `FL${f.fileId}`,
+		fileId: fileIdToString(f.fileId),
 		fileNumber: f.fileId,
 		objectId: f.objectId,
 		repoId: f.repoId,
@@ -303,23 +294,3 @@ const validateLabels = (labels: FileLabel[]) => {
 const normalizeLabel = (key: string) => {
 	return key.toLowerCase().trim();
 };
-
-export namespace Errors {
-	export class InvalidArgument extends Error {
-		constructor(message: string) {
-			super(message);
-		}
-	}
-
-	export class NotFound extends Error {
-		constructor(msg: string) {
-			super(msg);
-		}
-	}
-
-	export class StateConflict extends Error {
-		constructor(msg: string) {
-			super(msg);
-		}
-	}
-}

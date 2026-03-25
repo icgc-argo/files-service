@@ -35,66 +35,64 @@ let server: Server;
 
 // bootstraping the app and setting up connections to: db, kafka, experss server
 (async () => {
-  const appConfig = await getAppConfig();
+	const appConfig = await getAppConfig();
 
-  if (process.env.LOG_QUERIES === 'true') {
-    mongoose.set('debug', true);
-  }
-  /**
-   * Migrate mongo config requires exact undefined to be able to connect to db without user/password (dev/qa) env
-   * if the value is undefined or empty string we have to avoid setting it in the env because process.env will force string "undefined"
-   */
-  const mongoProps = appConfig.mongoProperties;
-  if (mongoProps.dbUsername && mongoProps.dbPassword) {
-    process.env.DB_USERNAME = mongoProps.dbUsername;
-    process.env.DB_PASSWORD = mongoProps.dbPassword;
-  }
+	if (process.env.LOG_QUERIES === 'true') {
+		mongoose.set('debug', true);
+	}
+	/**
+	 * Migrate mongo config requires exact undefined to be able to connect to db without user/password (dev/qa) env
+	 * if the value is undefined or empty string we have to avoid setting it in the env because process.env will force string "undefined"
+	 */
+	const mongoProps = appConfig.mongoProperties;
+	if (mongoProps.dbUsername && mongoProps.dbPassword) {
+		process.env.DB_USERNAME = mongoProps.dbUsername;
+		process.env.DB_PASSWORD = mongoProps.dbPassword;
+	}
 
-  let connection: any;
-  try {
-    connection = await database.connect();
-    const migrated = await up(connection.db);
-    migrated.forEach((fileName: string) => mongoLog.info('Migrated:', fileName));
-  } catch (err) {
-    mongoLog.error('failed to do migration', err);
-    process.exit(-10);
-  }
+	let connection: any;
+	try {
+		connection = await database.connect();
+		const migrated = await up(connection.db);
+		mongoLog.info(`Database connection successful.`);
+		migrated.forEach((fileName: string) => mongoLog.info('Migrated:', fileName));
+	} catch (err) {
+		mongoLog.error('failed to do migration', err);
+		process.exit(-10);
+	}
 
-  await dbConnection.connectDb(appConfig);
+	await dbConnection.connectDb(appConfig);
 
-  /**
-   * Connect to other external dependencies - failed connections will prevent server startup
-   *  - elasticsearch
-   *  - kafka
-   *  - ego
-   */
+	/**
+	 * Connect to other external dependencies - failed connections will prevent server startup
+	 *  - elasticsearch
+	 *  - kafka
+	 *  - ego
+	 */
 
-  // Init ES client
-  await getClient();
+	// Init ES client
+	await getClient();
 
-  if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
-    await kafka.setup(appConfig);
-  }
+	if (appConfig.kafkaProperties.kafkaMessagingEnabled) {
+		await kafka.setup(appConfig);
+	}
 
-  // Init Ego Connection
-  appConfig.auth.enabled && (await getEgoToken());
+	// Init Ego Connection
+	appConfig.auth.enabled && (await getEgoToken());
 
-  /**
-   * Start Express server.
-   */
-  const app = App(appConfig);
-  server = app.listen(app.get('port'), () => {
-    serverLog.info(
-      `Server started in ${app.get('env')} mode`,
-      `Listening to port ${app.get('port')}`,
-    );
-    if (!appConfig.auth.enabled) {
-      serverLog.warn(`Application running with AUTH DISABLED!`);
-    }
-    // serverLog.warn
-    serverLog.debug(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
-    serverLog.debug('Press CTRL-C to stop');
-  });
+	/**
+	 * Start Express server.
+	 */
+	const app = App(appConfig);
+	server = app.listen(app.get('port'), () => {
+		serverLog.info(`Server started in ${app.get('env')} mode`, `Listening to port ${app.get('port')}`);
+		if (!appConfig.auth.enabled) {
+			serverLog.warn(`Application running with AUTH DISABLED!`);
+		}
+		// serverLog.warn
+		serverLog.debug(`Access Swagger Docs at http://localhost:${app.get('port')}/api-docs`);
+		serverLog.debug('Press CTRL-C to stop');
+	});
 })();
 
 // terminate kafka connections before exiting
@@ -103,27 +101,27 @@ const errorTypes = ['unhandledRejection', 'uncaughtException'];
 const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 
 errorTypes.map(type => {
-  process.on(type as any, async (e: Error) => {
-    try {
-      serverLog.info(`process.on ${type}`);
-      serverLog.error(e.message);
-      console.log(e); // Get full error output
-      await mongoose.disconnect();
-      await kafka.disconnect();
-      process.exit(0);
-    } catch (_) {
-      process.exit(1);
-    }
-  });
+	process.on(type as any, async (e: Error) => {
+		try {
+			serverLog.info(`process.on ${type}`);
+			serverLog.error(e.message);
+			console.log(e); // Get full error output
+			await mongoose.disconnect();
+			await kafka.disconnect();
+			process.exit(0);
+		} catch (_) {
+			process.exit(1);
+		}
+	});
 });
 
 signalTraps.map(type => {
-  process.once(type as any, async () => {
-    try {
-      await mongoose.disconnect();
-      await kafka.disconnect();
-    } finally {
-      process.kill(process.pid, type);
-    }
-  });
+	process.once(type as any, async () => {
+		try {
+			await mongoose.disconnect();
+			await kafka.disconnect();
+		} finally {
+			process.kill(process.pid, type);
+		}
+	});
 });

@@ -429,7 +429,7 @@ export const getFileCentricIndexer = async () => {
 	}
 
 	async function deleteIndices(indices: string[]): Promise<void> {
-		if (!indices || !indices.length) {
+		if (!indices.length) {
 			return;
 		}
 		await client.indices.delete({ index: indices });
